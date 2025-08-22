@@ -13,6 +13,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const successMessage = document.getElementById('successMessage');
   const errorMessage = document.getElementById('errorMessage');
   
+  // Property history elements
+  const propertyHistorySection = document.getElementById('propertyHistorySection');
+  const propertyHistoryList = document.getElementById('propertyHistoryList');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  const exportHistoryBtn = document.getElementById('exportHistoryBtn');
+  
   let currentTab = null;
   let contentScriptReady = false;
   
@@ -34,6 +40,132 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
       errorMessage.style.display = 'none';
     }, 5000);
+  }
+  
+  // Property history management functions
+  async function savePropertyToHistory(url) {
+    try {
+      const result = await chrome.storage.local.get(['propertyHistory']);
+      const history = result.propertyHistory || [];
+      
+      // Check if property already exists
+      const existingIndex = history.findIndex(item => item.url === url);
+      if (existingIndex !== -1) {
+        // Update existing entry with new timestamp
+        history[existingIndex].timestamp = Date.now();
+        history[existingIndex].date = new Date().toLocaleDateString();
+      } else {
+        // Add new entry
+        const newEntry = {
+          url: url,
+          timestamp: Date.now(),
+          date: new Date().toLocaleDateString(),
+          domain: new URL(url).hostname
+        };
+        history.unshift(newEntry); // Add to beginning
+      }
+      
+      // Keep only the last 50 entries
+      if (history.length > 50) {
+        history.splice(50);
+      }
+      
+      await chrome.storage.local.set({ propertyHistory: history });
+      await loadPropertyHistory();
+    } catch (error) {
+      console.error('Failed to save property to history:', error);
+    }
+  }
+  
+  async function loadPropertyHistory() {
+    try {
+      const result = await chrome.storage.local.get(['propertyHistory']);
+      const history = result.propertyHistory || [];
+      
+      displayPropertyHistory(history);
+    } catch (error) {
+      console.error('Failed to load property history:', error);
+    }
+  }
+  
+  function displayPropertyHistory(history) {
+    if (!propertyHistoryList) return;
+    
+    if (history.length === 0) {
+      propertyHistoryList.innerHTML = '<div class="empty-history">No properties analyzed yet.</div>';
+      return;
+    }
+    
+    const historyHTML = history.map((item, index) => `
+      <div class="history-item">
+        <button class="history-item-remove" data-index="${index}" title="Remove">×</button>
+        <a href="${item.url}" target="_blank" class="history-item-url">${item.domain}</a>
+        <div class="history-item-date">${item.date}</div>
+      </div>
+    `).join('');
+    
+    propertyHistoryList.innerHTML = historyHTML;
+    
+    // Add event listeners for remove buttons
+    propertyHistoryList.querySelectorAll('.history-item-remove').forEach(button => {
+      button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const index = parseInt(button.dataset.index);
+        await removePropertyFromHistory(index);
+      });
+    });
+  }
+  
+  async function removePropertyFromHistory(index) {
+    try {
+      const result = await chrome.storage.local.get(['propertyHistory']);
+      const history = result.propertyHistory || [];
+      
+      history.splice(index, 1);
+      
+      await chrome.storage.local.set({ propertyHistory: history });
+      await loadPropertyHistory();
+    } catch (error) {
+      console.error('Failed to remove property from history:', error);
+    }
+  }
+  
+  async function clearPropertyHistory() {
+    try {
+      await chrome.storage.local.set({ propertyHistory: [] });
+      await loadPropertyHistory();
+      showSuccess('Property history cleared!');
+    } catch (error) {
+      console.error('Failed to clear property history:', error);
+      showError('Failed to clear history');
+    }
+  }
+  
+  function exportPropertyHistory() {
+    chrome.storage.local.get(['propertyHistory'], (result) => {
+      const history = result.propertyHistory || [];
+      
+      if (history.length === 0) {
+        showError('No properties to export');
+        return;
+      }
+      
+      const csvContent = 'URL,Domain,Date\n' + 
+        history.map(item => `"${item.url}","${item.domain}","${item.date}"`).join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `property-history-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showSuccess('Property history exported!');
+    });
   }
   
   // Helper function to validate property link
@@ -143,6 +275,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   
+  // Property history button event listeners
+  clearHistoryBtn.addEventListener('click', async function() {
+    if (confirm('Are you sure you want to clear all property history?')) {
+      await clearPropertyHistory();
+    }
+  });
+  
+  exportHistoryBtn.addEventListener('click', function() {
+    exportPropertyHistory();
+  });
+  
   // Paste button functionality
   pasteBtn.addEventListener('click', async function() {
     try {
@@ -186,6 +329,8 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       if (response && response.success) {
+        // Save property to history
+        await savePropertyToHistory(link);
         showSuccess('Property link sent to ChatGPT for analysis!');
         propertyLinkInput.value = ''; // Clear the input
       } else {
@@ -242,6 +387,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show property link section
             propertyLinkSection.style.display = 'block';
             
+            // Show and load property history section
+            propertyHistorySection.style.display = 'block';
+            await loadPropertyHistory();
+            
           } else {
             throw new Error('Content script not responding properly');
           }
@@ -260,6 +409,10 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Show property link section
           propertyLinkSection.style.display = 'block';
+          
+          // Show and load property history section
+          propertyHistorySection.style.display = 'block';
+          await loadPropertyHistory();
           
           // Try to inject content script
           try {
