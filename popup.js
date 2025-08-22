@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Check if property already exists
       const existingIndex = history.findIndex(item => item.url === url);
       if (existingIndex !== -1) {
-        // Update existing entry with new timestamp
+        // Update existing entry with new timestamp (preserve existing analysis if any)
         history[existingIndex].timestamp = Date.now();
         history[existingIndex].date = new Date().toLocaleDateString();
       } else {
@@ -60,7 +60,9 @@ document.addEventListener('DOMContentLoaded', function() {
           url: url,
           timestamp: Date.now(),
           date: new Date().toLocaleDateString(),
-          domain: new URL(url).hostname
+          domain: new URL(url).hostname,
+          analysis: null, // Will be populated when ChatGPT responds
+          analysisTimestamp: null
         };
         history.unshift(newEntry); // Add to beginning
       }
@@ -96,13 +98,24 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    const historyHTML = history.map((item, index) => `
-      <div class="history-item">
-        <button class="history-item-remove" data-index="${index}" title="Remove">×</button>
-        <a href="${item.url}" target="_blank" class="history-item-url">${item.domain}</a>
-        <div class="history-item-date">${item.date}</div>
-      </div>
-    `).join('');
+    const historyHTML = history.map((item, index) => {
+      const hasAnalysis = item.analysis && item.analysis.extractedData;
+      const analysisPreview = hasAnalysis ? generateAnalysisPreview(item.analysis) : '';
+      const analysisStatus = hasAnalysis ? 'analyzed' : 'pending';
+      
+      return `
+        <div class="history-item ${analysisStatus}">
+          <div class="history-item-header">
+            <button class="history-item-remove" data-index="${index}" title="Remove">×</button>
+            <a href="${item.url}" target="_blank" class="history-item-url">${item.domain}</a>
+            <div class="history-item-date">${item.date}</div>
+            <div class="analysis-status ${analysisStatus}">${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}</div>
+          </div>
+          ${analysisPreview}
+          ${hasAnalysis ? `<button class="view-analysis-btn" data-index="${index}">View Full Analysis</button>` : ''}
+        </div>
+      `;
+    }).join('');
     
     propertyHistoryList.innerHTML = historyHTML;
     
@@ -113,6 +126,134 @@ document.addEventListener('DOMContentLoaded', function() {
         const index = parseInt(button.dataset.index);
         await removePropertyFromHistory(index);
       });
+    });
+    
+    // Add event listeners for view analysis buttons
+    propertyHistoryList.querySelectorAll('.view-analysis-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const index = parseInt(button.dataset.index);
+        showFullAnalysis(history[index]);
+      });
+    });
+  }
+  
+  // Function to generate analysis preview
+  function generateAnalysisPreview(analysis) {
+    if (!analysis || !analysis.extractedData) return '';
+    
+    const data = analysis.extractedData;
+    const preview = [];
+    
+    if (data.price) preview.push(`💰 ${data.price}`);
+    if (data.bedrooms) preview.push(`🛏️ ${data.bedrooms} bed`);
+    if (data.bathrooms) preview.push(`🚿 ${data.bathrooms} bath`);
+    if (data.squareFeet) preview.push(`📐 ${data.squareFeet} sq ft`);
+    
+    const previewText = preview.join(' • ');
+    
+    return previewText ? `
+      <div class="analysis-preview">
+        <div class="analysis-summary">${previewText}</div>
+        ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 100)}${data.pros.length > 100 ? '...' : ''}</div>` : ''}
+        ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 100)}${data.cons.length > 100 ? '...' : ''}</div>` : ''}
+      </div>
+    ` : '';
+  }
+  
+  // Function to show full analysis in a modal or detailed view
+  function showFullAnalysis(propertyItem) {
+    if (!propertyItem.analysis) return;
+    
+    const analysis = propertyItem.analysis;
+    const data = analysis.extractedData;
+    
+    // Create modal content
+    const modalContent = `
+      <div class="analysis-modal-overlay" id="analysisModal">
+        <div class="analysis-modal">
+          <div class="analysis-modal-header">
+            <h3>Property Analysis</h3>
+            <button class="analysis-modal-close">×</button>
+          </div>
+          <div class="analysis-modal-content">
+            <div class="property-url">
+              <strong>Property:</strong> <a href="${propertyItem.url}" target="_blank">${propertyItem.domain}</a>
+            </div>
+            
+            ${Object.keys(data).length > 0 ? `
+              <div class="extracted-data">
+                <h4>Property Details</h4>
+                ${data.price ? `<div><strong>Price:</strong> $${data.price}</div>` : ''}
+                ${data.bedrooms ? `<div><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
+                ${data.bathrooms ? `<div><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
+                ${data.squareFeet ? `<div><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
+                ${data.yearBuilt ? `<div><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
+                ${data.lotSize ? `<div><strong>Lot Size:</strong> ${data.lotSize}</div>` : ''}
+                ${data.propertyType ? `<div><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
+                ${data.neighborhood ? `<div><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
+              </div>
+            ` : ''}
+            
+            ${data.pros ? `
+              <div class="analysis-section">
+                <h4>Pros</h4>
+                <p>${data.pros}</p>
+              </div>
+            ` : ''}
+            
+            ${data.cons ? `
+              <div class="analysis-section">
+                <h4>Cons</h4>
+                <p>${data.cons}</p>
+              </div>
+            ` : ''}
+            
+            ${data.marketAnalysis ? `
+              <div class="analysis-section">
+                <h4>Market Analysis</h4>
+                <p>${data.marketAnalysis}</p>
+              </div>
+            ` : ''}
+            
+            ${data.investmentPotential ? `
+              <div class="analysis-section">
+                <h4>Investment Potential</h4>
+                <p>${data.investmentPotential}</p>
+              </div>
+            ` : ''}
+            
+            ${data.redFlags ? `
+              <div class="analysis-section red-flags">
+                <h4>Red Flags</h4>
+                <p>${data.redFlags}</p>
+              </div>
+            ` : ''}
+            
+            <div class="full-response">
+              <h4>Full ChatGPT Response</h4>
+              <div class="response-text">${analysis.fullResponse.replace(/\n/g, '<br>')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalContent);
+    
+    // Add close functionality
+    const modal = document.getElementById('analysisModal');
+    const closeBtn = modal.querySelector('.analysis-modal-close');
+    
+    closeBtn.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
     });
   }
   
@@ -150,21 +291,52 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
-      const csvContent = 'URL,Domain,Date\n' + 
-        history.map(item => `"${item.url}","${item.domain}","${item.date}"`).join('\n');
+      // Create CSV with analysis data
+      const headers = [
+        'URL', 'Domain', 'Date', 'Analysis Status', 'Price', 'Bedrooms', 'Bathrooms', 
+        'Square Feet', 'Year Built', 'Property Type', 'Neighborhood', 'Pros', 'Cons', 
+        'Market Analysis', 'Investment Potential', 'Red Flags', 'Full Analysis'
+      ];
+      
+      const csvRows = history.map(item => {
+        const analysis = item.analysis;
+        const data = analysis ? analysis.extractedData : {};
+        
+        return [
+          `"${item.url}"`,
+          `"${item.domain}"`,
+          `"${item.date}"`,
+          `"${analysis ? 'Analyzed' : 'Pending'}"`,
+          `"${data.price || ''}"`,
+          `"${data.bedrooms || ''}"`,
+          `"${data.bathrooms || ''}"`,
+          `"${data.squareFeet || ''}"`,
+          `"${data.yearBuilt || ''}"`,
+          `"${data.propertyType || ''}"`,
+          `"${data.neighborhood || ''}"`,
+          `"${data.pros ? data.pros.replace(/"/g, '""') : ''}"`,
+          `"${data.cons ? data.cons.replace(/"/g, '""') : ''}"`,
+          `"${data.marketAnalysis ? data.marketAnalysis.replace(/"/g, '""') : ''}"`,
+          `"${data.investmentPotential ? data.investmentPotential.replace(/"/g, '""') : ''}"`,
+          `"${data.redFlags ? data.redFlags.replace(/"/g, '""') : ''}"`,
+          `"${analysis ? analysis.fullResponse.replace(/"/g, '""').substring(0, 1000) : ''}"`
+        ].join(',');
+      });
+      
+      const csvContent = headers.join(',') + '\n' + csvRows.join('\n');
       
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `property-history-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `property-analysis-export-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      showSuccess('Property history exported!');
+      showSuccess('Property analysis data exported!');
     });
   }
   
