@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Icon Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .icon { display: inline-block; margin: 10px; text-align: center; }
+        canvas { border: 1px solid #ccc; }
+        button { margin: 5px; padding: 8px 12px; background: #10a37f; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Simple Icon Generator</h1>
+    <p>Click each button to download the icon files:</p>
+    
+    <div id="icons"></div>
+
+    <script>
+        const sizes = [16, 32, 48, 128];
+        const colors = ['#10a37f', '#666666']; // Active, Inactive
+        
+        function createSimpleIcon(size, color, filename) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill with color
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, size, size);
+            
+            // Add border
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = Math.max(1, size / 32);
+            ctx.strokeRect(0, 0, size, size);
+            
+            // Add text
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size/4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🤖', size/2, size/2);
+            
+            const div = document.createElement('div');
+            div.className = 'icon';
+            div.innerHTML = `
+                <canvas id="${filename}"></canvas><br>
+                <button onclick="downloadIcon('${filename}')">Download ${filename}</button>
+            `;
+            
+            // Copy canvas to the one in the div
+            const targetCanvas = div.querySelector('canvas');
+            targetCanvas.width = size;
+            targetCanvas.height = size;
+            targetCanvas.getContext('2d').drawImage(canvas, 0, 0);
+            
+            return div;
+        }
+        
+        function downloadIcon(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = canvasId + '.png';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+        
+        const container = document.getElementById('icons');
+        
+        // Create active icons
+        sizes.forEach(size => {
+            container.appendChild(createSimpleIcon(size, colors[0], `icon${size}`));
+        });
+        
+        // Create inactive icons
+        sizes.forEach(size => {
+            container.appendChild(createSimpleIcon(size, colors[1], `icon${size}-gray`));
+        });
+    </script>
+</body>
+</html>

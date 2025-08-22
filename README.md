@@ -14,10 +14,14 @@ A Chrome extension that works exclusively on ChatGPT (chatgpt.com and chat.opena
 ### Method 1: Developer Mode (Recommended for testing)
 
 1. **Download/Clone** this repository to your local machine
-2. **Open Chrome** and navigate to `chrome://extensions/`
-3. **Enable Developer Mode** by toggling the switch in the top-right corner
-4. **Click "Load unpacked"** and select the folder containing this extension
-5. **Pin the extension** to your toolbar for easy access
+2. **Generate Icons** (required):
+   - Open `create-icons-simple.html` in your browser
+   - Click each "Download" button to save the icon files
+   - Save all files in the `icons/` folder with the exact names shown
+3. **Open Chrome** and navigate to `chrome://extensions/`
+4. **Enable Developer Mode** by toggling the switch in the top-right corner
+5. **Click "Load unpacked"** and select the folder containing this extension
+6. **Pin the extension** to your toolbar for easy access
 
 ### Method 2: Chrome Web Store (Future)
 This extension will be available on the Chrome Web Store once published.
@@ -39,6 +43,8 @@ This extension will be available on the Chrome Web Store once published.
 ├── popup.js               # Popup functionality
 ├── styles.css             # Extension styles and animations
 ├── icons/                 # Extension icons (16px, 32px, 48px, 128px)
+├── create-icons-simple.html  # Icon generator tool
+├── generate-icons.html    # Advanced icon generator
 └── README.md              # This file
 ```
 
@@ -59,6 +65,11 @@ This extension will be available on the Chrome Web Store once published.
 - Update `popup.html` and `popup.js` for interface changes
 - Add styles in `styles.css`
 - Update permissions in `manifest.json` if needed
+
+### Icon Management
+- Use `create-icons-simple.html` for basic icon generation
+- Use `generate-icons.html` for more detailed robot-themed icons
+- Icons must be actual PNG files (not empty placeholders)
 
 ## Security
 
