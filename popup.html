@@ -190,6 +190,96 @@
       color: #666;
       font-style: italic;
     }
+
+    .property-history-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+
+    .history-item {
+      background: #f8f9fa;
+      border: 1px solid #e1e5e9;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      position: relative;
+    }
+
+    .history-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .history-item-url {
+      color: #0066cc;
+      text-decoration: none;
+      word-break: break-all;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .history-item-url:hover {
+      text-decoration: underline;
+    }
+
+    .history-item-date {
+      color: #666;
+      font-size: 11px;
+    }
+
+    .history-item-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .history-item-remove:hover {
+      background: #c82333;
+    }
+
+    .empty-history {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      padding: 16px;
+    }
+
+    .btn-clear {
+      background: none;
+      border: none;
+      color: #dc3545;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 3px;
+      margin-left: auto;
+    }
+
+    .btn-clear:hover {
+      background: #f8d7da;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .history-actions {
+      display: flex;
+      justify-content: center;
+    }
   </style>
 </head>
 <body>
@@ -230,6 +320,19 @@
     </div>
     <div id="successMessage" class="success-message"></div>
     <div id="errorMessage" class="error-message"></div>
+  </div>
+  
+  <div id="propertyHistorySection" class="property-link-section" style="display: none;">
+    <div class="section-title">
+      📋 Analyzed Properties History
+      <button id="clearHistoryBtn" class="btn-clear">🗑️</button>
+    </div>
+    <div id="propertyHistoryList" class="property-history-list">
+      <div class="empty-history">No properties analyzed yet.</div>
+    </div>
+    <div class="history-actions">
+      <button id="exportHistoryBtn" class="btn btn-secondary btn-small">📤 Export</button>
+    </div>
   </div>
   
   <div class="footer">
