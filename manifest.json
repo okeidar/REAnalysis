@@ -11,10 +11,6 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://www.zillow.com/*",
-    "https://www.redfin.com/*",
-    "https://www.realtor.com/*",
-    "https://www.trulia.com/*",
     "https://chat.openai.com/*"
   ],
   "background": {
@@ -23,10 +19,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.zillow.com/*",
-        "https://www.redfin.com/*",
-        "https://www.realtor.com/*",
-        "https://www.trulia.com/*"
+        "https://chat.openai.com/*"
       ],
       "js": ["src/content/content.js"],
       "css": ["src/content/content.css"],
@@ -57,10 +50,7 @@
         "src/utils/*"
       ],
       "matches": [
-        "https://www.zillow.com/*",
-        "https://www.redfin.com/*",
-        "https://www.realtor.com/*",
-        "https://www.trulia.com/*"
+        "https://chat.openai.com/*"
       ]
     }
   ]

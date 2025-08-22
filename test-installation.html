@@ -3,40 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Real Estate Analyzer Extension</title>
+    <title>Real Estate Analyzer Extension Test</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            line-height: 1.6;
+            background: #f8f9fa;
         }
         .test-section {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .test-item {
-            margin: 10px 0;
-            padding: 10px;
             background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
             border-radius: 4px;
-            border-left: 4px solid #007bff;
+            margin: 10px 0;
         }
         .success {
-            border-left-color: #28a745;
             background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
         .error {
-            border-left-color: #dc3545;
             background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
-        .warning {
-            border-left-color: #ffc107;
-            background: #fff3cd;
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
         button {
             background: #007bff;
@@ -50,237 +51,135 @@
         button:hover {
             background: #0056b3;
         }
-        .code {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
+        .url-test {
             font-family: monospace;
-            margin: 10px 0;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
-    <h1>🏠 Real Estate Analyzer Extension - Installation Test</h1>
+    <h1>🏠 Real Estate Analyzer Extension Test</h1>
     
     <div class="test-section">
-        <h2>📋 Pre-Installation Checklist</h2>
-        <div class="test-item">
-            <strong>✅ Chrome Version:</strong> <span id="chromeVersion">Checking...</span>
+        <h2>📋 Installation Verification</h2>
+        <p>This page helps you verify that the Real Estate Analyzer extension is properly installed and configured to work <strong>only on ChatGPT pages</strong>.</p>
+        
+        <div id="extension-status" class="test-result info">
+            <strong>Status:</strong> Checking extension...
         </div>
-        <div class="test-item">
-            <strong>✅ Developer Mode:</strong> 
-            <span>Go to <code>chrome://extensions/</code> and enable "Developer mode"</span>
-        </div>
-        <div class="test-item">
-            <strong>✅ Files Ready:</strong> 
-            <span>Ensure all extension files are in the project directory</span>
-        </div>
+        
+        <button onclick="checkExtension()">Check Extension Status</button>
+        <button onclick="openChatGPT()">Open ChatGPT to Test</button>
     </div>
 
     <div class="test-section">
-        <h2>🔧 Installation Steps</h2>
-        <ol>
-            <li><strong>Open Extensions Page:</strong> Navigate to <code>chrome://extensions/</code></li>
-            <li><strong>Enable Developer Mode:</strong> Toggle the switch in the top-right corner</li>
-            <li><strong>Load Extension:</strong> Click "Load unpacked" and select the project directory</li>
-            <li><strong>Verify Installation:</strong> Look for the "📊 RE" icon in your toolbar</li>
-        </ol>
-        
-        <button onclick="openExtensionsPage()">Open Extensions Page</button>
-    </div>
-
-    <div class="test-section">
-        <h2>🧪 Quick Tests</h2>
-        
-        <div class="test-item">
-            <h3>Test 1: Extension Detection</h3>
-            <p>Check if the extension is properly loaded:</p>
-            <button onclick="testExtensionLoaded()">Test Extension Loaded</button>
-            <div id="extensionTest" class="result"></div>
-        </div>
-
-        <div class="test-item">
-            <h3>Test 2: Popup Interface</h3>
-            <p>Click the extension icon in your toolbar to test the popup interface.</p>
-            <div class="warning">
-                <strong>Expected:</strong> Popup should open showing "Real Estate Analyzer" interface
-            </div>
-        </div>
-
-        <div class="test-item">
-            <h3>Test 3: Property Page Detection</h3>
-            <p>Visit a property listing to test content script injection:</p>
-            <button onclick="openTestProperty()">Open Test Property</button>
-            <div class="warning">
-                <strong>Expected:</strong> "📊 Analyze Property" button should appear on property pages
-            </div>
-        </div>
-
-        <div class="test-item">
-            <h3>Test 4: Storage System</h3>
-            <p>Test the extension's storage functionality:</p>
-            <button onclick="testStorage()">Test Storage</button>
-            <div id="storageTest" class="result"></div>
-        </div>
-    </div>
-
-    <div class="test-section">
-        <h2>🐛 Troubleshooting</h2>
-        
-        <div class="test-item">
-            <h3>Common Issues:</h3>
+        <h2>✅ Expected Behavior</h2>
+        <div class="success">
+            <h3>On ChatGPT (chat.openai.com):</h3>
             <ul>
-                <li><strong>Service Worker Error:</strong> Check browser console for detailed error messages</li>
-                <li><strong>Extension Not Loading:</strong> Verify all files are present and manifest.json is valid</li>
-                <li><strong>Icons Not Showing:</strong> Clear browser cache and reload extension</li>
-                <li><strong>Button Not Appearing:</strong> Ensure you're on a property detail page, not search results</li>
+                <li>Extension should show a "🏠 RE Analyzer" interface in the top-right corner</li>
+                <li>Interface should have buttons for property analysis, comparison, and market analysis</li>
+                <li>Property links in chat should get a 📊 analysis button</li>
+                <li>Extension badge should appear in browser toolbar</li>
             </ul>
         </div>
-
-        <div class="test-item">
-            <h3>Debug Steps:</h3>
-            <div class="code">
-                1. Open Chrome DevTools (F12)<br>
-                2. Check Console tab for errors<br>
-                3. Go to chrome://extensions/<br>
-                4. Click "Inspect views → background page"<br>
-                5. Look for error messages
-            </div>
+        
+        <div class="error">
+            <h3>On Other Websites (Zillow, Redfin, etc.):</h3>
+            <ul>
+                <li>Extension should NOT show any interface elements</li>
+                <li>Extension should NOT inject any buttons or overlays</li>
+                <li>Extension badge should NOT appear in browser toolbar</li>
+            </ul>
         </div>
-
-        <button onclick="openTroubleshooting()">View Full Troubleshooting Guide</button>
-        <button onclick="runDebugScript()">Run Debug Script</button>
     </div>
 
     <div class="test-section">
-        <h2>✅ Success Indicators</h2>
-        <div class="test-item success">
-            <h3>Extension Working Correctly If:</h3>
-            <ul>
-                <li>✅ Extension icon appears in Chrome toolbar</li>
-                <li>✅ Popup opens when clicking the icon</li>
-                <li>✅ "Analyze Property" button appears on property pages</li>
-                <li>✅ Property analysis modal displays results</li>
-                <li>✅ Settings page loads without errors</li>
-                <li>✅ No console errors in background script</li>
-            </ul>
+        <h2>🧪 Test URLs</h2>
+        <p>Test the extension on these URLs to verify it only works on ChatGPT:</p>
+        
+        <h3>✅ Should Work (Extension Active):</h3>
+        <div class="url-test">
+            <a href="https://chat.openai.com" target="_blank">https://chat.openai.com</a>
+            <span style="color: #28a745;">← Extension should be active here</span>
+        </div>
+        
+        <h3>❌ Should NOT Work (Extension Inactive):</h3>
+        <div class="url-test">
+            <a href="https://www.zillow.com" target="_blank">https://www.zillow.com</a>
+            <span style="color: #dc3545;">← Extension should be inactive</span>
+        </div>
+        <div class="url-test">
+            <a href="https://www.redfin.com" target="_blank">https://www.redfin.com</a>
+            <span style="color: #dc3545;">← Extension should be inactive</span>
+        </div>
+        <div class="url-test">
+            <a href="https://www.realtor.com" target="_blank">https://www.realtor.com</a>
+            <span style="color: #dc3545;">← Extension should be inactive</span>
+        </div>
+        <div class="url-test">
+            <a href="https://www.google.com" target="_blank">https://www.google.com</a>
+            <span style="color: #dc3545;">← Extension should be inactive</span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Troubleshooting</h2>
+        <div class="info">
+            <h3>If the extension is not working on ChatGPT:</h3>
+            <ol>
+                <li>Make sure you've reloaded the extension in chrome://extensions</li>
+                <li>Refresh the ChatGPT page</li>
+                <li>Check the browser console for errors (F12 → Console)</li>
+                <li>Verify the extension is enabled in chrome://extensions</li>
+            </ol>
+        </div>
+        
+        <div class="info">
+            <h3>If the extension is still working on other sites:</h3>
+            <ol>
+                <li>Reload the extension in chrome://extensions</li>
+                <li>Clear browser cache and cookies</li>
+                <li>Restart your browser</li>
+                <li>Check that you're using the updated version</li>
+            </ol>
         </div>
     </div>
 
     <script>
-        // Detect Chrome version
-        function getChromeVersion() {
-            const userAgent = navigator.userAgent;
-            const match = userAgent.match(/Chrome\/(\d+)/);
-            return match ? parseInt(match[1]) : null;
-        }
-
-        // Update Chrome version display
-        function updateChromeVersion() {
-            const version = getChromeVersion();
-            const element = document.getElementById('chromeVersion');
-            
-            if (version) {
-                if (version >= 88) {
-                    element.innerHTML = `<span style="color: green;">Chrome ${version} ✅ (Compatible)</span>`;
-                } else {
-                    element.innerHTML = `<span style="color: red;">Chrome ${version} ❌ (Need 88+)</span>`;
-                }
-            } else {
-                element.innerHTML = '<span style="color: orange;">Unknown browser ⚠️</span>';
-            }
-        }
-
-        // Test if extension is loaded
-        function testExtensionLoaded() {
-            const result = document.getElementById('extensionTest');
+        function checkExtension() {
+            const statusDiv = document.getElementById('extension-status');
             
             if (typeof chrome !== 'undefined' && chrome.runtime) {
                 try {
-                    // Try to get extension info
-                    const manifest = chrome.runtime.getManifest();
-                    if (manifest && manifest.name === "ChatGPT Real Estate Analyzer") {
-                        result.innerHTML = '<div class="success">✅ Extension detected and loaded successfully!</div>';
-                    } else {
-                        result.innerHTML = '<div class="warning">⚠️ Chrome extension API available but Real Estate Analyzer not detected</div>';
-                    }
+                    chrome.runtime.sendMessage({action: 'ping'}, (response) => {
+                        if (chrome.runtime.lastError) {
+                            statusDiv.innerHTML = '<strong>Status:</strong> Extension not found or not responding';
+                            statusDiv.className = 'test-result error';
+                        } else {
+                            statusDiv.innerHTML = '<strong>Status:</strong> Extension is installed and responding!';
+                            statusDiv.className = 'test-result success';
+                        }
+                    });
                 } catch (error) {
-                    result.innerHTML = '<div class="error">❌ Error accessing extension: ' + error.message + '</div>';
+                    statusDiv.innerHTML = '<strong>Status:</strong> Extension not accessible from this page';
+                    statusDiv.className = 'test-result error';
                 }
             } else {
-                result.innerHTML = '<div class="error">❌ Chrome extension API not available. Make sure you\'re testing in Chrome with the extension loaded.</div>';
+                statusDiv.innerHTML = '<strong>Status:</strong> Chrome extension APIs not available';
+                statusDiv.className = 'test-result error';
             }
         }
-
-        // Test storage functionality
-        function testStorage() {
-            const result = document.getElementById('storageTest');
-            
-            if (typeof chrome !== 'undefined' && chrome.storage) {
-                // Test basic storage
-                const testData = { testKey: 'testValue', timestamp: Date.now() };
-                
-                chrome.storage.local.set(testData, function() {
-                    if (chrome.runtime.lastError) {
-                        result.innerHTML = '<div class="error">❌ Storage write failed: ' + chrome.runtime.lastError.message + '</div>';
-                    } else {
-                        chrome.storage.local.get(['testKey'], function(data) {
-                            if (chrome.runtime.lastError) {
-                                result.innerHTML = '<div class="error">❌ Storage read failed: ' + chrome.runtime.lastError.message + '</div>';
-                            } else if (data.testKey === 'testValue') {
-                                result.innerHTML = '<div class="success">✅ Storage system working correctly!</div>';
-                                // Clean up test data
-                                chrome.storage.local.remove(['testKey', 'timestamp']);
-                            } else {
-                                result.innerHTML = '<div class="error">❌ Storage data mismatch</div>';
-                            }
-                        });
-                    }
-                });
-            } else {
-                result.innerHTML = '<div class="error">❌ Chrome storage API not available</div>';
-            }
+        
+        function openChatGPT() {
+            window.open('https://chat.openai.com', '_blank');
         }
-
-        // Open extensions page
-        function openExtensionsPage() {
-            if (typeof chrome !== 'undefined' && chrome.tabs) {
-                chrome.tabs.create({ url: 'chrome://extensions/' });
-            } else {
-                window.open('chrome://extensions/', '_blank');
-            }
-        }
-
-        // Open test property page
-        function openTestProperty() {
-            const testUrls = [
-                'https://www.zillow.com/homedetails/',
-                'https://www.redfin.com/',
-                'https://www.realtor.com/',
-                'https://www.trulia.com/'
-            ];
-            
-            alert('Navigate to any property listing on:\\n\\n' + testUrls.join('\\n') + '\\n\\nThen look for the "📊 Analyze Property" button.');
-        }
-
-        // Open troubleshooting guide
-        function openTroubleshooting() {
-            window.open('./TROUBLESHOOTING.md', '_blank');
-        }
-
-        // Run debug script
-        function runDebugScript() {
-            const script = document.createElement('script');
-            script.src = './debug-extension.js';
-            document.head.appendChild(script);
-            
-            setTimeout(() => {
-                alert('Debug script loaded! Check the browser console (F12) for detailed results.');
-            }, 500);
-        }
-
-        // Initialize page
-        updateChromeVersion();
+        
+        // Auto-check on page load
+        document.addEventListener('DOMContentLoaded', checkExtension);
     </script>
 </body>
 </html>

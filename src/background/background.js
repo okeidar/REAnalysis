@@ -83,22 +83,16 @@ class BackgroundManager {
         title: 'Analyze Property with Real Estate Analyzer',
         contexts: ['link'],
         documentUrlPatterns: [
-          'https://www.zillow.com/*',
-          'https://www.redfin.com/*',
-          'https://www.realtor.com/*',
-          'https://www.trulia.com/*'
+          'https://chat.openai.com/*'
         ]
       });
 
       chrome.contextMenus.create({
         id: 'analyzeCurrentPage',
-        title: 'Analyze Current Property',
+        title: 'Use Real Estate Analyzer',
         contexts: ['page'],
         documentUrlPatterns: [
-          'https://www.zillow.com/homedetails/*',
-          'https://www.redfin.com/*/home/*',
-          'https://www.realtor.com/realestateandhomes-detail/*',
-          'https://www.trulia.com/p/*'
+          'https://chat.openai.com/*'
         ]
       });
     });
@@ -179,6 +173,10 @@ class BackgroundManager {
   async handleMessage(request, sender, sendResponse) {
     try {
       switch (request.action) {
+        case 'ping':
+          sendResponse({ success: true, message: 'Extension is active' });
+          break;
+
         case 'analyzeProperty':
           const analysis = await this.analyzeProperty(request.propertyData);
           sendResponse({ success: true, data: analysis });
@@ -241,9 +239,9 @@ class BackgroundManager {
    */
   async handleTabUpdate(tabId, changeInfo, tab) {
     if (changeInfo.status === 'complete' && tab.url) {
-      const site = propertyParser.identifySite(tab.url);
-      if (site) {
-        // Enable page action for property pages
+      // Check if this is a ChatGPT page
+      if (tab.url.includes('chat.openai.com')) {
+        // Enable page action for ChatGPT pages
         chrome.action.setBadgeText({
           tabId: tabId,
           text: '📊'

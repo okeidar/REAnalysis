@@ -1,21 +1,20 @@
 /**
- * Content Script for Real Estate Analyzer
- * Extracts property data from real estate websites
+ * Content Script for Real Estate Analyzer - ChatGPT Integration
+ * Provides real estate analysis tools within ChatGPT interface
  */
 
-class ContentExtractor {
+class ChatGPTRealEstateAnalyzer {
   constructor() {
-    this.currentSite = this.identifyCurrentSite();
     this.init();
   }
 
   /**
-   * Initialize content script
+   * Initialize content script for ChatGPT
    */
   init() {
     this.setupMessageListener();
-    this.setupPropertyDetection();
-    this.injectAnalyzeButton();
+    this.injectAnalyzerInterface();
+    this.observeChatInterface();
   }
 
   /**
@@ -29,669 +28,429 @@ class ContentExtractor {
   }
 
   /**
-   * Setup automatic property detection
+   * Inject real estate analyzer interface into ChatGPT
    */
-  setupPropertyDetection() {
-    // Detect if this is a property detail page
-    if (this.isPropertyPage()) {
-      this.extractAndAnalyzeProperty();
-    }
+  injectAnalyzerInterface() {
+    // Wait for ChatGPT interface to load
+    const checkInterface = () => {
+      const chatContainer = document.querySelector('main') || document.querySelector('[role="main"]');
+      if (chatContainer && !document.getElementById('re-analyzer-interface')) {
+        this.createAnalyzerInterface();
+      } else if (!chatContainer) {
+        setTimeout(checkInterface, 1000);
+      }
+    };
+    
+    checkInterface();
   }
 
   /**
-   * Inject analyze button into property pages
+   * Create the real estate analyzer interface
    */
-  injectAnalyzeButton() {
-    if (!this.isPropertyPage()) return;
-
-    const button = document.createElement('div');
-    button.id = 're-analyzer-button';
-    button.innerHTML = `
+  createAnalyzerInterface() {
+    const interface_ = document.createElement('div');
+    interface_.id = 're-analyzer-interface';
+    interface_.innerHTML = `
       <div style="
         position: fixed;
         top: 20px;
         right: 20px;
         z-index: 10000;
-        background: #007bff;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
+        background: #ffffff;
+        border: 2px solid #007bff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 16px rgba(0,123,255,0.2);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        width: 280px;
+        max-height: 400px;
+        overflow-y: auto;
       ">
-        <span>📊</span>
-        <span>Analyze Property</span>
+        <div style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #eee;
+        ">
+          <h3 style="margin: 0; color: #007bff; font-size: 16px;">🏠 RE Analyzer</h3>
+          <button id="toggle-analyzer" style="
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #666;
+          ">−</button>
+        </div>
+        
+        <div id="analyzer-content">
+          <div style="margin-bottom: 12px;">
+            <button id="quick-analysis-btn" style="
+              width: 100%;
+              background: #007bff;
+              color: white;
+              border: none;
+              padding: 10px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              margin-bottom: 8px;
+            ">📊 Quick Property Analysis</button>
+            
+            <button id="compare-properties-btn" style="
+              width: 100%;
+              background: #28a745;
+              color: white;
+              border: none;
+              padding: 10px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              margin-bottom: 8px;
+            ">⚖️ Compare Properties</button>
+            
+            <button id="market-analysis-btn" style="
+              width: 100%;
+              background: #ffc107;
+              color: black;
+              border: none;
+              padding: 10px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              margin-bottom: 8px;
+            ">📈 Market Analysis</button>
+            
+            <button id="saved-properties-btn" style="
+              width: 100%;
+              background: #6c757d;
+              color: white;
+              border: none;
+              padding: 10px;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            ">💾 Saved Properties</button>
+          </div>
+          
+          <div style="
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+          ">
+            Paste property links to analyze
+          </div>
+        </div>
       </div>
     `;
 
-    button.addEventListener('click', () => {
-      this.extractAndAnalyzeProperty();
-    });
-
-    button.addEventListener('mouseenter', (e) => {
-      e.target.style.transform = 'translateY(-2px)';
-      e.target.style.boxShadow = '0 6px 16px rgba(0,123,255,0.4)';
-    });
-
-    button.addEventListener('mouseleave', (e) => {
-      e.target.style.transform = 'translateY(0)';
-      e.target.style.boxShadow = '0 4px 12px rgba(0,123,255,0.3)';
-    });
-
-    document.body.appendChild(button);
+    document.body.appendChild(interface_);
+    this.setupInterfaceEventListeners();
   }
 
   /**
-   * Identify current real estate site
-   * @returns {string|null} Site identifier
+   * Setup event listeners for the analyzer interface
    */
-  identifyCurrentSite() {
-    const hostname = window.location.hostname.toLowerCase();
-    
-    if (hostname.includes('zillow.com')) return 'zillow';
-    if (hostname.includes('redfin.com')) return 'redfin';
-    if (hostname.includes('realtor.com')) return 'realtor';
-    if (hostname.includes('trulia.com')) return 'trulia';
-    
-    return null;
-  }
-
-  /**
-   * Check if current page is a property detail page
-   * @returns {boolean} True if property page
-   */
-  isPropertyPage() {
-    const url = window.location.href;
-    const pathname = window.location.pathname;
-
-    switch (this.currentSite) {
-      case 'zillow':
-        return pathname.includes('/homedetails/');
-      case 'redfin':
-        return pathname.includes('/home/');
-      case 'realtor':
-        return pathname.includes('/realestateandhomes-detail/');
-      case 'trulia':
-        return pathname.includes('/p/');
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Handle messages from background script
-   * @param {Object} request - Message request
-   * @param {Object} sender - Message sender
-   * @param {Function} sendResponse - Response callback
-   */
-  async handleMessage(request, sender, sendResponse) {
-    try {
-      switch (request.action) {
-        case 'extractPropertyData':
-          const propertyData = await this.extractPropertyData();
-          sendResponse({ success: true, data: propertyData });
-          break;
-        
-        case 'analyzeProperty':
-          await this.extractAndAnalyzeProperty();
-          sendResponse({ success: true });
-          break;
-
-        default:
-          sendResponse({ success: false, error: 'Unknown action' });
-      }
-    } catch (error) {
-      console.error('Error handling message:', error);
-      sendResponse({ success: false, error: error.message });
-    }
-  }
-
-  /**
-   * Extract property data from current page
-   * @returns {Promise<Object>} Property data
-   */
-  async extractPropertyData() {
-    try {
-      let propertyData = {
-        url: window.location.href,
-        site: this.currentSite,
-        extractedAt: new Date().toISOString()
-      };
-
-      switch (this.currentSite) {
-        case 'zillow':
-          propertyData = { ...propertyData, ...this.extractZillowData() };
-          break;
-        case 'redfin':
-          propertyData = { ...propertyData, ...this.extractRedfinData() };
-          break;
-        case 'realtor':
-          propertyData = { ...propertyData, ...this.extractRealtorData() };
-          break;
-        case 'trulia':
-          propertyData = { ...propertyData, ...this.extractTruliaData() };
-          break;
-        default:
-          propertyData = { ...propertyData, ...this.extractGenericData() };
-      }
-
-      // Clean and validate data
-      propertyData = this.cleanPropertyData(propertyData);
+  setupInterfaceEventListeners() {
+    // Toggle interface visibility
+    document.getElementById('toggle-analyzer').addEventListener('click', () => {
+      const content = document.getElementById('analyzer-content');
+      const toggle = document.getElementById('toggle-analyzer');
       
-      return propertyData;
-    } catch (error) {
-      console.error('Error extracting property data:', error);
-      return this.getEmptyPropertyData();
-    }
-  }
-
-  /**
-   * Extract data from Zillow property page
-   * @returns {Object} Zillow property data
-   */
-  extractZillowData() {
-    const data = {};
-
-    try {
-      // Address
-      data.address = this.getText('.summary-container h1') || 
-                    this.getText('[data-testid="property-address"]') ||
-                    this.getText('.street-address');
-
-      // Price
-      data.price = this.getNumeric('.summary-container .notranslate') ||
-                  this.getNumeric('[data-testid="price"]') ||
-                  this.getNumeric('.price-range');
-
-      // Beds/Baths
-      const bedsBaths = this.getText('.summary-container .summary-table') ||
-                       this.getText('[data-testid="bed-bath-info"]');
-      if (bedsBaths) {
-        const bedsMatch = bedsBaths.match(/(\d+)\s*(?:bed|bd)/i);
-        const bathsMatch = bedsBaths.match(/(\d+(?:\.\d+)?)\s*(?:bath|ba)/i);
-        data.beds = bedsMatch ? parseInt(bedsMatch[1]) : 0;
-        data.baths = bathsMatch ? parseFloat(bathsMatch[1]) : 0;
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.textContent = '−';
+      } else {
+        content.style.display = 'none';
+        toggle.textContent = '+';
       }
+    });
 
-      // Square footage
-      data.sqft = this.getNumeric('.summary-container') ||
-                 this.getNumericFromText('[data-testid="floor-size"]', 'sqft');
+    // Quick analysis button
+    document.getElementById('quick-analysis-btn').addEventListener('click', () => {
+      this.insertQuickAnalysisPrompt();
+    });
 
-      // Year built
-      data.yearBuilt = this.getNumericFromText('.summary-table', 'built') ||
-                      this.getNumericFromText('[data-testid="built-year"]');
+    // Compare properties button
+    document.getElementById('compare-properties-btn').addEventListener('click', () => {
+      this.insertComparePropertiesPrompt();
+    });
 
-      // Property type
-      data.propertyType = this.getText('.summary-container .property-type') ||
-                         this.getText('[data-testid="property-type"]');
+    // Market analysis button
+    document.getElementById('market-analysis-btn').addEventListener('click', () => {
+      this.insertMarketAnalysisPrompt();
+    });
 
-      // Description
-      data.description = this.getText('.description-container') ||
-                        this.getText('[data-testid="description"]') ||
-                        this.getText('.property-description');
-
-      // Property taxes
-      data.taxes = this.getNumericFromText('.tax-info', '$') ||
-                  this.getNumericFromText('[data-testid="tax-info"]', '$');
-
-      // HOA fees
-      data.hoa = this.getNumericFromText('.hoa-info', '$') ||
-                this.getNumericFromText('[data-testid="hoa-info"]', '$');
-
-      // Zestimate
-      data.zestimate = this.getNumeric('.zestimate-container') ||
-                      this.getNumeric('[data-testid="zestimate"]');
-
-      // Rent estimate
-      data.rentZestimate = this.getNumeric('.rent-zestimate') ||
-                          this.getNumeric('[data-testid="rent-zestimate"]');
-
-      // Images
-      data.images = this.extractImages([
-        '.media-stream img',
-        '.hdp-photo-carousel img',
-        '[data-testid="property-image"]'
-      ]);
-
-      // Days on market
-      data.daysOnMarket = this.getNumericFromText('.price-history', 'days') ||
-                         this.getNumericFromText('[data-testid="days-on-market"]');
-
-    } catch (error) {
-      console.error('Error extracting Zillow data:', error);
-    }
-
-    return data;
+    // Saved properties button
+    document.getElementById('saved-properties-btn').addEventListener('click', () => {
+      this.showSavedProperties();
+    });
   }
 
   /**
-   * Extract data from Redfin property page
-   * @returns {Object} Redfin property data
+   * Observe ChatGPT interface for changes
    */
-  extractRedfinData() {
-    const data = {};
-
-    try {
-      // Address
-      data.address = this.getText('.street-address') ||
-                    this.getText('[data-rf-test-id="abp-streetLine"]');
-
-      // Price
-      data.price = this.getNumeric('.statsValue') ||
-                  this.getNumeric('[data-rf-test-id="abp-price"]');
-
-      // Beds/Baths from stats section
-      const bedsElement = this.getElementByText('.stats .stat-value', 'bed');
-      const bathsElement = this.getElementByText('.stats .stat-value', 'bath');
-      data.beds = bedsElement ? this.getNumeric(bedsElement) : 0;
-      data.baths = bathsElement ? this.getNumeric(bathsElement) : 0;
-
-      // Square footage
-      data.sqft = this.getNumericFromText('.statsValue', 'sq ft') ||
-                 this.getNumericFromText('[data-rf-test-id="abp-sqFt"]');
-
-      // Year built
-      data.yearBuilt = this.getNumericFromText('.amenities', 'Built') ||
-                      this.getNumericFromText('.keyDetails', 'Built');
-
-      // Property type
-      data.propertyType = this.getText('.property-type') ||
-                         this.getText('[data-rf-test-id="abp-propertyType"]');
-
-      // Description
-      data.description = this.getText('.remarks') ||
-                        this.getText('[data-rf-test-id="abp-remarks"]');
-
-      // Property taxes
-      data.taxes = this.getNumericFromText('.keyDetails', 'Property Tax') ||
-                  this.getNumericFromText('.tax-records', '$');
-
-      // HOA fees
-      data.hoa = this.getNumericFromText('.keyDetails', 'HOA') ||
-                this.getNumericFromText('.hoa-info', '$');
-
-      // Images
-      data.images = this.extractImages([
-        '.bp-Carousel img',
-        '.photo-carousel img'
-      ]);
-
-    } catch (error) {
-      console.error('Error extracting Redfin data:', error);
-    }
-
-    return data;
-  }
-
-  /**
-   * Extract data from Realtor.com property page
-   * @returns {Object} Realtor.com property data
-   */
-  extractRealtorData() {
-    const data = {};
-
-    try {
-      // Address
-      data.address = this.getText('[data-testid="property-address"]') ||
-                    this.getText('.address');
-
-      // Price
-      data.price = this.getNumeric('[data-testid="property-price"]') ||
-                  this.getNumeric('.price');
-
-      // Beds/Baths
-      data.beds = this.getNumeric('[data-testid="property-beds"]') ||
-                 this.getNumericFromText('.property-meta', 'bed');
-      data.baths = this.getNumeric('[data-testid="property-baths"]') ||
-                  this.getNumericFromText('.property-meta', 'bath');
-
-      // Square footage
-      data.sqft = this.getNumeric('[data-testid="property-sqft"]') ||
-                 this.getNumericFromText('.property-meta', 'sqft');
-
-      // Year built
-      data.yearBuilt = this.getNumericFromText('.property-details', 'Built') ||
-                      this.getNumericFromText('.key-facts', 'Built');
-
-      // Property type
-      data.propertyType = this.getText('[data-testid="property-type"]') ||
-                         this.getText('.property-type');
-
-      // Description
-      data.description = this.getText('[data-testid="property-description"]') ||
-                        this.getText('.description');
-
-      // Property taxes
-      data.taxes = this.getNumericFromText('.tax-info', '$') ||
-                  this.getNumericFromText('.financial-info', 'Tax');
-
-      // Images
-      data.images = this.extractImages([
-        '.photo-list img',
-        '.carousel img'
-      ]);
-
-    } catch (error) {
-      console.error('Error extracting Realtor.com data:', error);
-    }
-
-    return data;
-  }
-
-  /**
-   * Extract data from Trulia property page
-   * @returns {Object} Trulia property data
-   */
-  extractTruliaData() {
-    const data = {};
-
-    try {
-      // Address
-      data.address = this.getText('[data-testid="property-street"]') ||
-                    this.getText('.address-container h1');
-
-      // Price
-      data.price = this.getNumeric('[data-testid="property-price"]') ||
-                  this.getNumeric('.price-container');
-
-      // Beds/Baths
-      data.beds = this.getNumericFromText('.property-features', 'bed') ||
-                 this.getNumeric('[data-testid="property-beds"]');
-      data.baths = this.getNumericFromText('.property-features', 'bath') ||
-                  this.getNumeric('[data-testid="property-baths"]');
-
-      // Square footage
-      data.sqft = this.getNumericFromText('.property-features', 'sqft') ||
-                 this.getNumeric('[data-testid="property-sqft"]');
-
-      // Description
-      data.description = this.getText('.property-description') ||
-                        this.getText('[data-testid="property-description"]');
-
-      // Images
-      data.images = this.extractImages([
-        '.media-stream img',
-        '.photo-carousel img'
-      ]);
-
-    } catch (error) {
-      console.error('Error extracting Trulia data:', error);
-    }
-
-    return data;
-  }
-
-  /**
-   * Extract basic data from any property page
-   * @returns {Object} Generic property data
-   */
-  extractGenericData() {
-    const data = {};
-
-    try {
-      // Try common selectors for address
-      data.address = this.getText('h1') ||
-                    this.getText('.address') ||
-                    this.getText('[class*="address"]');
-
-      // Try common selectors for price
-      data.price = this.getNumeric('.price') ||
-                  this.getNumeric('[class*="price"]') ||
-                  this.getNumericFromPageText('$');
-
-      // Try to find beds/baths in text
-      const pageText = document.body.textContent;
-      const bedsMatch = pageText.match(/(\d+)\s*(?:bed|bedroom)/i);
-      const bathsMatch = pageText.match(/(\d+(?:\.\d+)?)\s*(?:bath|bathroom)/i);
-      data.beds = bedsMatch ? parseInt(bedsMatch[1]) : 0;
-      data.baths = bathsMatch ? parseFloat(bathsMatch[1]) : 0;
-
-      // Try to find square footage
-      const sqftMatch = pageText.match(/(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft|sqft|square feet)/i);
-      data.sqft = sqftMatch ? parseInt(sqftMatch[1].replace(/,/g, '')) : 0;
-
-      // Get all images
-      data.images = this.extractImages(['img']);
-
-    } catch (error) {
-      console.error('Error extracting generic data:', error);
-    }
-
-    return data;
-  }
-
-  /**
-   * Get text content from element
-   * @param {string} selector - CSS selector
-   * @returns {string} Text content
-   */
-  getText(selector) {
-    const element = document.querySelector(selector);
-    return element ? element.textContent.trim() : '';
-  }
-
-  /**
-   * Get numeric value from element
-   * @param {string} selector - CSS selector
-   * @returns {number} Numeric value
-   */
-  getNumeric(selector) {
-    const text = this.getText(selector);
-    return this.parseNumeric(text);
-  }
-
-  /**
-   * Get numeric value from text containing specific substring
-   * @param {string} selector - CSS selector
-   * @param {string} contains - Text to search for
-   * @returns {number} Numeric value
-   */
-  getNumericFromText(selector, contains) {
-    const elements = document.querySelectorAll(selector);
-    for (const element of elements) {
-      if (element.textContent.toLowerCase().includes(contains.toLowerCase())) {
-        return this.parseNumeric(element.textContent);
-      }
-    }
-    return 0;
-  }
-
-  /**
-   * Get numeric value from page text
-   * @param {string} pattern - Pattern to search for
-   * @returns {number} Numeric value
-   */
-  getNumericFromPageText(pattern) {
-    const text = document.body.textContent;
-    const regex = new RegExp(`\\${pattern}([\\d,]+)`, 'g');
-    const matches = [...text.matchAll(regex)];
-    
-    if (matches.length > 0) {
-      // Return the largest number found (likely the price)
-      return Math.max(...matches.map(m => this.parseNumeric(m[1])));
-    }
-    
-    return 0;
-  }
-
-  /**
-   * Get element containing specific text
-   * @param {string} selector - CSS selector
-   * @param {string} text - Text to search for
-   * @returns {Element|null} Found element
-   */
-  getElementByText(selector, text) {
-    const elements = document.querySelectorAll(selector);
-    for (const element of elements) {
-      if (element.textContent.toLowerCase().includes(text.toLowerCase())) {
-        return element;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Extract images from page
-   * @param {Array} selectors - CSS selectors for images
-   * @returns {Array} Array of image URLs
-   */
-  extractImages(selectors) {
-    const images = [];
-    
-    selectors.forEach(selector => {
-      const imgElements = document.querySelectorAll(selector);
-      imgElements.forEach(img => {
-        if (img.src && !images.includes(img.src)) {
-          // Filter out small icons and placeholder images
-          if (img.naturalWidth > 100 && img.naturalHeight > 100) {
-            images.push(img.src);
-          }
+  observeChatInterface() {
+    // Watch for new messages to detect property links
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          this.scanForPropertyLinks(mutation.addedNodes);
         }
       });
     });
 
-    return images.slice(0, 20); // Limit to 20 images
+    // Start observing the chat container
+    const chatContainer = document.querySelector('main') || document.body;
+    observer.observe(chatContainer, {
+      childList: true,
+      subtree: true
+    });
   }
 
   /**
-   * Parse numeric value from string
-   * @param {string} text - Text to parse
-   * @returns {number} Parsed number
+   * Scan for property links in new content
+   * @param {NodeList} nodes - Added nodes to scan
    */
-  parseNumeric(text) {
-    if (typeof text === 'number') return text;
-    if (typeof text !== 'string') return 0;
-    
-    // Remove common non-numeric characters
-    const cleaned = text.replace(/[$,\s]/g, '');
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? 0 : parsed;
-  }
-
-  /**
-   * Clean property data
-   * @param {Object} data - Raw property data
-   * @returns {Object} Cleaned property data
-   */
-  cleanPropertyData(data) {
-    // Calculate price per sqft
-    if (data.price && data.sqft) {
-      data.pricePerSqft = Math.round((data.price / data.sqft) * 100) / 100;
-    }
-
-    // Ensure numeric fields are numbers
-    ['price', 'beds', 'baths', 'sqft', 'taxes', 'hoa', 'yearBuilt'].forEach(field => {
-      if (data[field]) {
-        data[field] = this.parseNumeric(data[field]);
+  scanForPropertyLinks(nodes) {
+    nodes.forEach(node => {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const links = node.querySelectorAll('a[href*="zillow.com"], a[href*="redfin.com"], a[href*="realtor.com"], a[href*="trulia.com"]');
+        links.forEach(link => {
+          this.enhancePropertyLink(link);
+        });
       }
     });
-
-    return data;
   }
 
   /**
-   * Get empty property data structure
-   * @returns {Object} Empty property data
+   * Enhance property links with quick action buttons
+   * @param {Element} link - Property link element
    */
-  getEmptyPropertyData() {
-    return {
-      url: window.location.href,
-      site: this.currentSite,
-      address: '',
-      price: 0,
-      beds: 0,
-      baths: 0,
-      sqft: 0,
-      description: '',
-      images: [],
-      extractedAt: new Date().toISOString()
-    };
+  enhancePropertyLink(link) {
+    if (link.getAttribute('data-re-enhanced')) return;
+    
+    link.setAttribute('data-re-enhanced', 'true');
+    
+    const enhanceButton = document.createElement('span');
+    enhanceButton.innerHTML = ' 📊';
+    enhanceButton.style.cssText = `
+      cursor: pointer;
+      color: #007bff;
+      font-weight: bold;
+      margin-left: 4px;
+    `;
+    enhanceButton.title = 'Analyze this property';
+    
+    enhanceButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.analyzePropertyFromLink(link.href);
+    });
+    
+    link.appendChild(enhanceButton);
   }
 
   /**
-   * Extract and analyze property from current page
+   * Insert quick analysis prompt into ChatGPT
    */
-  async extractAndAnalyzeProperty() {
-    try {
-      // Show loading indicator
-      this.showLoadingIndicator();
+  insertQuickAnalysisPrompt() {
+    const prompt = `I need help analyzing a real estate investment property. Please provide a comprehensive analysis including:
 
-      // Extract property data
-      const propertyData = await this.extractPropertyData();
+1. **Financial Analysis**:
+   - Cash flow calculation (rent - expenses)
+   - Cap rate (NOI ÷ purchase price)
+   - Cash-on-cash return
+   - Break-even analysis
+
+2. **Risk Assessment**:
+   - Market risks
+   - Property condition concerns
+   - Location factors
+   - Financing risks
+
+3. **Investment Recommendation**:
+   - Overall verdict (Strong Buy/Worth Considering/Pass)
+   - Key pros and cons
+   - Suggested next steps
+
+Please ask me for the property details (price, rent estimate, taxes, etc.) and I'll provide them.`;
+
+    this.insertTextIntoChat(prompt);
+  }
+
+  /**
+   * Insert compare properties prompt into ChatGPT
+   */
+  insertComparePropertiesPrompt() {
+    const prompt = `I want to compare multiple real estate investment properties. Please help me create a detailed comparison including:
+
+1. **Financial Metrics Comparison**:
+   - Monthly cash flow
+   - Cap rates
+   - Cash-on-cash returns
+   - Total ROI projections
+
+2. **Risk Analysis**:
+   - Market conditions for each location
+   - Property-specific risks
+   - Financing considerations
+
+3. **Recommendation**:
+   - Rank properties from best to worst investment
+   - Explain reasoning for rankings
+   - Highlight key differentiators
+
+Please ask me for the details of each property I want to compare.`;
+
+    this.insertTextIntoChat(prompt);
+  }
+
+  /**
+   * Insert market analysis prompt into ChatGPT
+   */
+  insertMarketAnalysisPrompt() {
+    const prompt = `I need a comprehensive real estate market analysis. Please help me understand:
+
+1. **Market Conditions**:
+   - Current trends (buyer's vs seller's market)
+   - Price appreciation trends
+   - Inventory levels
+
+2. **Rental Market**:
+   - Average rent prices
+   - Vacancy rates
+   - Rent growth trends
+
+3. **Economic Factors**:
+   - Local job market
+   - Population growth
+   - Major employers and industries
+
+4. **Investment Outlook**:
+   - Best neighborhoods for investment
+   - Property types with highest returns
+   - Potential risks and opportunities
+
+Please ask me for the specific location/market I want to analyze.`;
+
+    this.insertTextIntoChat(prompt);
+  }
+
+  /**
+   * Insert text into ChatGPT input field
+   * @param {string} text - Text to insert
+   */
+  insertTextIntoChat(text) {
+    // Find ChatGPT input field (multiple possible selectors)
+    const inputSelectors = [
+      'textarea[placeholder*="Message"]',
+      'textarea[data-id="root"]',
+      '#prompt-textarea',
+      'textarea',
+      '[contenteditable="true"]'
+    ];
+
+    let inputField = null;
+    for (const selector of inputSelectors) {
+      inputField = document.querySelector(selector);
+      if (inputField) break;
+    }
+
+    if (inputField) {
+      // Clear existing content and insert new text
+      inputField.value = text;
+      inputField.textContent = text;
       
-      // Send to background script for analysis
+      // Trigger input events to ensure ChatGPT recognizes the change
+      inputField.dispatchEvent(new Event('input', { bubbles: true }));
+      inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      // Focus the input field
+      inputField.focus();
+      
+      this.showNotification('Prompt inserted! You can edit it before sending.', 'success');
+    } else {
+      this.showNotification('Could not find ChatGPT input field', 'error');
+    }
+  }
+
+  /**
+   * Analyze property from a link
+   * @param {string} url - Property URL
+   */
+  async analyzePropertyFromLink(url) {
+    try {
+      this.showNotification('Analyzing property...', 'info');
+      
       const response = await chrome.runtime.sendMessage({
-        action: 'analyzeProperty',
-        propertyData: propertyData
+        action: 'parsePropertyFromUrl',
+        url: url
+      });
+
+      if (response.success && response.data) {
+        const propertyData = response.data;
+        const analysisPrompt = `Please analyze this real estate investment property:
+
+**Property Details:**
+- Address: ${propertyData.address || 'Not available'}
+- Price: $${propertyData.price?.toLocaleString() || 'Not available'}
+- Beds/Baths: ${propertyData.beds || '?'}/${propertyData.baths || '?'}
+- Square Feet: ${propertyData.sqft?.toLocaleString() || 'Not available'}
+- Property Type: ${propertyData.propertyType || 'Not specified'}
+- Year Built: ${propertyData.yearBuilt || 'Not available'}
+
+**Property URL:** ${url}
+
+Please provide a comprehensive investment analysis including cash flow potential, cap rate estimates, risks, and your overall recommendation.`;
+
+        this.insertTextIntoChat(analysisPrompt);
+        this.showNotification('Property analysis prompt generated!', 'success');
+      } else {
+        this.showNotification('Could not extract property data from link', 'error');
+      }
+    } catch (error) {
+      console.error('Error analyzing property from link:', error);
+      this.showNotification('Error analyzing property', 'error');
+    }
+  }
+
+  /**
+   * Show saved properties modal
+   */
+  async showSavedProperties() {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'getProperties'
       });
 
       if (response.success) {
-        this.showAnalysisModal(response.data);
+        this.displaySavedPropertiesModal(response.data);
       } else {
-        this.showError('Failed to analyze property');
+        this.showNotification('Could not load saved properties', 'error');
       }
-
     } catch (error) {
-      console.error('Error extracting and analyzing property:', error);
-      this.showError('Error analyzing property');
-    } finally {
-      this.hideLoadingIndicator();
+      console.error('Error loading saved properties:', error);
+      this.showNotification('Error loading properties', 'error');
     }
   }
 
   /**
-   * Show loading indicator
+   * Display saved properties in a modal
+   * @param {Array} properties - Array of saved properties
    */
-  showLoadingIndicator() {
-    const button = document.getElementById('re-analyzer-button');
-    if (button) {
-      button.innerHTML = `
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        ">
-          <span>⏳</span>
-          <span>Analyzing...</span>
-        </div>
-      `;
+  displaySavedPropertiesModal(properties) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('saved-properties-modal');
+    if (existingModal) {
+      existingModal.remove();
     }
-  }
 
-  /**
-   * Hide loading indicator
-   */
-  hideLoadingIndicator() {
-    const button = document.getElementById('re-analyzer-button');
-    if (button) {
-      button.innerHTML = `
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        ">
-          <span>📊</span>
-          <span>Analyze Property</span>
-        </div>
-      `;
-    }
-  }
-
-  /**
-   * Show analysis results modal
-   * @param {Object} analysis - Analysis results
-   */
-  showAnalysisModal(analysis) {
-    // Create modal overlay
     const modal = document.createElement('div');
-    modal.id = 're-analyzer-modal';
+    modal.id = 'saved-properties-modal';
     modal.innerHTML = `
       <div style="
         position: fixed;
@@ -709,7 +468,7 @@ class ContentExtractor {
           background: white;
           border-radius: 12px;
           padding: 24px;
-          max-width: 600px;
+          max-width: 800px;
           max-height: 80vh;
           overflow-y: auto;
           margin: 20px;
@@ -723,8 +482,8 @@ class ContentExtractor {
             border-bottom: 2px solid #eee;
             padding-bottom: 16px;
           ">
-            <h2 style="margin: 0; color: #333;">Property Analysis</h2>
-            <button id="close-modal" style="
+            <h2 style="margin: 0; color: #333;">Saved Properties (${properties.length})</h2>
+            <button id="close-properties-modal" style="
               background: #f8f9fa;
               border: none;
               border-radius: 50%;
@@ -735,77 +494,11 @@ class ContentExtractor {
             ">×</button>
           </div>
           
-          <div style="
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 20px;
-          ">
-            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">
-              <h4 style="margin: 0 0 8px 0; color: #007bff;">Monthly Cash Flow</h4>
-              <div style="font-size: 24px; font-weight: bold; color: ${analysis.analysis.financials.cashFlow.monthly >= 0 ? '#28a745' : '#dc3545'};">
-                $${analysis.analysis.financials.cashFlow.monthly.toLocaleString()}
-              </div>
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">
-              <h4 style="margin: 0 0 8px 0; color: #007bff;">Cap Rate</h4>
-              <div style="font-size: 24px; font-weight: bold; color: #333;">
-                ${analysis.analysis.financials.capRate.toFixed(2)}%
-              </div>
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">
-              <h4 style="margin: 0 0 8px 0; color: #007bff;">CoC Return</h4>
-              <div style="font-size: 24px; font-weight: bold; color: #333;">
-                ${analysis.analysis.financials.cocReturn.toFixed(2)}%
-              </div>
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px;">
-              <h4 style="margin: 0 0 8px 0; color: #007bff;">Verdict</h4>
-              <div style="font-size: 18px; font-weight: bold; color: ${this.getVerdictColor(analysis.analysis.verdict)};">
-                ${this.getVerdictEmoji(analysis.analysis.verdict)} ${analysis.analysis.verdict}
-              </div>
-            </div>
-          </div>
-          
-          <div style="margin-bottom: 20px;">
-            <h4 style="color: #333; margin-bottom: 12px;">Recommendation</h4>
-            <p style="margin: 0; line-height: 1.6; color: #666;">
-              ${analysis.analysis.recommendation}
-            </p>
-          </div>
-          
-          ${analysis.analysis.redFlags.length > 0 ? `
-            <div style="margin-bottom: 20px;">
-              <h4 style="color: #dc3545; margin-bottom: 12px;">⚠️ Red Flags</h4>
-              <ul style="margin: 0; padding-left: 20px; color: #666;">
-                ${analysis.analysis.redFlags.map(flag => `<li style="margin-bottom: 8px;">${flag}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-          
-          <div style="display: flex; gap: 12px; justify-content: flex-end;">
-            <button id="save-property" style="
-              background: #28a745;
-              color: white;
-              border: none;
-              padding: 12px 24px;
-              border-radius: 6px;
-              cursor: pointer;
-              font-weight: bold;
-            ">Save Property</button>
-            
-            <button id="export-analysis" style="
-              background: #007bff;
-              color: white;
-              border: none;
-              padding: 12px 24px;
-              border-radius: 6px;
-              cursor: pointer;
-              font-weight: bold;
-            ">Export Analysis</button>
+          <div id="properties-list">
+            ${properties.length === 0 ? 
+              '<p style="text-align: center; color: #666; font-style: italic;">No saved properties yet. Start by analyzing properties on real estate websites!</p>' :
+              properties.map(property => this.createPropertyCard(property)).join('')
+            }
           </div>
         </div>
       </div>
@@ -814,17 +507,8 @@ class ContentExtractor {
     document.body.appendChild(modal);
 
     // Add event listeners
-    document.getElementById('close-modal').addEventListener('click', () => {
+    document.getElementById('close-properties-modal').addEventListener('click', () => {
       modal.remove();
-    });
-
-    document.getElementById('save-property').addEventListener('click', () => {
-      this.saveProperty(analysis.property);
-      modal.remove();
-    });
-
-    document.getElementById('export-analysis').addEventListener('click', () => {
-      this.exportAnalysis(analysis);
     });
 
     // Close modal when clicking outside
@@ -833,6 +517,111 @@ class ContentExtractor {
         modal.remove();
       }
     });
+
+    // Add event listeners for property cards
+    properties.forEach(property => {
+      const analyzeBtn = document.getElementById(`analyze-${property.id}`);
+      if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', () => {
+          this.insertPropertyAnalysisPrompt(property);
+          modal.remove();
+        });
+      }
+    });
+  }
+
+  /**
+   * Create property card HTML
+   * @param {Object} property - Property data
+   * @returns {string} Property card HTML
+   */
+  createPropertyCard(property) {
+    const analysis = property.analysis || {};
+    const financials = analysis.financials || {};
+    const verdict = analysis.verdict || 'Not analyzed';
+    
+    return `
+      <div style="
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        background: #f8f9fa;
+      ">
+        <div style="
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 8px;
+        ">
+          <h4 style="margin: 0; color: #333; font-size: 14px;">
+            ${property.address || 'Unknown Address'}
+          </h4>
+          <span style="
+            background: ${this.getVerdictColor(verdict)};
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+          ">${verdict}</span>
+        </div>
+        
+        <div style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 12px;
+          font-size: 12px;
+        ">
+          <div><strong>Price:</strong> $${property.price?.toLocaleString() || 'N/A'}</div>
+          <div><strong>Beds/Baths:</strong> ${property.beds || '?'}/${property.baths || '?'}</div>
+          <div><strong>Cash Flow:</strong> $${financials.cashFlow?.monthly || 'N/A'}/mo</div>
+          <div><strong>Cap Rate:</strong> ${financials.capRate?.toFixed(2) || 'N/A'}%</div>
+        </div>
+        
+        <button id="analyze-${property.id}" style="
+          background: #007bff;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+          width: 100%;
+        ">Analyze in ChatGPT</button>
+      </div>
+    `;
+  }
+
+  /**
+   * Insert property analysis prompt for a saved property
+   * @param {Object} property - Property data
+   */
+  insertPropertyAnalysisPrompt(property) {
+    const analysis = property.analysis || {};
+    const financials = analysis.financials || {};
+    
+    const prompt = `Please provide detailed analysis for this saved property:
+
+**Property Details:**
+- Address: ${property.address || 'Not available'}
+- Price: $${property.price?.toLocaleString() || 'Not available'}
+- Beds/Baths: ${property.beds || '?'}/${property.baths || '?'}
+- Square Feet: ${property.sqft?.toLocaleString() || 'Not available'}
+- Property Type: ${property.propertyType || 'Not specified'}
+
+${analysis.verdict ? `**Previous Analysis:**
+- Verdict: ${analysis.verdict}
+- Monthly Cash Flow: $${financials.cashFlow?.monthly || 'N/A'}
+- Cap Rate: ${financials.capRate?.toFixed(2) || 'N/A'}%
+- Cash-on-Cash Return: ${financials.cocReturn?.toFixed(2) || 'N/A'}%
+
+Please provide updated market analysis and any new insights.` : 'Please provide a comprehensive investment analysis.'}
+
+**Property URL:** ${property.url || 'Not available'}`;
+
+    this.insertTextIntoChat(prompt);
   }
 
   /**
@@ -850,90 +639,34 @@ class ContentExtractor {
   }
 
   /**
-   * Get emoji for verdict
-   * @param {string} verdict - Verdict string
-   * @returns {string} Emoji
+   * Handle messages from background script
+   * @param {Object} request - Message request
+   * @param {Object} sender - Message sender
+   * @param {Function} sendResponse - Response callback
    */
-  getVerdictEmoji(verdict) {
-    switch (verdict) {
-      case 'Strong Buy': return '✅';
-      case 'Worth Considering': return '🤔';
-      case 'Pass': return '❌';
-      default: return '❓';
-    }
-  }
-
-  /**
-   * Save property to extension storage
-   * @param {Object} property - Property data
-   */
-  async saveProperty(property) {
+  async handleMessage(request, sender, sendResponse) {
     try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'saveProperty',
-        propertyData: property
-      });
+      switch (request.action) {
+        case 'insertPrompt':
+          this.insertTextIntoChat(request.prompt);
+          sendResponse({ success: true });
+          break;
+        
+        case 'analyzeProperty':
+          // This would be called from context menu or other sources
+          if (request.propertyData) {
+            this.insertPropertyAnalysisPrompt(request.propertyData);
+          }
+          sendResponse({ success: true });
+          break;
 
-      if (response.success) {
-        this.showNotification('Property saved successfully!', 'success');
-      } else {
-        this.showNotification('Failed to save property', 'error');
+        default:
+          sendResponse({ success: false, error: 'Unknown action' });
       }
     } catch (error) {
-      console.error('Error saving property:', error);
-      this.showNotification('Error saving property', 'error');
+      console.error('Error handling message:', error);
+      sendResponse({ success: false, error: error.message });
     }
-  }
-
-  /**
-   * Export analysis results
-   * @param {Object} analysis - Analysis data
-   */
-  exportAnalysis(analysis) {
-    const csvData = this.convertAnalysisToCSV(analysis);
-    const blob = new Blob([csvData], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `property-analysis-${Date.now()}.csv`;
-    a.click();
-    
-    URL.revokeObjectURL(url);
-    this.showNotification('Analysis exported successfully!', 'success');
-  }
-
-  /**
-   * Convert analysis to CSV format
-   * @param {Object} analysis - Analysis data
-   * @returns {string} CSV string
-   */
-  convertAnalysisToCSV(analysis) {
-    const { property, analysis: analysisData } = analysis;
-    const financials = analysisData.financials;
-    
-    const headers = [
-      'Address', 'Price', 'Beds', 'Baths', 'Sqft', 'Monthly Cash Flow',
-      'Cap Rate', 'CoC Return', 'Verdict', 'Recommendation'
-    ];
-    
-    const values = [
-      property.address || '',
-      property.price || 0,
-      property.beds || 0,
-      property.baths || 0,
-      property.sqft || 0,
-      financials.cashFlow.monthly || 0,
-      financials.capRate || 0,
-      financials.cocReturn || 0,
-      analysisData.verdict || '',
-      analysisData.recommendation || ''
-    ];
-    
-    return [
-      headers.join(','),
-      values.map(v => `"${v}"`).join(',')
-    ].join('\n');
   }
 
   /**
@@ -945,54 +678,47 @@ class ContentExtractor {
     const notification = document.createElement('div');
     notification.style.cssText = `
       position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+      top: 80px;
+      right: 20px;
       z-index: 10002;
       background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff'};
       color: white;
-      padding: 16px 24px;
+      padding: 12px 16px;
       border-radius: 8px;
-      font-family: Arial, sans-serif;
-      font-weight: bold;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      animation: slideDown 0.3s ease;
+      max-width: 300px;
+      animation: slideIn 0.3s ease;
     `;
     notification.textContent = message;
 
     // Add CSS animation
     const style = document.createElement('style');
     style.textContent = `
-      @keyframes slideDown {
-        from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
-        to { transform: translateX(-50%) translateY(0); opacity: 1; }
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
       }
     `;
     document.head.appendChild(style);
 
     document.body.appendChild(notification);
 
-    // Remove notification after 3 seconds
+    // Remove notification after 4 seconds
     setTimeout(() => {
       notification.remove();
       style.remove();
-    }, 3000);
-  }
-
-  /**
-   * Show error notification
-   * @param {string} message - Error message
-   */
-  showError(message) {
-    this.showNotification(message, 'error');
+    }, 4000);
   }
 }
 
-// Initialize content extractor when DOM is ready
+// Initialize ChatGPT Real Estate Analyzer when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    new ContentExtractor();
+    new ChatGPTRealEstateAnalyzer();
   });
 } else {
-  new ContentExtractor();
+  new ChatGPTRealEstateAnalyzer();
 }
