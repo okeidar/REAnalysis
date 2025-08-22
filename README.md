@@ -8,6 +8,7 @@ A Chrome extension that works exclusively on ChatGPT (chatgpt.com and chat.opena
 - **Visual Indicator**: Shows a temporary notification when the extension loads on ChatGPT
 - **Status Popup**: Click the extension icon to see current status and site information
 - **Smart Icon**: Extension icon changes based on whether you're on ChatGPT or not
+- **Property Link Analyzer**: Paste property links (Zillow, Realtor.com, etc.) and get comprehensive analysis from ChatGPT
 
 ## Installation
 
@@ -28,10 +29,32 @@ This extension will be available on the Chrome Web Store once published.
 
 ## Usage
 
+### Basic Usage
 1. **Navigate to ChatGPT**: Go to https://chatgpt.com or https://chat.openai.com
 2. **Extension Activates**: You'll see a temporary "🤖 ChatGPT Helper Active" notification
 3. **Check Status**: Click the extension icon to see detailed status information
 4. **Other Sites**: The extension remains inactive on all other websites
+
+### Property Link Analysis
+1. **Open ChatGPT**: Navigate to ChatGPT in your browser
+2. **Click Extension Icon**: The popup will show the Property Link Analyzer section
+3. **Paste Property Link**: 
+   - Manually paste a property URL, or
+   - Click the "📋 Paste" button to paste from clipboard
+4. **Click "🔍 Analyze"**: The extension will insert a comprehensive analysis prompt into ChatGPT
+5. **Review Results**: ChatGPT will analyze the property and provide detailed insights
+
+#### Supported Property Websites
+- Zillow.com
+- Realtor.com
+- Redfin.com
+- Homes.com
+- Trulia.com
+- Apartments.com
+- Rent.com
+- HotPads.com
+- PadMapper.com
+- LoopNet.com
 
 ## File Structure
 
@@ -59,6 +82,7 @@ This extension will be available on the Chrome Web Store once published.
 2. Navigate to ChatGPT - you should see the activation indicator
 3. Navigate to any other website - the extension should remain inactive
 4. Click the extension icon on both types of sites to verify status display
+5. Test property link analysis by pasting a valid property URL
 
 ### Adding Features
 - Modify `content.js` for ChatGPT page interactions
@@ -77,9 +101,16 @@ This extension:
 - Only requests permissions for ChatGPT domains
 - Does not collect or transmit any user data
 - Runs only on specified domains for security
-- Uses minimal permissions (activeTab, storage)
+- Uses minimal permissions (activeTab, storage, clipboardRead)
+- Validates property links before processing
 
 ## Version History
+
+### v1.0.1
+- Added Property Link Analyzer feature
+- Support for major property websites
+- Clipboard paste functionality
+- Enhanced popup interface with property analysis section
 
 ### v1.0.0
 - Initial release
@@ -94,6 +125,7 @@ If you encounter any issues:
 2. Verify you're on the correct ChatGPT domain
 3. Try reloading the extension in `chrome://extensions/`
 4. Ensure you're using a supported Chrome version
+5. For property analysis issues, verify the link is from a supported property website
 
 ## License
 
