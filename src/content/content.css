@@ -1,0 +1,448 @@
+/**
+ * Content Script CSS for Real Estate Analyzer
+ * Styles for injected elements on property pages
+ */
+
+/* Analyze button styles */
+#re-analyzer-button {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+#re-analyzer-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(0, 123, 255, 0.4) !important;
+}
+
+#re-analyzer-button:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3) !important;
+}
+
+/* Modal styles */
+#re-analyzer-modal {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  box-sizing: border-box !important;
+  z-index: 2147483647 !important; /* Maximum z-index to appear above everything */
+}
+
+#re-analyzer-modal * {
+  box-sizing: border-box !important;
+}
+
+#re-analyzer-modal h2,
+#re-analyzer-modal h3,
+#re-analyzer-modal h4 {
+  font-family: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#re-analyzer-modal p,
+#re-analyzer-modal li {
+  font-family: inherit !important;
+  line-height: 1.5 !important;
+}
+
+#re-analyzer-modal ul {
+  margin: 0 !important;
+  padding-left: 20px !important;
+}
+
+#re-analyzer-modal button {
+  font-family: inherit !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  outline: none !important;
+}
+
+#re-analyzer-modal button:hover {
+  opacity: 0.9 !important;
+  transform: translateY(-1px) !important;
+}
+
+#re-analyzer-modal button:active {
+  transform: translateY(0) !important;
+}
+
+/* Close button specific styles */
+#close-modal {
+  background: #f8f9fa !important;
+  color: #6c757d !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+#close-modal:hover {
+  background: #e9ecef !important;
+  color: #495057 !important;
+}
+
+/* Analysis grid styles */
+.re-analysis-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+.re-analysis-card {
+  background: #f8f9fa !important;
+  padding: 16px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e9ecef !important;
+}
+
+.re-analysis-card h4 {
+  margin: 0 0 8px 0 !important;
+  color: #007bff !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.re-analysis-value {
+  font-size: 24px !important;
+  font-weight: bold !important;
+  line-height: 1.2 !important;
+}
+
+.re-analysis-value.positive {
+  color: #28a745 !important;
+}
+
+.re-analysis-value.negative {
+  color: #dc3545 !important;
+}
+
+.re-analysis-value.neutral {
+  color: #333 !important;
+}
+
+/* Recommendation section */
+.re-recommendation {
+  background: #fff3cd !important;
+  border: 1px solid #ffeaa7 !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+.re-recommendation h4 {
+  color: #856404 !important;
+  margin-bottom: 12px !important;
+}
+
+.re-recommendation p {
+  color: #856404 !important;
+  margin: 0 !important;
+}
+
+/* Red flags section */
+.re-red-flags {
+  background: #f8d7da !important;
+  border: 1px solid #f5c6cb !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+.re-red-flags h4 {
+  color: #721c24 !important;
+  margin-bottom: 12px !important;
+}
+
+.re-red-flags ul {
+  color: #721c24 !important;
+  margin: 0 !important;
+  padding-left: 20px !important;
+}
+
+.re-red-flags li {
+  margin-bottom: 8px !important;
+}
+
+/* Action buttons */
+.re-action-buttons {
+  display: flex !important;
+  gap: 12px !important;
+  justify-content: flex-end !important;
+  padding-top: 20px !important;
+  border-top: 1px solid #e9ecef !important;
+}
+
+.re-btn {
+  padding: 12px 24px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 14px !important;
+}
+
+.re-btn-primary {
+  background: #007bff !important;
+  color: white !important;
+}
+
+.re-btn-primary:hover {
+  background: #0056b3 !important;
+}
+
+.re-btn-success {
+  background: #28a745 !important;
+  color: white !important;
+}
+
+.re-btn-success:hover {
+  background: #1e7e34 !important;
+}
+
+.re-btn-secondary {
+  background: #6c757d !important;
+  color: white !important;
+}
+
+.re-btn-secondary:hover {
+  background: #545b62 !important;
+}
+
+/* Notification styles */
+.re-notification {
+  position: fixed !important;
+  top: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 2147483647 !important;
+  padding: 16px 24px !important;
+  border-radius: 8px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  animation: re-slideDown 0.3s ease !important;
+  max-width: 400px !important;
+  text-align: center !important;
+}
+
+.re-notification.success {
+  background: #28a745 !important;
+  color: white !important;
+}
+
+.re-notification.error {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+.re-notification.info {
+  background: #007bff !important;
+  color: white !important;
+}
+
+/* Animations */
+@keyframes re-slideDown {
+  from {
+    transform: translateX(-50%) translateY(-100%) !important;
+    opacity: 0 !important;
+  }
+  to {
+    transform: translateX(-50%) translateY(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+@keyframes re-fadeIn {
+  from {
+    opacity: 0 !important;
+  }
+  to {
+    opacity: 1 !important;
+  }
+}
+
+@keyframes re-scaleIn {
+  from {
+    transform: scale(0.9) !important;
+    opacity: 0 !important;
+  }
+  to {
+    transform: scale(1) !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Modal animation */
+#re-analyzer-modal {
+  animation: re-fadeIn 0.3s ease !important;
+}
+
+#re-analyzer-modal > div > div {
+  animation: re-scaleIn 0.3s ease !important;
+}
+
+/* Loading states */
+.re-loading {
+  opacity: 0.7 !important;
+  pointer-events: none !important;
+}
+
+.re-loading::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 20px !important;
+  height: 20px !important;
+  margin: -10px 0 0 -10px !important;
+  border: 2px solid transparent !important;
+  border-top: 2px solid #007bff !important;
+  border-radius: 50% !important;
+  animation: re-spin 1s linear infinite !important;
+}
+
+@keyframes re-spin {
+  0% {
+    transform: rotate(0deg) !important;
+  }
+  100% {
+    transform: rotate(360deg) !important;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #re-analyzer-modal > div > div {
+    margin: 10px !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100vh - 20px) !important;
+  }
+
+  .re-analysis-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .re-action-buttons {
+    flex-direction: column !important;
+  }
+
+  .re-btn {
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  #re-analyzer-button {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    top: auto !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  #re-analyzer-button {
+    border: 2px solid currentColor !important;
+  }
+
+  .re-analysis-card {
+    border: 2px solid #000 !important;
+  }
+
+  .re-btn {
+    border: 2px solid currentColor !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  #re-analyzer-button,
+  #re-analyzer-modal,
+  #re-analyzer-modal *,
+  .re-notification {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  #re-analyzer-modal > div > div {
+    background: #2d3748 !important;
+    color: #e2e8f0 !important;
+  }
+
+  .re-analysis-card {
+    background: #4a5568 !important;
+    border-color: #718096 !important;
+  }
+
+  .re-analysis-card h4 {
+    color: #63b3ed !important;
+  }
+
+  .re-recommendation {
+    background: #744210 !important;
+    border-color: #975a16 !important;
+  }
+
+  .re-recommendation h4,
+  .re-recommendation p {
+    color: #fbd38d !important;
+  }
+
+  .re-red-flags {
+    background: #742a2a !important;
+    border-color: #9b2c2c !important;
+  }
+
+  .re-red-flags h4,
+  .re-red-flags ul,
+  .re-red-flags li {
+    color: #fed7d7 !important;
+  }
+
+  #close-modal {
+    background: #4a5568 !important;
+    color: #e2e8f0 !important;
+  }
+
+  #close-modal:hover {
+    background: #2d3748 !important;
+  }
+}
+
+/* Ensure styles don't interfere with existing page styles */
+#re-analyzer-button,
+#re-analyzer-modal,
+.re-notification {
+  all: initial !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Reset specific properties that might be inherited */
+#re-analyzer-button *,
+#re-analyzer-modal *,
+.re-notification * {
+  text-shadow: none !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-indent: 0 !important;
+  text-decoration: none !important;
+  text-transform: none !important;
+  white-space: normal !important;
+  direction: ltr !important;
+  unicode-bidi: normal !important;
+}

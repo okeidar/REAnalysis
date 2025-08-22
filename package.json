@@ -1,0 +1,61 @@
+{
+  "name": "chatgpt-real-estate-analyzer",
+  "version": "1.0.0",
+  "description": "Transform ChatGPT into a real estate portfolio manager. Analyze, compare, and organize properties from major real estate sites.",
+  "main": "manifest.json",
+  "scripts": {
+    "dev": "echo 'Load extension in Chrome Developer mode'",
+    "build": "echo 'Building extension for production'",
+    "test": "echo 'Running tests'",
+    "lint": "echo 'Linting code'",
+    "package": "zip -r real-estate-analyzer-extension.zip . -x '*.git*' '*.DS_Store*' 'node_modules/*' 'package*.json' 'README.md' 'assets/icons/create_icons.py'"
+  },
+  "keywords": [
+    "chrome-extension",
+    "real-estate",
+    "chatgpt",
+    "investment",
+    "property-analysis",
+    "zillow",
+    "redfin",
+    "realtor",
+    "trulia",
+    "portfolio-management"
+  ],
+  "author": "Real Estate Analyzer Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/re-analyzer-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/re-analyzer-extension/issues"
+  },
+  "homepage": "https://github.com/your-username/re-analyzer-extension#readme",
+  "devDependencies": {},
+  "dependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browser": {
+    "chrome": ">=88.0.0"
+  },
+  "manifestVersion": 3,
+  "extensionMetadata": {
+    "category": "Productivity",
+    "targetAudience": "Real Estate Investors",
+    "supportedSites": [
+      "zillow.com",
+      "redfin.com", 
+      "realtor.com",
+      "trulia.com"
+    ],
+    "features": [
+      "Property Analysis",
+      "Portfolio Management",
+      "ChatGPT Integration",
+      "Market Insights",
+      "Export Tools"
+    ]
+  }
+}
