@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator for ChatGPT Helper Extension</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .icon-container {
+            display: inline-block;
+            margin: 20px;
+            text-align: center;
+        }
+        .icon {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .icon-16 { width: 16px; height: 16px; font-size: 8px; }
+        .icon-32 { width: 32px; height: 32px; font-size: 16px; }
+        .icon-48 { width: 48px; height: 48px; font-size: 24px; }
+        .icon-128 { width: 128px; height: 128px; font-size: 64px; }
+        
+        .gray {
+            background: #ccc;
+            color: #666;
+        }
+        
+        .instructions {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #10a37f;
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">
+        <h2>📋 Instructions</h2>
+        <p>To create the required icon files for the Chrome extension:</p>
+        <ol>
+            <li>Open this HTML file in your browser</li>
+            <li>Right-click on each icon below and "Save image as..."</li>
+            <li>Save them in the <code>icons/</code> folder with the exact names shown</li>
+            <li>Alternatively, use browser dev tools to screenshot each icon at the exact dimensions</li>
+        </ol>
+        <p><strong>Note:</strong> You can also use any image editor to create 16x16, 32x32, 48x48, and 128x128 PNG files with a robot/chat icon.</p>
+    </div>
+
+    <h2>🤖 Active Icons (for ChatGPT pages)</h2>
+    <div class="icon-container">
+        <div class="icon icon-16">🤖</div>
+        <div>icon16.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-32">🤖</div>
+        <div>icon32.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-48">🤖</div>
+        <div>icon48.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-128">🤖</div>
+        <div>icon128.png</div>
+    </div>
+
+    <h2>⚫ Inactive Icons (for other pages)</h2>
+    <div class="icon-container">
+        <div class="icon icon-16 gray">🤖</div>
+        <div>icon16-gray.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-32 gray">🤖</div>
+        <div>icon32-gray.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-48 gray">🤖</div>
+        <div>icon48-gray.png</div>
+    </div>
+    <div class="icon-container">
+        <div class="icon icon-128 gray">🤖</div>
+        <div>icon128-gray.png</div>
+    </div>
+
+    <div class="instructions">
+        <h3>🎨 Alternative: Using SVG</h3>
+        <p>You can also create SVG versions and convert them to PNG:</p>
+        <textarea readonly style="width: 100%; height: 150px;">
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" fill="#10a37f" rx="16"/>
+  <text x="64" y="80" text-anchor="middle" font-size="64" fill="white">🤖</text>
+</svg>
+        </textarea>
+    </div>
+</body>
+</html>

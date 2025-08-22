@@ -1,0 +1,44 @@
+/* ChatGPT Helper Extension Styles */
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Extension indicator styles */
+#chatgpt-helper-indicator {
+  transition: all 0.3s ease-out;
+}
+
+#chatgpt-helper-indicator:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Additional utility classes for future features */
+.chatgpt-helper-highlight {
+  background-color: rgba(16, 163, 127, 0.1);
+  border-left: 3px solid #10a37f;
+  padding-left: 8px;
+}
+
+.chatgpt-helper-button {
+  background: #10a37f;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chatgpt-helper-button:hover {
+  background: #0d8a69;
+}
