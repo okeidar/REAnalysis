@@ -86,46 +86,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
   
-  // Handle saving property analysis data with enhanced logging
+  // Handle saving property analysis data
   if (request.action === 'savePropertyAnalysis') {
-    console.log('🔄 Background script saving property analysis for:', request.propertyUrl);
-    console.log('📊 Analysis data received:', {
-      hasFullResponse: !!request.analysisData?.fullResponse,
-      responseLength: request.analysisData?.fullResponse?.length || 0,
-      extractedDataKeys: Object.keys(request.analysisData?.extractedData || {}),
-      extractedDataCount: Object.keys(request.analysisData?.extractedData || {}).length
-    });
+    console.log('Background script saving property analysis:', request.propertyUrl);
     
     (async () => {
       try {
         // Get existing property history
         const result = await chrome.storage.local.get(['propertyHistory']);
         const history = result.propertyHistory || [];
-        console.log(`📚 Current history has ${history.length} entries`);
         
         // Find the property entry to update
         const propertyIndex = history.findIndex(item => item.url === request.propertyUrl);
-        console.log(`🔍 Property index in history: ${propertyIndex}`);
         
         if (propertyIndex !== -1) {
           // Update existing entry with analysis data
-          const oldEntry = { ...history[propertyIndex] };
           history[propertyIndex].analysis = request.analysisData;
           history[propertyIndex].analysisTimestamp = Date.now();
           
           // Save updated history
           await chrome.storage.local.set({ propertyHistory: history });
           
-          console.log('✅ Property analysis data saved successfully');
-          console.log('📝 Updated entry:', {
-            url: history[propertyIndex].url,
-            hadAnalysisBefore: !!oldEntry.analysis,
-            hasAnalysisNow: !!history[propertyIndex].analysis,
-            extractedKeys: Object.keys(history[propertyIndex].analysis?.extractedData || {})
-          });
-          sendResponse({ success: true, updated: true });
+          console.log('Property analysis data saved successfully');
+          sendResponse({ success: true });
         } else {
-          console.log('⚠️ Property not found in history, creating new entry');
+          console.log('Property not found in history, creating new entry');
           
           // Create new entry with analysis data
           const newEntry = {
@@ -146,35 +131,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           
           await chrome.storage.local.set({ propertyHistory: history });
           
-          console.log('✅ New property entry with analysis created');
-          console.log('📝 New entry:', {
-            url: newEntry.url,
-            domain: newEntry.domain,
-            hasAnalysis: !!newEntry.analysis,
-            extractedKeys: Object.keys(newEntry.analysis?.extractedData || {})
-          });
-          sendResponse({ success: true, created: true });
-        }
-        
-        // Verify the save was successful
-        const verificationResult = await chrome.storage.local.get(['propertyHistory']);
-        const verificationHistory = verificationResult.propertyHistory || [];
-        const verificationEntry = verificationHistory.find(item => item.url === request.propertyUrl);
-        
-        if (verificationEntry && verificationEntry.analysis) {
-          console.log('✅ Save verification successful - analysis data is present');
-        } else {
-          console.error('❌ Save verification failed - analysis data is missing');
+          console.log('New property entry with analysis created');
+          sendResponse({ success: true });
         }
         
       } catch (error) {
-        console.error('❌ Failed to save property analysis:', error);
-        console.error('Error details:', {
-          message: error.message,
-          stack: error.stack,
-          propertyUrl: request.propertyUrl,
-          hasAnalysisData: !!request.analysisData
-        });
+        console.error('Failed to save property analysis:', error);
         sendResponse({ success: false, error: error.message });
       }
     })();
