@@ -503,108 +503,6 @@ function injectContentScript() {
   });
 }
 
-
-  
-// Initialize popup
-async function initializePopup() {
-  try {
-    // Get current tab
-    const tabs = await new Promise((resolve) => {
-      chrome.tabs.query({active: true, currentWindow: true}, resolve);
-    });
-    
-    currentTab = tabs[0];
-    
-    if (!currentTab) {
-      throw new Error('No active tab found');
-    }
-    
-    console.log('Current tab:', currentTab.url);
-    
-    // Check if we're on ChatGPT
-    const isChatGPT = currentTab.url && (
-      currentTab.url.includes('chatgpt.com') || 
-      currentTab.url.includes('chat.openai.com')
-    );
-    
-    if (isChatGPT) {
-      // Try to communicate with content script
-      try {
-        const response = await sendMessageWithRetry({action: 'checkStatus'}, 2, 500);
-        
-        if (response && response.active) {
-          // Content script is active
-          statusElement.className = 'status active';
-          statusElement.textContent = '✅ Active on ChatGPT';
-          contentScriptReady = true;
-          
-          // Show site info
-          infoElement.style.display = 'block';
-          siteElement.textContent = response.site;
-          urlElement.textContent = response.url;
-          
-          // Show property link section
-          propertyLinkSection.style.display = 'block';
-          
-          // Show and load property history section
-          propertyHistorySection.style.display = 'block';
-          await loadPropertyHistory();
-          
-        } else {
-          throw new Error('Content script not responding properly');
-        }
-        
-      } catch (error) {
-        console.log('Content script communication failed, will try to inject:', error.message);
-        
-        // Content script might not be loaded, show as active anyway since we're on ChatGPT
-        statusElement.className = 'status active';
-        statusElement.textContent = '✅ Active on ChatGPT (initializing...)';
-        
-        // Show site info
-        infoElement.style.display = 'block';
-        siteElement.textContent = new URL(currentTab.url).hostname;
-        urlElement.textContent = currentTab.url;
-        
-        // Show property link section
-        propertyLinkSection.style.display = 'block';
-        
-        // Show and load property history section
-        propertyHistorySection.style.display = 'block';
-        await loadPropertyHistory();
-        
-        // Try to inject content script
-        try {
-          await injectContentScript();
-          contentScriptReady = true;
-          statusElement.textContent = '✅ Active on ChatGPT';
-        } catch (injectError) {
-          console.error('Failed to inject content script:', injectError);
-        }
-      }
-      
-    } else {
-      // Not on ChatGPT
-      statusElement.className = 'status inactive';
-      statusElement.textContent = '❌ Not available on this site';
-      
-      // Show site info
-      infoElement.style.display = 'block';
-      siteElement.textContent = new URL(currentTab.url).hostname;
-      urlElement.textContent = currentTab.url;
-    }
-    
-  } catch (error) {
-    console.error('Failed to initialize popup:', error);
-    statusElement.className = 'status inactive';
-    statusElement.textContent = '⚠️ Unable to check status';
-  }
-}
-  
-
-
-
-
 // Function to handle analyze button click
 async function handleAnalyzeClick() {
   if (!propertyUrlInput) return;
@@ -628,28 +526,15 @@ async function handleAnalyzeClick() {
   }
   
   try {
-    // Get current tab
-    const tabs = await new Promise((resolve) => {
-      chrome.tabs.query({active: true, currentWindow: true}, resolve);
-    });
-    
-    const currentTab = tabs[0];
-    if (!currentTab) {
-      throw new Error('No active tab found');
+    // First ensure content script is ready
+    if (!contentScriptReady) {
+      console.log('Content script not ready, attempting to inject...');
+      await injectContentScript();
+      contentScriptReady = true;
     }
     
-    // Check if we're on ChatGPT
-    const isChatGPT = currentTab.url && (
-      currentTab.url.includes('chatgpt.com') || 
-      currentTab.url.includes('chat.openai.com')
-    );
-    
-    if (!isChatGPT) {
-      throw new Error('Please navigate to ChatGPT first');
-    }
-    
-    // Send message to content script
-    const response = await chrome.tabs.sendMessage(currentTab.id, {
+    // Send message to content script with retry logic
+    const response = await sendMessageWithRetry({
       action: 'analyzeProperty',
       link: link
     });
