@@ -2,27 +2,53 @@
 
 // DOM elements
 let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, analyzeBtn, 
-    statusElement, propertySection, siteInfoElement, connectionStatus;
+    statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
+    successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
+    propertyHistorySection;
+
+// Global variables
+let currentTab = null;
+let contentScriptReady = false;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 ChatGPT Helper popup loaded');
   
-  // Get DOM elements
-  propertyHistoryList = document.getElementById('property-history-list');
-  clearHistoryBtn = document.getElementById('clear-history-btn');
-  exportHistoryBtn = document.getElementById('export-history-btn');
-  propertyUrlInput = document.getElementById('property-url-input');
-  analyzeBtn = document.getElementById('analyze-btn');
+  // Get DOM elements with correct IDs from HTML
+  propertyHistoryList = document.getElementById('propertyHistoryList');
+  clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  exportHistoryBtn = document.getElementById('exportHistoryBtn');
+  propertyUrlInput = document.getElementById('propertyLinkInput');
+  analyzeBtn = document.getElementById('analyzeBtn');
+  pasteBtn = document.getElementById('pasteBtn');
   statusElement = document.getElementById('status');
-  propertySection = document.querySelector('.property-section');
-  siteInfoElement = document.getElementById('site-info');
-  connectionStatus = document.getElementById('connection-status');
+  successMessage = document.getElementById('successMessage');
+  errorMessage = document.getElementById('errorMessage');
+  propertyLinkSection = document.getElementById('propertyLinkSection');
+  propertyHistorySection = document.getElementById('propertyHistorySection');
+  infoElement = document.getElementById('info');
+  siteElement = document.getElementById('site');
+  urlElement = document.getElementById('url');
 
   // Set up event listeners
-  if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', clearPropertyHistory);
+  if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
+    if (confirm('Are you sure you want to clear all property history?')) {
+      await clearPropertyHistory();
+    }
+  });
   if (exportHistoryBtn) exportHistoryBtn.addEventListener('click', exportPropertyHistory);
   if (analyzeBtn) analyzeBtn.addEventListener('click', handleAnalyzeClick);
+  if (pasteBtn) pasteBtn.addEventListener('click', async function() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (propertyUrlInput) {
+        propertyUrlInput.value = text;
+        showSuccess('Link pasted successfully!');
+      }
+    } catch (err) {
+      showError('Unable to paste from clipboard. Please paste manually.');
+    }
+  });
 
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -33,15 +59,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Load initial data
+  // Load initial data and check site status
   await loadPropertyHistory();
-  await checkSiteStatus();
+  await initializePopup();
   
   // Set up periodic refresh for pending analyses
   setInterval(async () => {
     await loadPropertyHistory();
   }, 5000); // Refresh every 5 seconds to catch pending -> analyzed transitions
 });
+
+// Helper function to show success message
+function showSuccess(message) {
+  if (successMessage && errorMessage) {
+    successMessage.textContent = message;
+    successMessage.style.display = 'block';
+    errorMessage.style.display = 'none';
+    setTimeout(() => {
+      successMessage.style.display = 'none';
+    }, 3000);
+  }
+}
+
+// Helper function to show error message
+function showError(message) {
+  if (errorMessage && successMessage) {
+    errorMessage.textContent = message;
+    errorMessage.style.display = 'block';
+    successMessage.style.display = 'none';
+    setTimeout(() => {
+      errorMessage.style.display = 'none';
+    }, 5000);
+  }
+}
 
 // Function to save property to history
 async function savePropertyToHistory(url) {
@@ -453,78 +503,63 @@ function injectContentScript() {
   });
 }
 
-// Property history button event listeners
-// clearHistoryBtn.addEventListener('click', async function() {
-//   if (confirm('Are you sure you want to clear all property history?')) {
-//     await clearPropertyHistory();
-//   }
-// });
+// Function to handle analyze button click
+async function handleAnalyzeClick() {
+  if (!propertyUrlInput) return;
   
-// exportHistoryBtn.addEventListener('click', function() {
-//   exportPropertyHistory();
-// });
+  const link = propertyUrlInput.value.trim();
   
-// Paste button functionality
-// pasteBtn.addEventListener('click', async function() {
-//   try {
-//     const text = await navigator.clipboard.readText();
-//     propertyLinkInput.value = text;
-//     showSuccess('Link pasted successfully!');
-//   } catch (err) {
-//     showError('Unable to paste from clipboard. Please paste manually.');
-//   }
-// });
+  if (!link) {
+    showError('Please enter a property link first.');
+    return;
+  }
   
-// Analyze button functionality
-// analyzeBtn.addEventListener('click', async function() {
-//   const link = propertyLinkInput.value.trim();
+  if (!isValidPropertyLink(link)) {
+    showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
+    return;
+  }
   
-//   if (!link) {
-//     showError('Please enter a property link first.');
-//     return;
-//   }
+  // Disable button while processing
+  if (analyzeBtn) {
+    analyzeBtn.disabled = true;
+    analyzeBtn.textContent = '🔄 Analyzing...';
+  }
   
-//   if (!isValidPropertyLink(link)) {
-//     showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
-//     return;
-//   }
-  
-//   // Disable button while processing
-//   analyzeBtn.disabled = true;
-//   analyzeBtn.textContent = '🔄 Analyzing...';
-  
-//   try {
-//     // First ensure content script is ready
-//     if (!contentScriptReady) {
-//       console.log('Content script not ready, attempting to inject...');
-//       await injectContentScript();
-//     }
+  try {
+    // First ensure content script is ready
+    if (!contentScriptReady) {
+      console.log('Content script not ready, attempting to inject...');
+      await injectContentScript();
+      contentScriptReady = true;
+    }
     
-//     // Send message to content script with retry logic
-//     const response = await sendMessageWithRetry({
-//       action: 'analyzeProperty',
-//       link: link
-//     });
+    // Send message to content script with retry logic
+    const response = await sendMessageWithRetry({
+      action: 'analyzeProperty',
+      link: link
+    });
     
-//     if (response && response.success) {
-//       // Save property to history
-//       await savePropertyToHistory(link);
-//       showSuccess('Property link sent to ChatGPT for analysis!');
-//       propertyLinkInput.value = ''; // Clear the input
-//     } else {
-//       throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
-//     }
+    if (response && response.success) {
+      // Save property to history
+      await savePropertyToHistory(link);
+      showSuccess('Property link sent to ChatGPT for analysis!');
+      if (propertyUrlInput) propertyUrlInput.value = ''; // Clear the input
+    } else {
+      throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
+    }
     
-//   } catch (error) {
-//     console.error('Analysis failed:', error);
-//     showError(`Unable to communicate with ChatGPT: ${error.message}`);
-//   } finally {
-//     analyzeBtn.disabled = false;
-//     analyzeBtn.textContent = '🔍 Analyze';
-//   }
-// });
-  
-// Initialize popup
+  } catch (error) {
+    console.error('Analysis failed:', error);
+    showError(`Unable to communicate with ChatGPT: ${error.message}`);
+  } finally {
+    if (analyzeBtn) {
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = '🔍 Analyze';
+    }
+  }
+}
+
+// Initialize popup functionality
 async function initializePopup() {
   try {
     // Get current tab
@@ -558,16 +593,15 @@ async function initializePopup() {
           contentScriptReady = true;
           
           // Show site info
-          infoElement.style.display = 'block';
-          siteElement.textContent = response.site;
-          urlElement.textContent = response.url;
+          if (infoElement) infoElement.style.display = 'block';
+          if (siteElement) siteElement.textContent = response.site;
+          if (urlElement) urlElement.textContent = response.url;
           
           // Show property link section
-          propertyLinkSection.style.display = 'block';
+          if (propertyLinkSection) propertyLinkSection.style.display = 'block';
           
           // Show and load property history section
-          propertyHistorySection.style.display = 'block';
-          await loadPropertyHistory();
+          if (propertyHistorySection) propertyHistorySection.style.display = 'block';
           
         } else {
           throw new Error('Content script not responding properly');
@@ -581,16 +615,15 @@ async function initializePopup() {
         statusElement.textContent = '✅ Active on ChatGPT (initializing...)';
         
         // Show site info
-        infoElement.style.display = 'block';
-        siteElement.textContent = new URL(currentTab.url).hostname;
-        urlElement.textContent = currentTab.url;
+        if (infoElement) infoElement.style.display = 'block';
+        if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
+        if (urlElement) urlElement.textContent = currentTab.url;
         
         // Show property link section
-        propertyLinkSection.style.display = 'block';
+        if (propertyLinkSection) propertyLinkSection.style.display = 'block';
         
         // Show and load property history section
-        propertyHistorySection.style.display = 'block';
-        await loadPropertyHistory();
+        if (propertyHistorySection) propertyHistorySection.style.display = 'block';
         
         // Try to inject content script
         try {
@@ -608,143 +641,14 @@ async function initializePopup() {
       statusElement.textContent = '❌ Not available on this site';
       
       // Show site info
-      infoElement.style.display = 'block';
-      siteElement.textContent = new URL(currentTab.url).hostname;
-      urlElement.textContent = currentTab.url;
+      if (infoElement) infoElement.style.display = 'block';
+      if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
+      if (urlElement) urlElement.textContent = currentTab.url;
     }
     
   } catch (error) {
     console.error('Failed to initialize popup:', error);
     statusElement.className = 'status inactive';
     statusElement.textContent = '⚠️ Unable to check status';
-  }
-}
-  
-// Initialize the popup
-// initializePopup();
-
-// Helper functions for UI
-function showSuccess(message) {
-  console.log('✅ Success:', message);
-  // You can implement a toast notification here if needed
-}
-
-function showError(message) {
-  console.error('❌ Error:', message);
-  // You can implement a toast notification here if needed
-}
-
-// Function to handle analyze button click
-async function handleAnalyzeClick() {
-  if (!propertyUrlInput) return;
-  
-  const link = propertyUrlInput.value.trim();
-  
-  if (!link) {
-    showError('Please enter a property link first.');
-    return;
-  }
-  
-  if (!isValidPropertyLink(link)) {
-    showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
-    return;
-  }
-  
-  // Disable button while processing
-  if (analyzeBtn) {
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = '🔄 Analyzing...';
-  }
-  
-  try {
-    // Get current tab
-    const tabs = await new Promise((resolve) => {
-      chrome.tabs.query({active: true, currentWindow: true}, resolve);
-    });
-    
-    const currentTab = tabs[0];
-    if (!currentTab) {
-      throw new Error('No active tab found');
-    }
-    
-    // Check if we're on ChatGPT
-    const isChatGPT = currentTab.url && (
-      currentTab.url.includes('chatgpt.com') || 
-      currentTab.url.includes('chat.openai.com')
-    );
-    
-    if (!isChatGPT) {
-      throw new Error('Please navigate to ChatGPT first');
-    }
-    
-    // Send message to content script
-    const response = await chrome.tabs.sendMessage(currentTab.id, {
-      action: 'analyzeProperty',
-      link: link
-    });
-    
-    if (response && response.success) {
-      // Save property to history
-      await savePropertyToHistory(link);
-      showSuccess('Property link sent to ChatGPT for analysis!');
-      if (propertyUrlInput) propertyUrlInput.value = ''; // Clear the input
-    } else {
-      throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
-    }
-    
-  } catch (error) {
-    console.error('Analysis failed:', error);
-    showError(`Unable to communicate with ChatGPT: ${error.message}`);
-  } finally {
-    if (analyzeBtn) {
-      analyzeBtn.disabled = false;
-      analyzeBtn.textContent = '🔍 Analyze';
-    }
-  }
-}
-
-// Function to check site status
-async function checkSiteStatus() {
-  try {
-    const tabs = await new Promise((resolve) => {
-      chrome.tabs.query({active: true, currentWindow: true}, resolve);
-    });
-    
-    const currentTab = tabs[0];
-    if (!currentTab) return;
-    
-    const isChatGPT = currentTab.url && (
-      currentTab.url.includes('chatgpt.com') || 
-      currentTab.url.includes('chat.openai.com')
-    );
-    
-    if (statusElement) {
-      if (isChatGPT) {
-        statusElement.className = 'status active';
-        statusElement.textContent = '✅ Active on ChatGPT';
-        
-        if (propertySection) {
-          propertySection.style.display = 'block';
-        }
-      } else {
-        statusElement.className = 'status inactive';
-        statusElement.textContent = '❌ Not available on this site';
-        
-        if (propertySection) {
-          propertySection.style.display = 'none';
-        }
-      }
-    }
-    
-    if (siteInfoElement) {
-      siteInfoElement.textContent = `Site: ${new URL(currentTab.url).hostname}`;
-    }
-    
-  } catch (error) {
-    console.error('Failed to check site status:', error);
-    if (statusElement) {
-      statusElement.className = 'status inactive';
-      statusElement.textContent = '⚠️ Unable to check status';
-    }
   }
 }
