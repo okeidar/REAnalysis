@@ -14,110 +14,338 @@ function isChatGPTSite() {
 function extractPropertyAnalysisData(responseText) {
   if (!responseText || typeof responseText !== 'string') return null;
   
+  console.log('Extracting property analysis from response (first 200 chars):', responseText.substring(0, 200));
+  
   const analysis = {
     fullResponse: responseText,
     extractedData: {},
     timestamp: Date.now()
   };
   
-  // Extract key property information using regex patterns
+  // Helper function to extract year built with fallback methods
+  function extractYearBuilt(text) {
+    const patterns = [
+      /(?:built|constructed|year)[:\s]*(\d{4})/i,
+      /(\d{4})\s*(?:built|construction)/i,
+      /built\s*in\s*(\d{4})/i,
+      /was\s*built\s*in\s*(\d{4})/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        const year = parseInt(match[1]);
+        if (year >= 1800 && year <= new Date().getFullYear()) {
+          return match[1];
+        }
+      }
+    }
+    return null;
+  }
+  
+  // Helper function to extract neighborhood with better context
+  function extractNeighborhood(text) {
+    const patterns = [
+      /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/i,
+      /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/i,
+      /(?:in)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        let neighborhood = match[1].trim();
+        // Clean up common false matches
+        if (neighborhood.length > 3 && 
+            !neighborhood.match(/^(the|this|that|which|excellent|good|great|today|market)$/i) &&
+            !neighborhood.match(/^\d+/)) {
+          return neighborhood;
+        }
+      }
+    }
+    return null;
+  }
+  
+  // Improved regex patterns to handle various formats
   const patterns = {
-    price: /(?:price|cost|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
-    bedrooms: /(\d+)\s*(?:bed(?:room)?s?|br)/i,
-    bathrooms: /(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)/i,
-    squareFeet: /(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft\.?|square\s*feet)/i,
-    yearBuilt: /(?:built|year)[:\s]*(\d{4})/i,
+    // Price patterns - handle various formats
+    price: /(?:price|cost|asking|listed|for|at)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
+    
+    // Bedroom patterns - handle "3 bed", "3-bedroom", "3 bedrooms", etc.
+    bedrooms: /(?:(\d+)[\s-]*(?:bed(?:room)?s?|br\b))|(?:(?:bed(?:room)?s?|br)[:\s]*(\d+))/i,
+    
+    // Bathroom patterns - similar flexibility
+    bathrooms: /(?:(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b))|(?:(?:bath(?:room)?s?|ba)[:\s]*(\d+(?:\.\d+)?))/i,
+    
+    // Square feet patterns - handle "sqft", "sq ft", "square feet", etc.
+    squareFeet: /(?:(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft))|(?:(?:size|spans)[:\s]*(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft))/i,
+    
+    // Lot size patterns
     lotSize: /(?:lot|land)[:\s]*(\d+(?:\.\d+)?)\s*(?:acres?|sq\.?\s*ft\.?)/i,
-    propertyType: /(?:property\s*type|type)[:\s]*([^.\n]+)/i,
-    neighborhood: /(?:neighborhood|area|location)[:\s]*([^.\n]+)/i
+    
+    // Property type patterns - more flexible
+    propertyType: /(?:property\s*type|type)[:\s]*([^.\n,]+)|(?:(single\s*family|condo|townhouse|apartment|duplex|house|home))/i
   };
   
-  // Extract structured data
+  // Extract structured data with improved matching
   for (const [key, pattern] of Object.entries(patterns)) {
     const match = responseText.match(pattern);
     if (match) {
-      analysis.extractedData[key] = match[1].trim();
+      // Handle multiple capture groups - take the first non-empty one
+      let value = '';
+      for (let i = 1; i < match.length; i++) {
+        if (match[i] && match[i].trim()) {
+          value = match[i].trim();
+          break;
+        }
+      }
+      
+      if (value) {
+        analysis.extractedData[key] = value;
+        console.log(`✅ Extracted ${key}:`, value);
+      }
+    } else {
+      console.log(`❌ Failed to extract ${key} with regex`);
     }
   }
   
-  // Extract sections like pros/cons, analysis, etc.
+  // Use helper functions for complex extractions
+  const yearBuilt = extractYearBuilt(responseText);
+  if (yearBuilt) {
+    analysis.extractedData.yearBuilt = yearBuilt;
+    console.log(`✅ Extracted yearBuilt:`, yearBuilt);
+  } else {
+    console.log(`❌ Failed to extract yearBuilt`);
+  }
+  
+  const neighborhood = extractNeighborhood(responseText);
+  if (neighborhood) {
+    analysis.extractedData.neighborhood = neighborhood;
+    console.log(`✅ Extracted neighborhood:`, neighborhood);
+  } else {
+    console.log(`❌ Failed to extract neighborhood`);
+  }
+  
+  // Improved section extraction with multiple strategies
+  function extractSection(sectionName, keywords, text) {
+    // Strategy 1: Look for section headers
+    for (const keyword of keywords) {
+      const headerPattern = new RegExp(`\\*\\*\\s*${keyword}\\s*:?\\*\\*\\s*([^]*?)(?=\\*\\*|$)`, 'i');
+      const match = text.match(headerPattern);
+      if (match && match[1]) {
+        let content = match[1].trim();
+        content = cleanSectionContent(content);
+        if (content.length > 10) {
+          return content;
+        }
+      }
+    }
+    
+    // Strategy 2: Look for bullet point sections
+    for (const keyword of keywords) {
+      const bulletPattern = new RegExp(`${keyword}\\s*:?\\s*\\n([^]*?)(?=\\n\\s*(?:cons?|pros?|advantages?|disadvantages?|market|investment|red flags?)\\s*:|\\n\\n|$)`, 'i');
+      const match = text.match(bulletPattern);
+      if (match && match[1]) {
+        let content = match[1].trim();
+        content = cleanSectionContent(content);
+        if (content.length > 10) {
+          return content;
+        }
+      }
+    }
+    
+    // Strategy 3: Look for inline mentions
+    for (const keyword of keywords) {
+      const inlinePattern = new RegExp(`(?:${keyword})\\s*(?:include|are)?:?\\s*([^.]*(?:\\.[^.]*){0,2})`, 'i');
+      const match = text.match(inlinePattern);
+      if (match && match[1]) {
+        let content = match[1].trim();
+        content = cleanSectionContent(content);
+        if (content.length > 20) {
+          return content;
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  function cleanSectionContent(content) {
+    return content
+      .replace(/^\*\*.*?\*\*\s*/gm, '') // Remove markdown headers
+      .replace(/^[•\-\*]\s*/gm, '') // Remove bullet points
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .replace(/^[:\s]+/, '') // Remove leading colons and spaces
+      .trim();
+  }
+  
+  // Extract sections using improved logic
   const sections = {
-    pros: /(?:pros?|advantages?|positives?)[:\s]*([^]*?)(?=cons?|disadvantages?|negatives?|investment|market|neighborhood|red flags|\n\n|$)/i,
-    cons: /(?:cons?|disadvantages?|negatives?|concerns?)[:\s]*([^]*?)(?=pros?|advantages?|investment|market|neighborhood|red flags|\n\n|$)/i,
-    marketAnalysis: /(?:market\s*analysis|price\s*evaluation)[:\s]*([^]*?)(?=neighborhood|pros?|cons?|investment|red flags|\n\n|$)/i,
-    investmentPotential: /(?:investment\s*potential)[:\s]*([^]*?)(?=neighborhood|pros?|cons?|market|red flags|\n\n|$)/i,
-    redFlags: /(?:red\s*flags?|concerns?|warnings?)[:\s]*([^]*?)(?=neighborhood|pros?|cons?|market|investment|\n\n|$)/i
+    pros: ['pros', 'advantages', 'positives', 'strengths', 'benefits'],
+    cons: ['cons', 'disadvantages', 'negatives', 'concerns', 'weaknesses', 'drawbacks'],
+    marketAnalysis: ['market analysis', 'market assessment', 'price evaluation', 'market'],
+    investmentPotential: ['investment potential', 'investment analysis', 'investment'],
+    redFlags: ['red flags', 'concerns', 'warnings', 'issues', 'problems']
   };
   
-  for (const [key, pattern] of Object.entries(sections)) {
-    const match = responseText.match(pattern);
-    if (match) {
-      analysis.extractedData[key] = match[1].trim().substring(0, 500); // Limit length
+  for (const [key, keywords] of Object.entries(sections)) {
+    const content = extractSection(key, keywords, responseText);
+    if (content) {
+      analysis.extractedData[key] = content.substring(0, 500); // Limit length
+      console.log(`✅ Extracted ${key} (${content.length} chars):`, content.substring(0, 100) + '...');
+    } else {
+      console.log(`❌ Failed to extract ${key}`);
     }
   }
   
+  console.log('Final extracted data keys:', Object.keys(analysis.extractedData));
+  console.log('Final extracted data count:', Object.keys(analysis.extractedData).length);
+  
+  // Only return analysis if we extracted meaningful property data
+  const hasPropertyData = analysis.extractedData.price || 
+                         analysis.extractedData.bedrooms || 
+                         analysis.extractedData.bathrooms || 
+                         analysis.extractedData.squareFeet ||
+                         analysis.extractedData.yearBuilt ||
+                         analysis.extractedData.propertyType;
+  
+  if (!hasPropertyData) {
+    console.log('⚠️ No meaningful property data extracted, skipping save');
+    return null;
+  }
+  
+  console.log('✅ Meaningful property data found, analysis ready for save');
   return analysis;
 }
 
-// Function to monitor for new ChatGPT messages
+// Function to monitor for new ChatGPT messages with improved detection
 function setupResponseMonitor() {
   let lastMessageCount = 0;
+  let lastProcessedMessage = '';
   
   const checkForNewMessages = () => {
-    // Look for ChatGPT response containers
+    // Updated selectors for current ChatGPT interface (2024)
     const messageSelectors = [
       '[data-message-author-role="assistant"]',
+      '[data-message-id] [data-message-author-role="assistant"]',
+      '.group.w-full.text-token-text-primary',
+      '.group.final-completion',
+      '.prose.result-streaming',
+      '.prose',
+      '[class*="markdown"]',
+      '[class*="message"][class*="assistant"]',
       '.message.assistant',
       '.group.assistant',
-      '[class*="assistant"]',
-      '.prose'
+      '[class*="assistant"]'
     ];
     
     let messages = [];
+    let foundSelector = null;
+    
     for (const selector of messageSelectors) {
       const elements = document.querySelectorAll(selector);
       if (elements.length > 0) {
         messages = Array.from(elements);
+        foundSelector = selector;
         break;
       }
     }
     
-    if (messages.length > lastMessageCount) {
+    if (foundSelector) {
+      console.log(`Found ${messages.length} messages using selector: ${foundSelector}`);
+    }
+    
+    if (messages.length > lastMessageCount || messages.length > 0) {
       const newMessage = messages[messages.length - 1];
-      const messageText = newMessage.textContent || newMessage.innerText;
+      if (!newMessage) return;
+      
+      const messageText = newMessage.textContent || newMessage.innerText || '';
+      
+      // Skip if we've already processed this exact message
+      if (messageText === lastProcessedMessage) {
+        return;
+      }
       
       // Check if this appears to be a property analysis response
-      if (currentPropertyAnalysis && 
-          messageText && 
-          (messageText.includes('property') || 
-           messageText.includes('analysis') || 
-           messageText.includes('listing') ||
-           messageText.includes('bedroom') ||
-           messageText.includes('bathroom') ||
-           messageText.includes('price'))) {
+      if (currentPropertyAnalysis && messageText && messageText.length > 100) {
+        console.log('Checking message for property analysis content...');
         
-        console.log('Detected property analysis response');
-        const analysisData = extractPropertyAnalysisData(messageText);
+        // More comprehensive property analysis detection
+        const propertyKeywords = [
+          'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
+          'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment',
+          'pros', 'cons', 'advantages', 'disadvantages', 'real estate',
+          'zillow', 'realtor', 'mls', 'home', 'house', 'condo', 'townhouse'
+        ];
         
-        if (analysisData) {
-          // Send the analysis data back to the popup/background
-          chrome.runtime.sendMessage({
-            action: 'savePropertyAnalysis',
-            propertyUrl: currentPropertyAnalysis.url,
-            analysisData: analysisData
-          }).catch(err => console.log('Failed to send analysis data:', err));
+        const keywordMatches = propertyKeywords.filter(keyword => 
+          messageText.toLowerCase().includes(keyword)
+        ).length;
+        
+        console.log(`Found ${keywordMatches} property keywords in response`);
+        
+        // Require at least 3 property-related keywords for a match
+        if (keywordMatches >= 3) {
+          console.log('✅ Detected property analysis response');
+          const analysisData = extractPropertyAnalysisData(messageText);
+          
+          if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+            console.log('✅ Successfully extracted analysis data, sending to background...');
+            console.log('📊 Extracted data summary:', {
+              dataPoints: Object.keys(analysisData.extractedData).length,
+              hasPrice: !!analysisData.extractedData.price,
+              hasBedrooms: !!analysisData.extractedData.bedrooms,
+              hasBathrooms: !!analysisData.extractedData.bathrooms,
+              hasSquareFeet: !!analysisData.extractedData.squareFeet,
+              keys: Object.keys(analysisData.extractedData)
+            });
+            
+            // Send the analysis data back to the background script
+            chrome.runtime.sendMessage({
+              action: 'savePropertyAnalysis',
+              propertyUrl: currentPropertyAnalysis.url,
+              analysisData: analysisData
+            }).then(response => {
+              console.log('✅ Analysis data sent successfully:', response);
+              if (response && response.success) {
+                console.log('🎉 Property analysis saved and should now show as analyzed!');
+              }
+            }).catch(err => {
+              console.error('❌ Failed to send analysis data:', err);
+            });
+            
+            // Reset the current analysis tracking
+            currentPropertyAnalysis = null;
+            lastProcessedMessage = messageText;
+          } else {
+            console.log('⚠️ No extractable data found in response, response may be incomplete');
+            console.log('📝 Response preview:', messageText.substring(0, 300) + '...');
+            
+            // If response is long enough, it might be complete but just not matching our patterns
+            if (messageText.length > 500) {
+              console.log('🔄 Response is substantial, will retry extraction in a few seconds...');
+              // Don't reset currentPropertyAnalysis yet, allow for retry
+            }
+          }
+        } else if (messageText.length > 200) {
+          // If we have a substantial response but not enough keywords, log for debugging
+          console.log(`⚠️ Substantial response (${messageText.length} chars) but only ${keywordMatches} property keywords found`);
+          console.log('🔍 Keywords found:', propertyKeywords.filter(keyword => 
+            messageText.toLowerCase().includes(keyword)
+          ));
+          console.log('📝 Response preview:', messageText.substring(0, 200) + '...');
+        } else {
+          console.log('⚠️ Insufficient property keywords, waiting for more content...');
         }
-        
-        // Reset the current analysis tracking
-        currentPropertyAnalysis = null;
       }
       
       lastMessageCount = messages.length;
     }
   };
   
-  // Check for new messages every 2 seconds
-  setInterval(checkForNewMessages, 2000);
+  // Check for new messages every 1 second (more frequent)
+  const intervalId = setInterval(checkForNewMessages, 1000);
   
   // Also use MutationObserver for more immediate detection
   const observer = new MutationObserver((mutations) => {
@@ -129,13 +357,16 @@ function setupResponseMonitor() {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const hasMessageClass = node.querySelector && (
               node.querySelector('[data-message-author-role="assistant"]') ||
-              node.querySelector('.message.assistant') ||
-              node.querySelector('.group.assistant') ||
-              node.matches('[data-message-author-role="assistant"]') ||
-              node.matches('.message.assistant') ||
-              node.matches('.group.assistant')
+              node.querySelector('.prose') ||
+              node.querySelector('[class*="message"]') ||
+              node.classList.contains('group') ||
+              node.classList.contains('prose')
             );
-            if (hasMessageClass) {
+            
+            if (hasMessageClass || 
+                node.classList.contains('group') || 
+                node.classList.contains('prose') ||
+                node.getAttribute('data-message-author-role') === 'assistant') {
               shouldCheck = true;
               break;
             }
@@ -145,14 +376,36 @@ function setupResponseMonitor() {
     });
     
     if (shouldCheck) {
-      setTimeout(checkForNewMessages, 1000); // Delay to allow content to fully load
+      console.log('🔍 MutationObserver detected potential message change');
+      setTimeout(checkForNewMessages, 500); // Small delay to let content load
     }
   });
   
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
+  // Observe the main chat container
+  const chatContainers = [
+    document.querySelector('main'),
+    document.querySelector('[class*="conversation"]'),
+    document.querySelector('[class*="chat"]'),
+    document.body
+  ].filter(Boolean);
+  
+  chatContainers.forEach(container => {
+    if (container) {
+      observer.observe(container, {
+        childList: true,
+        subtree: true
+      });
+      console.log('👀 Started observing container:', container.tagName);
+    }
   });
+  
+  console.log('🚀 Response monitor setup complete');
+  
+  // Cleanup function
+  return () => {
+    clearInterval(intervalId);
+    observer.disconnect();
+  };
 }
 
 // Function to find ChatGPT input field with more comprehensive selectors
