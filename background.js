@@ -71,4 +71,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
+  
+  // Handle saving property analysis data
+  if (request.action === 'savePropertyAnalysis') {
+    console.log('Background script saving property analysis:', request.propertyUrl);
+    
+    (async () => {
+      try {
+        // Get existing property history
+        const result = await chrome.storage.local.get(['propertyHistory']);
+        const history = result.propertyHistory || [];
+        
+        // Find the property entry to update
+        const propertyIndex = history.findIndex(item => item.url === request.propertyUrl);
+        
+        if (propertyIndex !== -1) {
+          // Update existing entry with analysis data
+          history[propertyIndex].analysis = request.analysisData;
+          history[propertyIndex].analysisTimestamp = Date.now();
+          
+          // Save updated history
+          await chrome.storage.local.set({ propertyHistory: history });
+          
+          console.log('Property analysis data saved successfully');
+          sendResponse({ success: true });
+        } else {
+          console.log('Property not found in history, creating new entry');
+          
+          // Create new entry with analysis data
+          const newEntry = {
+            url: request.propertyUrl,
+            timestamp: Date.now(),
+            date: new Date().toLocaleDateString(),
+            domain: new URL(request.propertyUrl).hostname,
+            analysis: request.analysisData,
+            analysisTimestamp: Date.now()
+          };
+          
+          history.unshift(newEntry);
+          
+          // Keep only the last 50 entries
+          if (history.length > 50) {
+            history.splice(50);
+          }
+          
+          await chrome.storage.local.set({ propertyHistory: history });
+          
+          console.log('New property entry with analysis created');
+          sendResponse({ success: true });
+        }
+        
+      } catch (error) {
+        console.error('Failed to save property analysis:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    
+    return true; // Keep message channel open for async response
+  }
 });
