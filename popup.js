@@ -53,7 +53,17 @@ document.addEventListener('DOMContentLoaded', function() {
         'rent.com',
         'hotpads.com',
         'padmapper.com',
-        'loopnet.com'
+        'loopnet.com',
+        'yad2.co.il',
+        'madlan.co.il',
+        'spitogatos.gr',
+        'zoopla.co.uk',
+        'rightmove.co.uk',
+        'homestra.com',
+        'boligportal.dk',
+        'lejebolig.dk',
+        'zyprus.com',
+        'bazaraki.com'
       ];
       
       return propertyDomains.some(domain => hostname.includes(domain));
