@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Helper Extension",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A Chrome extension that works exclusively on ChatGPT",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "clipboardRead",
+    "scripting"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
