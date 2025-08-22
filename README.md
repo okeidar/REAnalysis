@@ -68,6 +68,7 @@ This extension will be available on the Chrome Web Store once published.
 ├── icons/                 # Extension icons (16px, 32px, 48px, 128px)
 ├── create-icons-simple.html  # Icon generator tool
 ├── generate-icons.html    # Advanced icon generator
+
 └── README.md              # This file
 ```
 
@@ -84,6 +85,7 @@ This extension will be available on the Chrome Web Store once published.
 4. Click the extension icon on both types of sites to verify status display
 5. Test property link analysis by pasting a valid property URL
 
+
 ### Adding Features
 - Modify `content.js` for ChatGPT page interactions
 - Update `popup.html` and `popup.js` for interface changes
@@ -95,16 +97,56 @@ This extension will be available on the Chrome Web Store once published.
 - Use `generate-icons.html` for more detailed robot-themed icons
 - Icons must be actual PNG files (not empty placeholders)
 
+## Troubleshooting
+
+### Common Issues
+
+#### "Unable to communicate with ChatGPT" Error
+If you see this error even when on the ChatGPT page:
+
+1. **Reload the page**: Refresh the ChatGPT page and try again
+2. **Reload the extension**: Go to `chrome://extensions/`, find the extension, and click the reload button
+3. **Check permissions**: Ensure the extension has access to ChatGPT domains
+4. **Disable conflicting extensions**: Other extensions might interfere with functionality
+5. **Try incognito mode**: Test if the extension works in an incognito window
+6. **Clear cache**: Clear browser cache and cookies for ChatGPT
+
+#### Extension Not Showing Property Section
+- Make sure you're on `chatgpt.com` or `chat.openai.com`
+- The property section only appears when the extension detects ChatGPT
+- Try refreshing the page if the section doesn't appear
+
+#### Property Link Not Being Inserted
+- Ensure the link is from a supported property website
+- Wait for the ChatGPT page to fully load before using the extension
+- Check that the ChatGPT input field is visible and accessible
+- Try clicking directly in the ChatGPT input field first
+
+### Debug Information
+Open the browser console (F12) to see detailed logging from the extension. Look for:
+- Content script loading messages
+- Message passing between popup and content script
+- Input field detection attempts
+- Error messages with specific details
+
 ## Security
 
 This extension:
 - Only requests permissions for ChatGPT domains
 - Does not collect or transmit any user data
 - Runs only on specified domains for security
-- Uses minimal permissions (activeTab, storage, clipboardRead)
+- Uses minimal permissions (activeTab, storage, clipboardRead, scripting)
 - Validates property links before processing
 
 ## Version History
+
+### v1.0.2
+- Fixed communication issues between popup and content script
+- Improved ChatGPT input field detection with more selectors
+- Added retry logic for message passing
+- Enhanced error handling and user feedback
+- Added content script injection fallback
+- Improved debugging with console logging
 
 ### v1.0.1
 - Added Property Link Analyzer feature
@@ -126,6 +168,7 @@ If you encounter any issues:
 3. Try reloading the extension in `chrome://extensions/`
 4. Ensure you're using a supported Chrome version
 5. For property analysis issues, verify the link is from a supported property website
+6. Try disabling other extensions that might conflict
 
 ## License
 
