@@ -787,16 +787,59 @@ async function initializePopup() {
   }
 }
 
-// Default prompt template
-const DEFAULT_PROMPT = `Analyze this property for investment potential. Provide:
+// Default prompt for property analysis
+const DEFAULT_PROMPT = `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
-• Price analysis & investment metrics
-• Neighborhood & market overview  
-• Rental income potential
-• Key pros & cons
-• Investment recommendation
+**REQUIRED DATA EXTRACTION:**
+1. **Price**: Exact asking price (include currency symbol)
+2. **Bedrooms**: Number of bedrooms (numeric)
+3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
+4. **Square Footage**: Total square footage (numeric)
+5. **Year Built**: Construction year (4-digit year)
+6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
+7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
+8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
+9. **Rental Growth Potential**: Assess as High/Strong/Moderate/Low/Limited based on area development and market trends
 
-Property Link: {PROPERTY_URL}`;
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections:
+
+**PROPERTY DETAILS:**
+- List all the required data points above in a clear format
+- Include any additional relevant specifications (lot size, parking, etc.)
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Provide your location score (X/10) with detailed justification
+- Analyze proximity to schools, shopping, transportation, employment centers
+- Assess neighborhood safety, walkability, and future development plans
+- Comment on property taxes, HOA fees, and local regulations
+
+**RENTAL INCOME ANALYSIS:**
+- Provide your estimated monthly rental income with reasoning
+- Compare to local rental comps if possible
+- Assess rental growth potential (High/Strong/Moderate/Low/Limited) with specific factors:
+  * Population growth trends
+  * Economic development in the area
+  * New construction and inventory levels
+  * Employment opportunities and job market
+  * Infrastructure improvements planned
+
+**INVESTMENT SUMMARY:**
+- Overall investment grade and reasoning
+- Top 3 advantages (pros)
+- Top 3 concerns or limitations (cons)
+- Any red flags or warning signs
+- Price comparison to market value
+- Recommendation for this property as a rental investment
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format
+- Categorize rental growth potential clearly
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
 
 // Settings Functions
 async function loadCustomPrompt() {
