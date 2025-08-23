@@ -1796,6 +1796,9 @@ if (isChatGPTSite()) {
     }
   });
   
-} else {
+
+}
+else {
   console.log('❌ ChatGPT Helper Extension is not active on this site');
+}
 }
