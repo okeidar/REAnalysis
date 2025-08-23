@@ -4,6 +4,9 @@ console.log('ChatGPT Helper Extension loaded on:', window.location.href);
 // Global variable to track current property analysis
 let currentPropertyAnalysis = null;
 
+// Track processed messages per property URL to prevent cross-contamination
+let processedMessagesPerProperty = new Map();
+
 // Check if we're on ChatGPT
 function isChatGPTSite() {
   return window.location.hostname === 'chatgpt.com' || 
@@ -222,7 +225,6 @@ function extractPropertyAnalysisData(responseText) {
 // Function to monitor for new ChatGPT messages with improved detection
 function setupResponseMonitor() {
   let lastMessageCount = 0;
-  let lastProcessedMessage = '';
   
   const checkForNewMessages = () => {
     // Updated selectors for current ChatGPT interface (2024)
@@ -262,14 +264,26 @@ function setupResponseMonitor() {
       
       const messageText = newMessage.textContent || newMessage.innerText || '';
       
-      // Skip if we've already processed this exact message
-      if (messageText === lastProcessedMessage) {
-        return;
+      // Skip if we've already processed this exact message for this property
+      const currentUrl = currentPropertyAnalysis?.url;
+      if (currentUrl && processedMessagesPerProperty.has(currentUrl)) {
+        const processedMessages = processedMessagesPerProperty.get(currentUrl);
+        if (processedMessages.includes(messageText)) {
+          return;
+        }
       }
       
       // Check if this appears to be a property analysis response
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
         console.log('Checking message for property analysis content...');
+        
+        // Check if analysis session has timed out (10 minutes)
+        const sessionAge = Date.now() - currentPropertyAnalysis.timestamp;
+        if (sessionAge > 10 * 60 * 1000) {
+          console.log('⏰ Property analysis session timed out, clearing...');
+          currentPropertyAnalysis = null;
+          return;
+        }
         
         // More comprehensive property analysis detection
         const propertyKeywords = [
@@ -287,12 +301,15 @@ function setupResponseMonitor() {
         
         // Require at least 3 property-related keywords for a match
         if (keywordMatches >= 3) {
-          console.log('✅ Detected property analysis response');
+          console.log('✅ Detected property analysis response for:', currentPropertyAnalysis.url);
+          console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
           const analysisData = extractPropertyAnalysisData(messageText);
           
           if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
-            console.log('✅ Successfully extracted analysis data, sending to background...');
+            console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
             console.log('📊 Extracted data summary:', {
+              propertyUrl: currentPropertyAnalysis.url,
+              sessionId: currentPropertyAnalysis.sessionId,
               dataPoints: Object.keys(analysisData.extractedData).length,
               hasPrice: !!analysisData.extractedData.price,
               hasBedrooms: !!analysisData.extractedData.bedrooms,
@@ -305,6 +322,7 @@ function setupResponseMonitor() {
             chrome.runtime.sendMessage({
               action: 'savePropertyAnalysis',
               propertyUrl: currentPropertyAnalysis.url,
+              sessionId: currentPropertyAnalysis.sessionId,
               analysisData: analysisData
             }).then(response => {
               console.log('✅ Analysis data sent successfully:', response);
@@ -315,9 +333,22 @@ function setupResponseMonitor() {
               console.error('❌ Failed to send analysis data:', err);
             });
             
+            // Track this message as processed for this property
+            if (currentUrl) {
+              if (!processedMessagesPerProperty.has(currentUrl)) {
+                processedMessagesPerProperty.set(currentUrl, []);
+              }
+              processedMessagesPerProperty.get(currentUrl).push(messageText);
+              
+              // Limit stored messages per property to prevent memory bloat
+              const messages = processedMessagesPerProperty.get(currentUrl);
+              if (messages.length > 5) {
+                messages.shift(); // Remove oldest message
+              }
+            }
+            
             // Reset the current analysis tracking
             currentPropertyAnalysis = null;
-            lastProcessedMessage = messageText;
           } else {
             console.log('⚠️ No extractable data found in response, response may be incomplete');
             console.log('📝 Response preview:', messageText.substring(0, 300) + '...');
@@ -488,11 +519,25 @@ function waitForInputField(maxWait = 10000) {
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
   
-  // Track this property analysis
+  // Clear any previous analysis tracking to prevent cross-contamination
+  if (currentPropertyAnalysis) {
+    console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis.url);
+  }
+  
+  // Track this property analysis with enhanced metadata
   currentPropertyAnalysis = {
     url: propertyLink,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   };
+  
+  console.log('🎯 New property analysis session started:', currentPropertyAnalysis.sessionId);
+  
+  // Clear any previous processed messages for this property to allow fresh analysis
+  if (processedMessagesPerProperty.has(propertyLink)) {
+    processedMessagesPerProperty.delete(propertyLink);
+    console.log('🧹 Cleared previous message history for property');
+  }
   
   try {
     // Wait for input field to be available
