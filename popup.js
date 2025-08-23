@@ -347,37 +347,109 @@ function exportPropertyHistory() {
       return;
     }
     
-    // Create CSV with analysis data
+    // Helper function to clean text for Excel
+    const cleanText = (text) => {
+      if (!text) return '';
+      return text
+        .replace(/"/g, '""')  // Escape quotes
+        .replace(/[\r\n]+/g, ' | ')  // Replace line breaks with separator
+        .replace(/\s+/g, ' ')  // Normalize whitespace
+        .trim()
+        .substring(0, 500);  // Limit length
+    };
+    
+    // Helper function to extract numeric value
+    const extractNumber = (str) => {
+      if (!str) return '';
+      const match = str.toString().replace(/[,$]/g, '').match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : '';
+    };
+    
+    // Create simplified scoring for investment potential
+    const getInvestmentScore = (investmentText) => {
+      if (!investmentText) return '';
+      const text = investmentText.toLowerCase();
+      if (text.includes('excellent') || text.includes('strong')) return 'A';
+      if (text.includes('good') || text.includes('positive')) return 'B';
+      if (text.includes('fair') || text.includes('moderate')) return 'C';
+      if (text.includes('poor') || text.includes('weak')) return 'D';
+      return 'TBD';
+    };
+    
+    // Create CSV with optimized Excel format
     const headers = [
-      'URL', 'Domain', 'Date', 'Analysis Status', 'Price', 'Bedrooms', 'Bathrooms', 
-      'Square Feet', 'Year Built', 'Property Type', 'Neighborhood', 'Pros', 'Cons', 
-      'Market Analysis', 'Investment Potential', 'Red Flags', 'Full Analysis'
+      // Basic Property Info
+      'Property URL', 'Source Website', 'Analysis Date', 'Status',
+      
+      // Key Metrics (for easy comparison)
+      'Price ($)', 'Bedrooms', 'Bathrooms', 'Square Feet', 'Price per Sq Ft',
+      'Year Built', 'Property Age', 'Property Type', 'Neighborhood',
+      
+      // Analysis Summary (cleaned for Excel)
+      'Key Pros', 'Key Cons', 'Market Analysis Summary', 
+      'Investment Rating', 'Red Flags', 'Overall Score'
     ];
     
     const csvRows = history.map(item => {
       const analysis = item.analysis;
       const data = analysis ? analysis.extractedData : {};
       
+      // Extract and format numeric values
+      const price = extractNumber(data.price);
+      const sqft = extractNumber(data.squareFeet);
+      const bedrooms = extractNumber(data.bedrooms);
+      const bathrooms = extractNumber(data.bathrooms);
+      const yearBuilt = extractNumber(data.yearBuilt);
+      
+      // Calculate derived metrics
+      const pricePerSqFt = (price && sqft) ? (price / sqft).toFixed(2) : '';
+      const propertyAge = yearBuilt ? new Date().getFullYear() - yearBuilt : '';
+      
       return [
         `"${item.url}"`,
         `"${item.domain}"`,
-        `"${item.date}"`,
+        `"${new Date(item.date).toLocaleDateString()}"`,
         `"${analysis ? 'Analyzed' : 'Pending'}"`,
-        `"${data.price || ''}"`,
-        `"${data.bedrooms || ''}"`,
-        `"${data.bathrooms || ''}"`,
-        `"${data.squareFeet || ''}"`,
-        `"${data.yearBuilt || ''}"`,
+        
+        // Numeric values (no quotes for Excel calculations)
+        price || '',
+        bedrooms || '',
+        bathrooms || '',
+        sqft || '',
+        pricePerSqFt || '',
+        yearBuilt || '',
+        propertyAge || '',
+        
         `"${data.propertyType || ''}"`,
         `"${data.neighborhood || ''}"`,
-        `"${data.pros ? data.pros.replace(/"/g, '""') : ''}"`,
-        `"${data.cons ? data.cons.replace(/"/g, '""') : ''}"`,
-        `"${data.marketAnalysis ? data.marketAnalysis.replace(/"/g, '""') : ''}"`,
-        `"${data.investmentPotential ? data.investmentPotential.replace(/"/g, '""') : ''}"`,
-        `"${data.redFlags ? data.redFlags.replace(/"/g, '""') : ''}"`,
-        `"${analysis ? analysis.fullResponse.replace(/"/g, '""').substring(0, 1000) : ''}"`
+        
+        // Cleaned text analysis
+        `"${cleanText(data.pros)}"`,
+        `"${cleanText(data.cons)}"`,
+        `"${cleanText(data.marketAnalysis)}"`,
+        `"${getInvestmentScore(data.investmentPotential)}"`,
+        `"${cleanText(data.redFlags)}"`,
+        `"${getInvestmentScore(data.investmentPotential)}"`
       ].join(',');
     });
+    
+    // Add summary statistics row
+    const analyzedProperties = history.filter(item => item.analysis);
+    if (analyzedProperties.length > 0) {
+      const prices = analyzedProperties.map(item => {
+        const price = extractNumber(item.analysis.extractedData.price);
+        return price || 0;
+      }).filter(p => p > 0);
+      
+      const avgPrice = prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(0) : '';
+      
+      csvRows.push([
+        '"SUMMARY"', '""', '""', '""',
+        avgPrice ? `"Average: $${avgPrice}"` : '""',
+        '""', '""', '""', '""', '""', '""', '""', '""',
+        '""', '""', '""', '""', '""', '""'
+      ].join(','));
+    }
     
     const csvContent = headers.join(',') + '\n' + csvRows.join('\n');
     
@@ -386,13 +458,13 @@ function exportPropertyHistory() {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `property-analysis-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `property-comparison-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showSuccess('Property analysis data exported!');
+    showSuccess('Property comparison table exported for Excel!');
   });
 }
 
