@@ -94,13 +94,18 @@ function extractPropertyAnalysisData(responseText) {
     // Bedroom extraction
     bedrooms: {
       patterns: [
+        /(?:bedroom)[s]?[:\s]*(\d+)/gi,
+        /(?:bedrooms)[:\s]*(\d+)/gi,
         /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
-        /(?:bed(?:room)?s?|br)[:\s]*(\d+)/gi,
-        /(\d+)\s*(?:bedroom|bed)/gi
+        /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
+        /\b(\d+)\s*bed\b/gi,
+        /(\d+)\s*(?:bed)/gi
       ],
       validator: (value) => {
         const num = parseInt(value);
-        return num >= 0 && num <= 20;
+        const isValid = num >= 0 && num <= 20;
+        console.log(`🔍 Validating bedroom value "${value}" -> ${num} -> ${isValid ? 'VALID' : 'INVALID'}`);
+        return isValid;
       }
     },
     
@@ -200,6 +205,8 @@ function extractPropertyAnalysisData(responseText) {
   
   // Function to extract data from PROPERTY DETAILS section
   function extractFromPropertyDetails(text, analysis) {
+    console.log('🔍 Extracting from Property Details section:', text.substring(0, 200) + '...');
+    
     // Extract specific data points with enhanced patterns
     const patterns = {
       price: [
@@ -208,8 +215,10 @@ function extractPropertyAnalysisData(responseText) {
       ],
       bedrooms: [
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
+        /(?:bedrooms)[:\s]*(\d+)/gi,
         /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
-        /(\d+)\s*(?:bedroom|bed)/gi
+        /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
+        /\b(\d+)\s*bed\b/gi
       ],
       bathrooms: [
         /(?:bathroom)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
@@ -235,17 +244,28 @@ function extractPropertyAnalysisData(responseText) {
       if (!analysis.extractedData[key]) { // Only set if not already extracted
         let bestMatch = null;
         
+        console.log(`🔍 Trying to extract ${key} with ${patternArray.length} patterns...`);
+        
         // Try each pattern until we find a match
-        for (const pattern of patternArray) {
+        for (let i = 0; i < patternArray.length; i++) {
+          const pattern = patternArray[i];
           pattern.lastIndex = 0; // Reset regex
           const match = pattern.exec(text);
+          
+          console.log(`  Pattern ${i + 1} for ${key}:`, pattern.source);
+          console.log(`  Match result:`, match);
+          
           if (match && match[1]) {
             const value = match[1].trim();
+            console.log(`  Extracted value for ${key}:`, value);
             
             // Validate the extracted value
             if (validateExtractedValue(key, value)) {
               bestMatch = value;
+              console.log(`  ✅ Valid ${key} value:`, value);
               break; // Use the first valid match
+            } else {
+              console.log(`  ❌ Invalid ${key} value:`, value);
             }
           }
         }
@@ -253,6 +273,8 @@ function extractPropertyAnalysisData(responseText) {
         if (bestMatch) {
           analysis.extractedData[key] = bestMatch;
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+        } else {
+          console.log(`❌ Failed to extract ${key} from Property Details`);
         }
       }
     }
