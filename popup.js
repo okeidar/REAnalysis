@@ -1172,12 +1172,12 @@ async function getCurrentPrompt() {
 const DEFAULT_COLUMNS = [
   // Property Identification
   { id: 'propertyId', name: 'Property ID', description: 'Unique identifier for the property', category: 'identification', enabled: true },
-  { id: 'address', name: 'Address/URL', description: 'Property address or listing URL', category: 'identification', enabled: true },
+  { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: true },
   { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: true },
   { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: true },
   
   // Core Property Metrics
-  { id: 'price', name: 'Price ($)', description: 'Property listing price', category: 'metrics', enabled: true },
+  { id: 'price', name: 'Price ($)', description: 'Property asking price', category: 'metrics', enabled: true },
   { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'metrics', enabled: true },
   { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'metrics', enabled: true },
   { id: 'squareFeet', name: 'Square Feet', description: 'Property size in square feet', category: 'metrics', enabled: true },
