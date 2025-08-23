@@ -904,48 +904,45 @@ async function getCurrentPrompt() {
 
 // Default column configuration
 const DEFAULT_COLUMNS = [
-  // Property Identification
-  { id: 'propertyId', name: 'Property ID', description: 'Unique identifier for the property', category: 'identification', enabled: true },
-  { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: true },
-  { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: true },
-  { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: true },
+  // Core Property Information
+  { id: 'price', name: 'Price', description: 'Property asking price', category: 'core', enabled: true, order: 1 },
+  { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 2 },
+  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: true, order: 3 },
+  { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: true, order: 4 },
+  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: true, order: 5 },
+  { id: 'propertyType', name: 'Property Type', description: 'Type of property (house, condo, apartment, etc.)', category: 'core', enabled: true, order: 6 },
   
-  // Core Property Metrics
-  { id: 'price', name: 'Price ($)', description: 'Property asking price', category: 'metrics', enabled: true },
-  { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'metrics', enabled: true },
-  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'metrics', enabled: true },
-  { id: 'squareFeet', name: 'Square Feet', description: 'Property size in square feet', category: 'metrics', enabled: true },
-  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'metrics', enabled: true },
-  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'metrics', enabled: true },
-  { id: 'propertyAge', name: 'Property Age', description: 'Age of the property in years', category: 'metrics', enabled: true },
-  { id: 'propertyType', name: 'Property Type', description: 'Type of property (house, condo, etc.)', category: 'metrics', enabled: true },
-  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood', category: 'metrics', enabled: true },
+  // Financial Analysis
+  { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: true, order: 7 },
   
-  // Value Analysis Scores
-  { id: 'overallScore', name: 'Overall Score', description: 'Overall property score (1-10)', category: 'scores', enabled: true },
-  { id: 'investmentScore', name: 'Investment Score', description: 'Investment potential score (1-10)', category: 'scores', enabled: true },
-  { id: 'marketScore', name: 'Market Score', description: 'Market value score (1-10)', category: 'scores', enabled: true },
-  { id: 'locationScore', name: 'Location Score', description: 'Location quality score (1-10)', category: 'scores', enabled: true },
-  { id: 'conditionScore', name: 'Condition Score', description: 'Property condition score (1-10)', category: 'scores', enabled: true },
+  // Location & Scoring
+  { id: 'locationScore', name: 'Location & Neighborhood Scoring', description: 'Location quality score (e.g., 7/10, 2/10)', category: 'scoring', enabled: true, order: 8 },
+  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Assessment of rental income growth potential', category: 'analysis', enabled: true, order: 9 },
   
-  // Financial Metrics
-  { id: 'monthlyPayment', name: 'Est. Monthly Payment', description: 'Estimated monthly mortgage payment', category: 'financial', enabled: true },
-  { id: 'priceVsMarket', name: 'Price vs Market', description: 'Price comparison to market value', category: 'financial', enabled: true },
-  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment potential summary', category: 'financial', enabled: false },
-  { id: 'valueRating', name: 'Value Rating', description: 'Overall value rating', category: 'financial', enabled: true },
-  
-  // Analysis Summary
-  { id: 'topPros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: true },
-  { id: 'topCons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: true },
-  { id: 'redFlagsCount', name: 'Red Flags Count', description: 'Number of warning indicators', category: 'analysis', enabled: true },
-  { id: 'keyConcerns', name: 'Key Concerns', description: 'Primary issues summary', category: 'analysis', enabled: false },
-  
-  // Detailed Analysis
-  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Detailed market assessment', category: 'analysis', enabled: false },
-  { id: 'investmentDetails', name: 'Investment Details', description: 'Complete investment analysis', category: 'analysis', enabled: false },
-  { id: 'allPros', name: 'All Pros', description: 'Complete advantages list', category: 'analysis', enabled: false },
-  { id: 'allCons', name: 'All Cons', description: 'Complete disadvantages list', category: 'analysis', enabled: false },
-  { id: 'redFlagsDetail', name: 'Red Flags Detail', description: 'Detailed warning information', category: 'analysis', enabled: false }
+  // Additional Optional Columns (disabled by default)
+  { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: false, order: 10 },
+  { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: false, order: 11 },
+  { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: false, order: 12 },
+  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'metrics', enabled: false, order: 13 },
+  { id: 'propertyAge', name: 'Property Age', description: 'Age of the property in years', category: 'metrics', enabled: false, order: 14 },
+  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'metrics', enabled: false, order: 15 },
+  { id: 'overallScore', name: 'Overall Score', description: 'Overall property score (1-10)', category: 'scores', enabled: false, order: 16 },
+  { id: 'investmentScore', name: 'Investment Score', description: 'Investment potential score (1-10)', category: 'scores', enabled: false, order: 17 },
+  { id: 'marketScore', name: 'Market Score', description: 'Market value score (1-10)', category: 'scores', enabled: false, order: 18 },
+  { id: 'conditionScore', name: 'Condition Score', description: 'Property condition score (1-10)', category: 'scores', enabled: false, order: 19 },
+  { id: 'monthlyPayment', name: 'Est. Monthly Payment', description: 'Estimated monthly mortgage payment', category: 'financial', enabled: false, order: 20 },
+  { id: 'priceVsMarket', name: 'Price vs Market', description: 'Price comparison to market value', category: 'financial', enabled: false, order: 21 },
+  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment potential summary', category: 'financial', enabled: false, order: 22 },
+  { id: 'valueRating', name: 'Value Rating', description: 'Overall value rating', category: 'financial', enabled: false, order: 23 },
+  { id: 'topPros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 24 },
+  { id: 'topCons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 25 },
+  { id: 'redFlagsCount', name: 'Red Flags Count', description: 'Number of warning indicators', category: 'analysis', enabled: false, order: 26 },
+  { id: 'keyConcerns', name: 'Key Concerns', description: 'Primary issues summary', category: 'analysis', enabled: false, order: 27 },
+  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Detailed market assessment', category: 'analysis', enabled: false, order: 28 },
+  { id: 'investmentDetails', name: 'Investment Details', description: 'Complete investment analysis', category: 'analysis', enabled: false, order: 29 },
+  { id: 'allPros', name: 'All Pros', description: 'Complete advantages list', category: 'analysis', enabled: false, order: 30 },
+  { id: 'allCons', name: 'All Cons', description: 'Complete disadvantages list', category: 'analysis', enabled: false, order: 31 },
+  { id: 'redFlagsDetail', name: 'Red Flags Detail', description: 'Detailed warning information', category: 'analysis', enabled: false, order: 32 }
 ];
 
 // Column Configuration Functions
@@ -1506,7 +1503,7 @@ function getInputType(columnType) {
   }
 }
 
-// Export function (simplified version for space)
+// Export function (updated for new column structure)
 async function exportPropertyHistory() {
   try {
     const [historyResult, columnResult] = await Promise.all([
@@ -1527,19 +1524,186 @@ async function exportPropertyHistory() {
       .filter(col => col.enabled)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     
-    // Create CSV content (simplified)
+    // Helper function to extract numeric value
+    const extractNumber = (str) => {
+      if (!str) return '';
+      const match = str.toString().replace(/[,$]/g, '').match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : '';
+    };
+    
+    // Helper function to clean text for Excel
+    const cleanText = (text) => {
+      if (!text) return '';
+      return text
+        .replace(/"/g, '""')  // Escape quotes
+        .replace(/[\r\n]+/g, ' | ')  // Replace line breaks with separator
+        .replace(/\s+/g, ' ')  // Normalize whitespace
+        .trim()
+        .substring(0, 500);  // Limit length
+    };
+    
+    // Helper function to estimate rental income based on property data
+    const estimateRentalIncome = (data, price) => {
+      if (!price) return '';
+      
+      // Basic rental estimation: 1% rule as starting point
+      let monthlyRent = price * 0.01;
+      
+      // Adjust based on property type
+      if (data.propertyType) {
+        const type = data.propertyType.toLowerCase();
+        if (type.includes('apartment') || type.includes('condo')) {
+          monthlyRent *= 0.9; // Slightly lower for apartments/condos
+        } else if (type.includes('single family') || type.includes('house')) {
+          monthlyRent *= 1.1; // Slightly higher for houses
+        }
+      }
+      
+      // Adjust based on bedrooms
+      const bedrooms = extractNumber(data.bedrooms);
+      if (bedrooms) {
+        if (bedrooms <= 1) monthlyRent *= 0.8;
+        else if (bedrooms >= 4) monthlyRent *= 1.2;
+      }
+      
+      return Math.round(monthlyRent);
+    };
+    
+    // Helper function to extract location score from analysis
+    const extractLocationScore = (analysis) => {
+      if (!analysis) return '';
+      
+      const text = (analysis.marketAnalysis || '') + ' ' + (analysis.pros || '') + ' ' + (analysis.neighborhood || '');
+      const lowerText = text.toLowerCase();
+      
+      // Look for explicit scores first
+      const scoreMatch = text.match(/location[^\d]*(\d+)\/10/i) || text.match(/neighborhood[^\d]*(\d+)\/10/i);
+      if (scoreMatch) return `${scoreMatch[1]}/10`;
+      
+      // Infer score based on keywords
+      let score = 5; // Default neutral score
+      
+      if (lowerText.includes('excellent location') || lowerText.includes('prime location')) score = 9;
+      else if (lowerText.includes('great location') || lowerText.includes('desirable')) score = 8;
+      else if (lowerText.includes('good location') || lowerText.includes('convenient')) score = 7;
+      else if (lowerText.includes('decent location') || lowerText.includes('accessible')) score = 6;
+      else if (lowerText.includes('average location') || lowerText.includes('moderate')) score = 5;
+      else if (lowerText.includes('poor location') || lowerText.includes('remote')) score = 3;
+      else if (lowerText.includes('bad location') || lowerText.includes('undesirable')) score = 2;
+      
+      // Positive location indicators
+      if (lowerText.includes('near schools') || lowerText.includes('good schools')) score += 1;
+      if (lowerText.includes('public transport') || lowerText.includes('transit')) score += 1;
+      if (lowerText.includes('shopping') || lowerText.includes('restaurants')) score += 0.5;
+      if (lowerText.includes('safe') || lowerText.includes('low crime')) score += 1;
+      
+      // Negative location indicators
+      if (lowerText.includes('high crime') || lowerText.includes('unsafe')) score -= 2;
+      if (lowerText.includes('noisy') || lowerText.includes('busy road')) score -= 1;
+      if (lowerText.includes('far from') || lowerText.includes('isolated')) score -= 1;
+      
+      score = Math.max(1, Math.min(10, Math.round(score)));
+      return `${score}/10`;
+    };
+    
+    // Helper function to assess rental growth potential
+    const assessRentalGrowthPotential = (analysis) => {
+      if (!analysis) return '';
+      
+      const text = (analysis.marketAnalysis || '') + ' ' + (analysis.investmentPotential || '') + ' ' + (analysis.neighborhood || '');
+      const lowerText = text.toLowerCase();
+      
+      // High growth indicators
+      if (lowerText.includes('growing area') || lowerText.includes('development') || 
+          lowerText.includes('gentrification') || lowerText.includes('upcoming')) {
+        return 'High';
+      }
+      
+      // Strong growth indicators
+      if (lowerText.includes('strong rental market') || lowerText.includes('high demand') ||
+          lowerText.includes('good investment') || lowerText.includes('appreciating')) {
+        return 'Strong';
+      }
+      
+      // Moderate growth indicators
+      if (lowerText.includes('stable') || lowerText.includes('steady') ||
+          lowerText.includes('moderate') || lowerText.includes('average growth')) {
+        return 'Moderate';
+      }
+      
+      // Low growth indicators
+      if (lowerText.includes('declining') || lowerText.includes('saturated market') ||
+          lowerText.includes('poor prospects') || lowerText.includes('stagnant')) {
+        return 'Low';
+      }
+      
+      // Limited growth indicators
+      if (lowerText.includes('limited') || lowerText.includes('slow growth') ||
+          lowerText.includes('mature market')) {
+        return 'Limited';
+      }
+      
+      return 'Moderate'; // Default
+    };
+    
+    // Create CSV content
     const headers = enabledColumns.map(col => col.name);
     const csvRows = history.map(item => {
       return enabledColumns.map(column => {
         // Simplified data extraction
         const data = item.analysis ? item.analysis.extractedData : {};
+        const price = extractNumber(data.price);
+        
         switch (column.id) {
-          case 'address': return `"${item.url}"`;
-          case 'source': return `"${item.domain}"`;
-          case 'analysisDate': return `"${item.date}"`;
-          case 'price': return data.price || '';
-          case 'bedrooms': return data.bedrooms || '';
-          case 'bathrooms': return data.bathrooms || '';
+          case 'price':
+            return price ? `$${price.toLocaleString()}` : '';
+            
+          case 'bedrooms':
+            return extractNumber(data.bedrooms) || '';
+            
+          case 'bathrooms':
+            return extractNumber(data.bathrooms) || '';
+            
+          case 'squareFeet':
+            const sqft = extractNumber(data.squareFeet);
+            return sqft ? sqft.toLocaleString() : '';
+            
+          case 'yearBuilt':
+            return extractNumber(data.yearBuilt) || '';
+            
+          case 'propertyType':
+            return `"${data.propertyType || ''}"`;
+            
+          case 'estimatedRentalIncome':
+            const rental = estimateRentalIncome(data, price);
+            return rental ? `$${rental.toLocaleString()}` : '';
+            
+          case 'locationScore':
+            return extractLocationScore(item.analysis);
+            
+          case 'rentalGrowthPotential':
+            return `"${assessRentalGrowthPotential(item.analysis)}"`;
+            
+          case 'address':
+            return `"${item.url}"`;
+            
+          case 'source':
+            return `"${item.domain}"`;
+            
+          case 'analysisDate':
+            return `"${item.date}"`;
+            
+          case 'pricePerSqFt':
+            const sqftForCalc = extractNumber(data.squareFeet);
+            return (price && sqftForCalc) ? `$${(price / sqftForCalc).toFixed(2)}` : '';
+            
+          case 'propertyAge':
+            const yearBuilt = extractNumber(data.yearBuilt);
+            return yearBuilt ? new Date().getFullYear() - yearBuilt : '';
+            
+          case 'neighborhood':
+            return `"${data.neighborhood || ''}"`;
+            
           default:
             if (column.isCustom) {
               const customValue = getCustomColumnValue(item, column);
