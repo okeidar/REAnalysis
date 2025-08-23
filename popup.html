@@ -364,6 +364,47 @@
             <!-- Column items will be populated by JavaScript -->
           </div>
           
+          <div class="custom-column-section">
+            <div class="custom-column-header">
+              <h4>➕ Add Custom Column</h4>
+              <button id="toggleCustomColumnBtn" class="btn-toggle">▼</button>
+            </div>
+            <div id="customColumnForm" class="custom-column-form" style="display: none;">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="customColumnName">Column Name:</label>
+                  <input type="text" id="customColumnName" class="form-input" placeholder="e.g., Personal Notes" maxlength="50">
+                </div>
+                <div class="form-group">
+                  <label for="customColumnType">Column Type:</label>
+                  <select id="customColumnType" class="form-select">
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="currency">Currency ($)</option>
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="rating">Rating (1-10)</option>
+                    <option value="boolean">Yes/No</option>
+                    <option value="date">Date</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="customColumnDescription">Description:</label>
+                  <input type="text" id="customColumnDescription" class="form-input" placeholder="Brief description of this column" maxlength="100">
+                </div>
+                <div class="form-group">
+                  <label for="customColumnDefault">Default Value:</label>
+                  <input type="text" id="customColumnDefault" class="form-input" placeholder="Optional default value">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button id="addCustomColumnBtn" class="btn btn-primary btn-small">➕ Add Column</button>
+                <button id="cancelCustomColumnBtn" class="btn btn-secondary btn-small">❌ Cancel</button>
+              </div>
+            </div>
+          </div>
+          
           <div class="column-help">
             <p><strong>Tips:</strong></p>
             <ul>

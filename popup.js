@@ -7,7 +7,9 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     propertyHistorySection, settingsSection, settingsToggle, toggleSettingsBtn, settingsContent,
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
     columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
-    saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent;
+    saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent,
+    toggleCustomColumnBtn, customColumnForm, customColumnName, customColumnType,
+    customColumnDescription, customColumnDefault, addCustomColumnBtn, cancelCustomColumnBtn;
 
 // Global variables
 let currentTab = null;
@@ -53,6 +55,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   previewColumnsBtn = document.getElementById('previewColumnsBtn');
   togglePromptBtn = document.getElementById('togglePromptBtn');
   promptContent = document.getElementById('promptContent');
+  
+  // Custom column elements
+  toggleCustomColumnBtn = document.getElementById('toggleCustomColumnBtn');
+  customColumnForm = document.getElementById('customColumnForm');
+  customColumnName = document.getElementById('customColumnName');
+  customColumnType = document.getElementById('customColumnType');
+  customColumnDescription = document.getElementById('customColumnDescription');
+  customColumnDefault = document.getElementById('customColumnDefault');
+  addCustomColumnBtn = document.getElementById('addCustomColumnBtn');
+  cancelCustomColumnBtn = document.getElementById('cancelCustomColumnBtn');
 
   // Set up event listeners
   if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
@@ -88,6 +100,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (resetColumnsBtn) resetColumnsBtn.addEventListener('click', resetColumnsToDefault);
   if (saveColumnsBtn) saveColumnsBtn.addEventListener('click', saveColumnSettings);
   if (previewColumnsBtn) previewColumnsBtn.addEventListener('click', previewExportColumns);
+  
+  // Custom column event listeners
+  if (toggleCustomColumnBtn) toggleCustomColumnBtn.addEventListener('click', toggleCustomColumnForm);
+  if (addCustomColumnBtn) addCustomColumnBtn.addEventListener('click', addCustomColumn);
+  if (cancelCustomColumnBtn) cancelCustomColumnBtn.addEventListener('click', clearCustomColumnForm);
 
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -213,6 +230,7 @@ function displayPropertyHistory(history) {
         </div>
         ${analysisPreview}
         ${hasAnalysis ? `<button class="view-analysis-btn" data-index="${index}">View Full Analysis</button>` : ''}
+        <button class="edit-custom-data-btn" data-index="${index}">✏️ Edit Custom Data</button>
       </div>
     `;
   }).join('');
@@ -232,6 +250,14 @@ function displayPropertyHistory(history) {
     btn.addEventListener('click', (e) => {
       const index = parseInt(e.target.getAttribute('data-index'));
       showFullAnalysis(history[index]);
+    });
+  });
+  
+  // Add event listeners for edit custom data buttons
+  document.querySelectorAll('.edit-custom-data-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      showCustomDataEditor(history[index], index);
     });
   });
 }
@@ -377,6 +403,17 @@ async function clearPropertyHistory() {
     console.error('Failed to clear property history:', error);
     showError('Failed to clear history');
   }
+}
+
+// Function to get custom column value for a property
+function getCustomColumnValue(item, column) {
+  // Check if the property has custom column data stored
+  if (item.customColumns && item.customColumns[column.id]) {
+    return item.customColumns[column.id];
+  }
+  
+  // Return default value if available
+  return column.defaultValue || '';
 }
 
 async function exportPropertyHistory() {
@@ -612,6 +649,19 @@ async function exportPropertyHistory() {
           case 'redFlagsDetail':
             return `"${cleanText(data.redFlags)}"`;
           default:
+            // Handle custom columns
+            if (column.isCustom) {
+              const customValue = getCustomColumnValue(item, column);
+              const formattedValue = formatCustomColumnValue(customValue, column.type);
+              
+              // For numeric types, don't quote the value for Excel calculations
+              if (['number', 'currency', 'percentage', 'rating'].includes(column.type)) {
+                const numericValue = parseFloat(formattedValue.replace(/[$%,]/g, ''));
+                return isNaN(numericValue) ? '""' : numericValue;
+              } else {
+                return `"${formattedValue}"`;
+              }
+            }
             return '""';
         }
       });
@@ -649,6 +699,10 @@ async function exportPropertyHistory() {
           case 'topCons':
             return `"Price range: $${minPrice}-$${maxPrice}"`;
           default:
+            // For custom columns, show empty value in summary
+            if (column.isCustom) {
+              return '""';
+            }
             return '""';
         }
       });
@@ -1141,20 +1195,23 @@ function renderColumnConfiguration(columns) {
   
   columns.forEach((column, index) => {
     const columnItem = document.createElement('div');
-    columnItem.className = 'column-item';
+    columnItem.className = `column-item ${column.isCustom ? 'custom-column' : ''}`;
     columnItem.draggable = true;
     columnItem.dataset.columnId = column.id;
     columnItem.dataset.index = index;
+    
+    const deleteButton = column.isCustom ? `<button class="column-delete-btn" data-column-id="${column.id}">🗑️</button>` : '';
     
     columnItem.innerHTML = `
       <div class="column-drag-handle">⋮⋮</div>
       <input type="checkbox" class="column-checkbox" ${column.enabled ? 'checked' : ''}>
       <div class="column-info">
-        <div class="column-name">${column.name}</div>
+        <div class="column-name">${column.name}${column.isCustom ? ' (Custom)' : ''}</div>
         <div class="column-description">${column.description}</div>
       </div>
-      <div class="column-category ${column.category}">${column.category}</div>
+      <div class="column-category ${column.category || 'custom'}">${column.category || 'custom'}</div>
       <div class="column-count">${index + 1}</div>
+      ${deleteButton}
     `;
     
     // Add event listeners
@@ -1163,6 +1220,15 @@ function renderColumnConfiguration(columns) {
       column.enabled = checkbox.checked;
       updateColumnCount();
     });
+    
+    // Delete button for custom columns
+    if (column.isCustom) {
+      const deleteBtn = columnItem.querySelector('.column-delete-btn');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteCustomColumn(column.id);
+      });
+    }
     
     // Drag and drop functionality
     columnItem.addEventListener('dragstart', handleDragStart);
@@ -1337,3 +1403,259 @@ function previewExportColumns() {
   
   showSuccess(`Preview generated for ${enabledColumns.length} columns`);
 }
+
+// Custom Column Management Functions
+function toggleCustomColumnForm() {
+  if (customColumnForm && toggleCustomColumnBtn) {
+    const isVisible = customColumnForm.style.display !== 'none';
+    customColumnForm.style.display = isVisible ? 'none' : 'block';
+    toggleCustomColumnBtn.textContent = isVisible ? '▼' : '▲';
+    
+    if (!isVisible) {
+      clearCustomColumnForm();
+    }
+  }
+}
+
+function clearCustomColumnForm() {
+  if (customColumnName) customColumnName.value = '';
+  if (customColumnType) customColumnType.value = 'text';
+  if (customColumnDescription) customColumnDescription.value = '';
+  if (customColumnDefault) customColumnDefault.value = '';
+}
+
+async function addCustomColumn() {
+  try {
+    const name = customColumnName.value.trim();
+    const type = customColumnType.value;
+    const description = customColumnDescription.value.trim();
+    const defaultValue = customColumnDefault.value.trim();
+    
+    // Validation
+    if (!name) {
+      showError('Column name is required');
+      return;
+    }
+    
+    if (name.length > 50) {
+      showError('Column name must be 50 characters or less');
+      return;
+    }
+    
+    // Check for duplicate names
+    const result = await chrome.storage.local.get(['columnConfiguration']);
+    const existingColumns = result.columnConfiguration || DEFAULT_COLUMNS;
+    
+    if (existingColumns.some(col => col.name.toLowerCase() === name.toLowerCase())) {
+      showError('A column with this name already exists');
+      return;
+    }
+    
+    // Create custom column
+    const customColumn = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: name,
+      description: description || `Custom ${type} column`,
+      category: 'custom',
+      enabled: true,
+      isCustom: true,
+      type: type,
+      defaultValue: defaultValue,
+      order: existingColumns.length
+    };
+    
+    // Add to configuration
+    const updatedColumns = [...existingColumns, customColumn];
+    await chrome.storage.local.set({ columnConfiguration: updatedColumns });
+    
+    // Re-render the column list
+    renderColumnConfiguration(updatedColumns);
+    
+    // Clear form and hide it
+    clearCustomColumnForm();
+    toggleCustomColumnForm();
+    
+    showSuccess(`Custom column "${name}" added successfully!`);
+    
+  } catch (error) {
+    console.error('Error adding custom column:', error);
+    showError('Failed to add custom column');
+  }
+}
+
+async function deleteCustomColumn(columnId) {
+  if (!confirm('Are you sure you want to delete this custom column? This action cannot be undone.')) {
+    return;
+  }
+  
+  try {
+    const result = await chrome.storage.local.get(['columnConfiguration']);
+    const existingColumns = result.columnConfiguration || DEFAULT_COLUMNS;
+    
+    const updatedColumns = existingColumns.filter(col => col.id !== columnId);
+    await chrome.storage.local.set({ columnConfiguration: updatedColumns });
+    
+    // Re-render the column list
+    renderColumnConfiguration(updatedColumns);
+    
+    showSuccess('Custom column deleted successfully');
+    
+  } catch (error) {
+    console.error('Error deleting custom column:', error);
+    showError('Failed to delete custom column');
+  }
+}
+
+// Function to format custom column values based on type
+function formatCustomColumnValue(value, type) {
+  if (!value && value !== 0) return '';
+  
+  switch (type) {
+    case 'currency':
+      const numValue = parseFloat(value);
+      return isNaN(numValue) ? value : `$${numValue.toLocaleString()}`;
+    case 'percentage':
+      const pctValue = parseFloat(value);
+      return isNaN(pctValue) ? value : `${pctValue}%`;
+    case 'rating':
+      const ratingValue = parseFloat(value);
+      return isNaN(ratingValue) ? value : Math.min(10, Math.max(1, ratingValue));
+    case 'boolean':
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      const lowerValue = value.toString().toLowerCase();
+      return ['true', 'yes', '1', 'on'].includes(lowerValue) ? 'Yes' : 'No';
+    case 'date':
+      try {
+        const dateValue = new Date(value);
+        return isNaN(dateValue.getTime()) ? value : dateValue.toLocaleDateString();
+      } catch {
+        return value;
+      }
+    case 'number':
+      const numberValue = parseFloat(value);
+      return isNaN(numberValue) ? value : numberValue.toLocaleString();
+    case 'text':
+         default:
+       return value.toString();
+   }
+ }
+ 
+ // Function to show custom data editor
+ async function showCustomDataEditor(propertyItem, propertyIndex) {
+   try {
+     // Get current column configuration to find custom columns
+     const result = await chrome.storage.local.get(['columnConfiguration']);
+     const columnConfig = result.columnConfiguration || DEFAULT_COLUMNS;
+     const customColumns = columnConfig.filter(col => col.isCustom && col.enabled);
+     
+     if (customColumns.length === 0) {
+       showError('No custom columns are configured. Add custom columns in settings first.');
+       return;
+     }
+     
+     // Create modal
+     const modal = document.createElement('div');
+     modal.className = 'modal-overlay';
+     modal.innerHTML = `
+       <div class="custom-data-modal">
+         <div class="custom-data-modal-header">
+           <h3>✏️ Edit Custom Data</h3>
+           <button class="custom-data-modal-close">✕</button>
+         </div>
+         <div class="custom-data-modal-content">
+           <div class="property-info">
+             <strong>Property:</strong> ${propertyItem.url}
+           </div>
+           <form id="customDataForm" class="custom-data-form">
+             ${customColumns.map(column => `
+               <div class="form-group">
+                 <label for="custom_${column.id}">${column.name}:</label>
+                 <input 
+                   type="${getInputType(column.type)}" 
+                   id="custom_${column.id}" 
+                   class="form-input" 
+                   placeholder="${column.description}"
+                   value="${getCustomColumnValue(propertyItem, column)}"
+                   ${column.type === 'rating' ? 'min="1" max="10"' : ''}
+                 >
+                 <small class="form-help">Type: ${column.type}${column.defaultValue ? ` (Default: ${column.defaultValue})` : ''}</small>
+               </div>
+             `).join('')}
+           </form>
+         </div>
+         <div class="custom-data-modal-actions">
+           <button id="saveCustomDataBtn" class="btn btn-primary">💾 Save Changes</button>
+           <button id="cancelCustomDataBtn" class="btn btn-secondary">❌ Cancel</button>
+         </div>
+       </div>
+     `;
+     
+     document.body.appendChild(modal);
+     
+     // Add event listeners
+     const closeBtn = modal.querySelector('.custom-data-modal-close');
+     const saveBtn = modal.querySelector('#saveCustomDataBtn');
+     const cancelBtn = modal.querySelector('#cancelCustomDataBtn');
+     
+     const closeModal = () => modal.remove();
+     
+     closeBtn.addEventListener('click', closeModal);
+     cancelBtn.addEventListener('click', closeModal);
+     modal.addEventListener('click', (e) => {
+       if (e.target === modal) closeModal();
+     });
+     
+     saveBtn.addEventListener('click', async () => {
+       try {
+         // Collect form data
+         const customData = {};
+         customColumns.forEach(column => {
+           const input = document.getElementById(`custom_${column.id}`);
+           if (input && input.value.trim()) {
+             customData[column.id] = input.value.trim();
+           }
+         });
+         
+         // Update property with custom data
+         const historyResult = await chrome.storage.local.get(['propertyHistory']);
+         const history = historyResult.propertyHistory || [];
+         
+         if (history[propertyIndex]) {
+           history[propertyIndex].customColumns = customData;
+           await chrome.storage.local.set({ propertyHistory: history });
+           
+           // Refresh the display
+           displayPropertyHistory(history);
+           
+           closeModal();
+           showSuccess('Custom data saved successfully!');
+         }
+         
+       } catch (error) {
+         console.error('Error saving custom data:', error);
+         showError('Failed to save custom data');
+       }
+     });
+     
+   } catch (error) {
+     console.error('Error showing custom data editor:', error);
+     showError('Failed to open custom data editor');
+   }
+ }
+ 
+ // Helper function to get appropriate input type for column type
+ function getInputType(columnType) {
+   switch (columnType) {
+     case 'number':
+     case 'currency':
+     case 'percentage':
+     case 'rating':
+       return 'number';
+     case 'date':
+       return 'date';
+     case 'boolean':
+       return 'checkbox';
+     default:
+       return 'text';
+   }
+ }
