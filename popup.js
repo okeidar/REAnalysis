@@ -9,7 +9,12 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
     saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent,
     toggleCustomColumnBtn, customColumnForm, customColumnName, customColumnType,
-    customColumnDescription, customColumnDefault, addCustomColumnBtn, cancelCustomColumnBtn;
+    customColumnDescription, customColumnDefault, addCustomColumnBtn, cancelCustomColumnBtn,
+    // Prompt splitting elements
+    toggleSplittingBtn, splittingStatus, splittingIcon, splittingPhase, splittingDetails, splittingProgress, splittingProgressBar,
+    enableSplitting, lengthThreshold, confirmationTimeout, splittingAdvancedSettings,
+    toggleAdvancedSplitting, viewSplittingAnalytics, saveSplittingSettings, splittingAnalytics,
+    splitAttempts, successRate, fallbackUses, averageTime;
 
 // Global variables
 let currentTab = null;
@@ -57,6 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Custom column elements
   toggleCustomColumnBtn = document.getElementById('toggleCustomColumnBtn');
+  toggleSplittingBtn = document.getElementById('toggleSplittingBtn');
   customColumnForm = document.getElementById('customColumnForm');
   customColumnName = document.getElementById('customColumnName');
   customColumnType = document.getElementById('customColumnType');
@@ -64,6 +70,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   customColumnDefault = document.getElementById('customColumnDefault');
   addCustomColumnBtn = document.getElementById('addCustomColumnBtn');
   cancelCustomColumnBtn = document.getElementById('cancelCustomColumnBtn');
+
+  // Prompt splitting elements
+  splittingStatus = document.getElementById('splittingStatus');
+  splittingIcon = document.getElementById('splittingIcon');
+  splittingPhase = document.getElementById('splittingPhase');
+  splittingDetails = document.getElementById('splittingDetails');
+  splittingProgress = document.getElementById('splittingProgress');
+  splittingProgressBar = document.getElementById('splittingProgressBar');
+  enableSplitting = document.getElementById('enableSplitting');
+  lengthThreshold = document.getElementById('lengthThreshold');
+  confirmationTimeout = document.getElementById('confirmationTimeout');
+  splittingAdvancedSettings = document.getElementById('splittingAdvancedSettings');
+  toggleAdvancedSplitting = document.getElementById('toggleAdvancedSplitting');
+  viewSplittingAnalytics = document.getElementById('viewSplittingAnalytics');
+  saveSplittingSettings = document.getElementById('saveSplittingSettings');
+  splittingAnalytics = document.getElementById('splittingAnalytics');
+  splitAttempts = document.getElementById('splitAttempts');
+  successRate = document.getElementById('successRate');
+  fallbackUses = document.getElementById('fallbackUses');
+  averageTime = document.getElementById('averageTime');
 
   // Set up collapsible functionality
   setupCollapsibles();
@@ -75,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   if (exportHistoryBtn) exportHistoryBtn.addEventListener('click', exportPropertyHistory);
-  if (analyzeBtn) analyzeBtn.addEventListener('click', handleAnalyzeClick);
+  if (analyzeBtn) analyzeBtn.addEventListener('click', handleAnalyzeClickWithSplitting);
   if (pasteBtn) pasteBtn.addEventListener('click', async function() {
     try {
       const text = await navigator.clipboard.readText();
@@ -104,6 +130,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (addCustomColumnBtn) addCustomColumnBtn.addEventListener('click', addCustomColumn);
   if (cancelCustomColumnBtn) cancelCustomColumnBtn.addEventListener('click', clearCustomColumnForm);
 
+  // Prompt splitting event listeners
+  if (enableSplitting) enableSplitting.addEventListener('change', updateSplittingSettingsVisibility);
+  if (toggleAdvancedSplitting) toggleAdvancedSplitting.addEventListener('click', toggleAdvancedSplittingSettings);
+  if (viewSplittingAnalytics) viewSplittingAnalytics.addEventListener('click', loadSplittingAnalytics);
+  if (saveSplittingSettings) saveSplittingSettings.addEventListener('click', savePromptSplittingSettings);
+
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.propertyHistory) {
@@ -117,6 +149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadPropertyHistory();
   await loadCustomPrompt();
   await loadColumnConfiguration();
+  await loadPromptSplittingSettings();
   await initializePopup();
   
   // Set up periodic refresh for pending analyses
@@ -1820,5 +1853,375 @@ async function exportPropertyHistory() {
   } catch (error) {
     console.error('Error exporting property history:', error);
     showError('Failed to export property history');
+  }
+}
+
+// PROMPT SPLITTING FUNCTIONS
+
+// Function to load prompt splitting settings
+async function loadPromptSplittingSettings() {
+  try {
+    const result = await chrome.storage.local.get(['promptSplittingSettings']);
+    const settings = result.promptSplittingSettings || {
+      isEnabled: true,
+      lengthThreshold: 2000,
+      confirmationTimeout: 30000
+    };
+    
+    // Update UI elements
+    if (enableSplitting) enableSplitting.checked = settings.isEnabled;
+    if (lengthThreshold) lengthThreshold.value = settings.lengthThreshold;
+    if (confirmationTimeout) confirmationTimeout.value = settings.confirmationTimeout / 1000; // Convert to seconds
+    
+    updateSplittingSettingsVisibility();
+    
+    console.log('✅ Loaded prompt splitting settings:', settings);
+  } catch (error) {
+    console.error('❌ Failed to load prompt splitting settings:', error);
+  }
+}
+
+// Function to save prompt splitting settings
+async function savePromptSplittingSettings() {
+  try {
+    const settings = {
+      isEnabled: enableSplitting ? enableSplitting.checked : true,
+      lengthThreshold: lengthThreshold ? parseInt(lengthThreshold.value) : 2000,
+      confirmationTimeout: confirmationTimeout ? parseInt(confirmationTimeout.value) * 1000 : 30000
+    };
+    
+    // Save to storage
+    await chrome.storage.local.set({ promptSplittingSettings: settings });
+    
+    // Update content script settings
+    if (currentTab) {
+      try {
+        await sendMessageWithRetry({
+          action: 'updatePromptSplittingSettings',
+          settings: settings
+        });
+        showSuccess('Prompt splitting settings saved successfully!');
+      } catch (error) {
+        console.error('Failed to update content script settings:', error);
+        showSuccess('Settings saved locally (will apply on next analysis)');
+      }
+    } else {
+      showSuccess('Settings saved successfully!');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to save prompt splitting settings:', error);
+    showError('Failed to save prompt splitting settings');
+  }
+}
+
+// Function to update settings visibility based on enabled state
+function updateSplittingSettingsVisibility() {
+  if (!enableSplitting || !splittingAdvancedSettings) return;
+  
+  if (enableSplitting.checked) {
+    splittingAdvancedSettings.classList.remove('hidden');
+  } else {
+    splittingAdvancedSettings.classList.add('hidden');
+  }
+}
+
+// Function to toggle advanced splitting settings
+function toggleAdvancedSplittingSettings() {
+  if (!splittingAdvancedSettings || !toggleAdvancedSplitting) return;
+  
+  const isVisible = !splittingAdvancedSettings.classList.contains('hidden');
+  
+  if (isVisible) {
+    splittingAdvancedSettings.classList.add('hidden');
+    toggleAdvancedSplitting.textContent = '⚙️ Advanced';
+  } else {
+    splittingAdvancedSettings.classList.remove('hidden');
+    toggleAdvancedSplitting.textContent = '⚙️ Hide Advanced';
+  }
+}
+
+// Function to load and display splitting analytics
+async function loadSplittingAnalytics() {
+  try {
+    if (!currentTab) {
+      showError('Please navigate to ChatGPT first');
+      return;
+    }
+    
+    // Toggle analytics display if already shown
+    if (splittingAnalytics && !splittingAnalytics.classList.contains('hidden')) {
+      splittingAnalytics.classList.add('hidden');
+      if (viewSplittingAnalytics) {
+        viewSplittingAnalytics.textContent = '📊 Analytics';
+      }
+      return;
+    }
+    
+    const response = await sendMessageWithRetry({
+      action: 'getPromptSplittingAnalytics'
+    });
+    
+    if (response && response.success) {
+      const analytics = response.analytics;
+      
+      // Update analytics display with enhanced data
+      if (splitAttempts) splitAttempts.textContent = analytics.splitAttempts || 0;
+      
+      if (successRate) {
+        const rate = analytics.splitAttempts > 0 ? 
+          Math.round((analytics.splitSuccesses / analytics.splitAttempts) * 100) : 0;
+        successRate.textContent = `${rate}%`;
+        
+        // Color code the success rate
+        if (rate >= 80) {
+          successRate.style.color = '#16a34a'; // Green
+        } else if (rate >= 60) {
+          successRate.style.color = '#f59e0b'; // Yellow
+        } else {
+          successRate.style.color = '#dc2626'; // Red
+        }
+      }
+      
+      if (fallbackUses) {
+        fallbackUses.textContent = analytics.fallbackUses || 0;
+        // Show fallback percentage if there are attempts
+        if (analytics.splitAttempts > 0) {
+          const fallbackRate = Math.round((analytics.fallbackUses / analytics.splitAttempts) * 100);
+          fallbackUses.textContent += ` (${fallbackRate}%)`;
+        }
+      }
+      
+      if (averageTime) {
+        if (analytics.averageConfirmationTime && analytics.averageConfirmationTime.length > 0) {
+          const avgMs = analytics.averageConfirmationTime.reduce((a, b) => a + b, 0) / analytics.averageConfirmationTime.length;
+          averageTime.textContent = `${Math.round(avgMs / 1000)}s`;
+        } else {
+          averageTime.textContent = '0s';
+        }
+      }
+      
+      // Add detailed analytics if available
+      updateDetailedAnalytics(analytics);
+      
+      // Show analytics panel
+      if (splittingAnalytics) {
+        splittingAnalytics.classList.remove('hidden');
+      }
+      
+      // Update button text
+      if (viewSplittingAnalytics) {
+        viewSplittingAnalytics.textContent = '📊 Hide Analytics';
+      }
+      
+      showSuccess('Analytics loaded successfully!');
+    } else {
+      showError('Failed to load analytics');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to load splitting analytics:', error);
+    showError('Failed to load analytics');
+  }
+}
+
+// Function to update detailed analytics display
+function updateDetailedAnalytics(analytics) {
+  // Add detailed analytics section if it doesn't exist
+  let detailedSection = document.getElementById('detailedAnalytics');
+  if (!detailedSection && splittingAnalytics) {
+    detailedSection = document.createElement('div');
+    detailedSection.id = 'detailedAnalytics';
+    detailedSection.style.cssText = `
+      margin-top: var(--space-md);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--border);
+      font-size: var(--font-size-sm);
+    `;
+    
+    detailedSection.innerHTML = `
+      <h5 style="margin: 0 0 var(--space-sm) 0; font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">Detailed Statistics</h5>
+      <div id="failureReasons" class="hidden"></div>
+      <div id="performanceMetrics"></div>
+    `;
+    
+    splittingAnalytics.appendChild(detailedSection);
+  }
+  
+  // Update failure reasons if available
+  const failureReasonsDiv = document.getElementById('failureReasons');
+  if (failureReasonsDiv && analytics.failureReasons && Object.keys(analytics.failureReasons).length > 0) {
+    failureReasonsDiv.classList.remove('hidden');
+    failureReasonsDiv.innerHTML = `
+      <div style="margin-bottom: var(--space-sm);"><strong>Failure Reasons:</strong></div>
+      ${Object.entries(analytics.failureReasons).map(([reason, count]) => 
+        `<div style="margin-left: var(--space-md);">• ${reason}: ${count}</div>`
+      ).join('')}
+    `;
+  }
+  
+  // Update performance metrics
+  const performanceDiv = document.getElementById('performanceMetrics');
+  if (performanceDiv) {
+    const responseTimeAvg = analytics.confirmationTimes && analytics.confirmationTimes.length > 0 ?
+      Math.round(analytics.confirmationTimes.reduce((a, b) => a + b, 0) / analytics.confirmationTimes.length / 1000) : 0;
+    
+    performanceDiv.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm);">
+        <div><strong>Response Time:</strong> ${responseTimeAvg}s</div>
+        <div><strong>Total Sessions:</strong> ${analytics.splitAttempts || 0}</div>
+      </div>
+    `;
+  }
+}
+
+// Function to show splitting status during analysis
+function showSplittingStatus(phase, details, progress = 0) {
+  if (!splittingStatus || !splittingPhase || !splittingDetails) return;
+  
+  // Update phase and details
+  splittingPhase.textContent = `Prompt Splitting - ${phase}`;
+  splittingDetails.textContent = details;
+  
+  // Update progress
+  if (splittingProgress && splittingProgressBar) {
+    splittingProgress.classList.remove('hidden');
+    splittingProgressBar.style.width = `${progress}%`;
+  }
+  
+  // Update icon based on phase
+  if (splittingIcon) {
+    switch (phase) {
+      case 'Instructions':
+        splittingIcon.textContent = '📝';
+        break;
+      case 'Confirmation':
+        splittingIcon.textContent = '⏳';
+        break;
+      case 'Property Link':
+        splittingIcon.textContent = '🔗';
+        break;
+      case 'Complete':
+        splittingIcon.textContent = '✅';
+        break;
+      case 'Failed':
+        splittingIcon.textContent = '❌';
+        break;
+      default:
+        splittingIcon.textContent = '🔀';
+    }
+  }
+  
+  // Show the status
+  splittingStatus.classList.remove('hidden');
+}
+
+// Function to hide splitting status
+function hideSplittingStatus() {
+  if (splittingStatus) {
+    splittingStatus.classList.add('hidden');
+  }
+}
+
+// Function to monitor splitting progress
+async function monitorSplittingProgress() {
+  if (!currentTab) return;
+  
+  try {
+    const response = await sendMessageWithRetry({
+      action: 'checkStatus'
+    });
+    
+    if (response && response.splittingSession) {
+      const session = response.splittingSession;
+      const duration = Date.now() - session.startTime;
+      
+      if (session.phase === 'instructions') {
+        showSplittingStatus('Confirmation', `Waiting for ChatGPT confirmation... (${Math.round(duration/1000)}s)`, 25);
+      } else if (session.phase === 'property') {
+        showSplittingStatus('Property Link', 'Sending property link for analysis...', 75);
+      }
+      
+      // Continue monitoring if session is active
+      setTimeout(monitorSplittingProgress, 1000);
+    } else {
+      // No active session, hide status
+      hideSplittingStatus();
+    }
+  } catch (error) {
+    console.error('Error monitoring splitting progress:', error);
+  }
+}
+
+// Enhanced analyze function with splitting status monitoring
+async function handleAnalyzeClickWithSplitting() {
+  if (!propertyUrlInput) return;
+  
+  const link = propertyUrlInput.value.trim();
+  
+  if (!link) {
+    showError('Please enter a property link first.');
+    return;
+  }
+  
+  if (!isValidPropertyLink(link)) {
+    showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
+    return;
+  }
+  
+  // Disable button while processing
+  if (analyzeBtn) {
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
+  }
+  
+  try {
+    // First ensure content script is ready
+    if (!contentScriptReady) {
+      console.log('Content script not ready, attempting to inject...');
+      await injectContentScript();
+      contentScriptReady = true;
+    }
+    
+    // Show initial splitting status
+    showSplittingStatus('Instructions', 'Preparing prompt splitting...', 10);
+    
+    // Send message to content script with retry logic
+    const response = await sendMessageWithRetry({
+      action: 'analyzeProperty',
+      link: link
+    });
+    
+    if (response && response.success) {
+      // Save property to history
+      await savePropertyToHistory(link);
+      
+      if (response.usedSplitting) {
+        showSplittingStatus('Instructions', 'Phase 1: Sending instructions...', 25);
+        // Start monitoring progress
+        monitorSplittingProgress();
+        showSuccess('Property analysis started with prompt splitting!');
+      } else {
+        hideSplittingStatus();
+        showSuccess('Property link sent to ChatGPT for analysis!');
+      }
+      
+      if (propertyUrlInput) propertyUrlInput.value = ''; // Clear the input
+    } else {
+      hideSplittingStatus();
+      throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
+    }
+    
+  } catch (error) {
+    console.error('Analysis failed:', error);
+    hideSplittingStatus();
+    showSplittingStatus('Failed', `Error: ${error.message}`, 0);
+    setTimeout(hideSplittingStatus, 5000); // Hide after 5 seconds
+    showError(`Unable to communicate with ChatGPT: ${error.message}`);
+  } finally {
+    if (analyzeBtn) {
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = '🔍 Analyze Property';
+    }
   }
 }

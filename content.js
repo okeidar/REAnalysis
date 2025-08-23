@@ -33,10 +33,487 @@ let currentPropertyAnalysis = null;
 // Track processed messages per property URL to prevent cross-contamination
 let processedMessagesPerProperty = new Map();
 
+// PROMPT SPLITTING FEATURE - Global state management
+let promptSplittingState = {
+  isEnabled: true, // Default enabled
+  currentSession: null,
+  confirmationTimeout: 30000, // 30 seconds
+  maxRetries: 3,
+  lengthThreshold: 2000, // Split prompts longer than 2000 chars
+  analytics: {
+    splitAttempts: 0,
+    splitSuccesses: 0,
+    fallbackUses: 0,
+    averageConfirmationTime: [],
+    failureReasons: {},
+    fallbackReasons: {},
+    confirmationTimes: []
+  }
+};
+
+// Prompt splitting session state
+let splittingSession = null;
+
 // Check if we're on ChatGPT
 function isChatGPTSite() {
   return window.location.hostname === 'chatgpt.com' || 
          window.location.hostname === 'chat.openai.com';
+}
+
+// PROMPT SPLITTING CORE FUNCTIONS
+
+// Function to load prompt splitting settings from storage
+async function loadPromptSplittingSettings() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['promptSplittingSettings']),
+      { promptSplittingSettings: null }
+    );
+    
+    if (result.promptSplittingSettings) {
+      promptSplittingState = { ...promptSplittingState, ...result.promptSplittingSettings };
+      console.log('✅ Loaded prompt splitting settings:', promptSplittingState);
+    }
+  } catch (error) {
+    console.error('❌ Failed to load prompt splitting settings:', error);
+  }
+}
+
+// Function to save prompt splitting analytics
+async function savePromptSplittingAnalytics() {
+  try {
+    await safeChromeFall(() => chrome.storage.local.set({ 
+      promptSplittingAnalytics: promptSplittingState.analytics 
+    }));
+    console.log('📊 Analytics saved:', promptSplittingState.analytics);
+  } catch (error) {
+    console.error('❌ Failed to save prompt splitting analytics:', error);
+  }
+}
+
+// Function to update analytics with detailed tracking
+function updateSplittingAnalytics(eventType, data = {}) {
+  const analytics = promptSplittingState.analytics;
+  
+  switch (eventType) {
+    case 'split_started':
+      analytics.splitAttempts++;
+      analytics.lastAttemptTime = Date.now();
+      break;
+      
+    case 'split_success':
+      analytics.splitSuccesses++;
+      if (data.duration) {
+        analytics.averageConfirmationTime.push(data.duration);
+        // Keep only last 50 measurements
+        if (analytics.averageConfirmationTime.length > 50) {
+          analytics.averageConfirmationTime.shift();
+        }
+      }
+      break;
+      
+    case 'split_failed':
+      if (data.reason) {
+        analytics.failureReasons = analytics.failureReasons || {};
+        analytics.failureReasons[data.reason] = (analytics.failureReasons[data.reason] || 0) + 1;
+      }
+      break;
+      
+    case 'fallback_used':
+      analytics.fallbackUses++;
+      if (data.reason) {
+        analytics.fallbackReasons = analytics.fallbackReasons || {};
+        analytics.fallbackReasons[data.reason] = (analytics.fallbackReasons[data.reason] || 0) + 1;
+      }
+      break;
+      
+    case 'confirmation_received':
+      if (data.responseTime) {
+        analytics.confirmationTimes = analytics.confirmationTimes || [];
+        analytics.confirmationTimes.push(data.responseTime);
+        // Keep only last 100 measurements
+        if (analytics.confirmationTimes.length > 100) {
+          analytics.confirmationTimes.shift();
+        }
+      }
+      break;
+  }
+  
+  // Save analytics periodically
+  savePromptSplittingAnalytics();
+}
+
+// Function to get performance statistics
+function getPerformanceStats() {
+  const analytics = promptSplittingState.analytics;
+  
+  const successRate = analytics.splitAttempts > 0 ? 
+    (analytics.splitSuccesses / analytics.splitAttempts) * 100 : 0;
+    
+  const averageConfirmationTime = analytics.averageConfirmationTime.length > 0 ?
+    analytics.averageConfirmationTime.reduce((a, b) => a + b, 0) / analytics.averageConfirmationTime.length : 0;
+    
+  const averageResponseTime = analytics.confirmationTimes && analytics.confirmationTimes.length > 0 ?
+    analytics.confirmationTimes.reduce((a, b) => a + b, 0) / analytics.confirmationTimes.length : 0;
+  
+  return {
+    totalAttempts: analytics.splitAttempts,
+    successfulSplits: analytics.splitSuccesses,
+    successRate: Math.round(successRate),
+    fallbackUses: analytics.fallbackUses,
+    averageConfirmationTime: Math.round(averageConfirmationTime / 1000), // in seconds
+    averageResponseTime: Math.round(averageResponseTime / 1000), // in seconds
+    failureReasons: analytics.failureReasons || {},
+    fallbackReasons: analytics.fallbackReasons || {}
+  };
+}
+
+// Function to determine if prompt should be split
+function shouldSplitPrompt(prompt, propertyLink) {
+  if (!promptSplittingState.isEnabled) {
+    console.log('📝 Prompt splitting disabled, using single prompt approach');
+    return false;
+  }
+  
+  const totalLength = prompt.length + propertyLink.length;
+  const shouldSplit = totalLength > promptSplittingState.lengthThreshold;
+  
+  console.log(`📏 Prompt analysis: ${totalLength} chars, threshold: ${promptSplittingState.lengthThreshold}, should split: ${shouldSplit}`);
+  return shouldSplit;
+}
+
+// Function to split prompt into instruction and link phases
+function splitPrompt(prompt, propertyLink) {
+  // Remove the property URL placeholder and add confirmation request
+  const instructionPrompt = prompt
+    .replace('{PROPERTY_URL}', '')
+    .replace('Property Link: {PROPERTY_URL}', '')
+    .trim() + '\n\n' + 
+    'Please say "YES, I UNDERSTAND" if you understand these instructions and are ready to analyze the property link I will provide next.';
+  
+  return {
+    instructions: instructionPrompt,
+    propertyLink: `Please analyze this property using the instructions I just provided: ${propertyLink}`,
+    originalPrompt: prompt.replace('{PROPERTY_URL}', propertyLink)
+  };
+}
+
+// Function to detect ChatGPT confirmation response
+function detectConfirmation(responseText) {
+  if (!responseText) return false;
+  
+  const text = responseText.toLowerCase().trim();
+  const confirmationPatterns = [
+    /yes,?\s*i\s+understand/i,
+    /yes\s*understand/i,
+    /understood/i,
+    /ready\s+to\s+analyze/i,
+    /i\s+understand.*ready/i,
+    /got\s+it.*ready/i,
+    /understood.*property/i
+  ];
+  
+  const hasConfirmation = confirmationPatterns.some(pattern => pattern.test(text));
+  console.log(`🔍 Confirmation detection: "${text.substring(0, 100)}..." -> ${hasConfirmation}`);
+  return hasConfirmation;
+}
+
+// Function to execute two-phase prompt splitting
+async function executeTwoPhasePromptSplit(promptData, propertyLink) {
+  console.log('🚀 Starting two-phase prompt splitting execution');
+  
+  // Initialize splitting session
+  splittingSession = {
+    id: `split_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    propertyLink: propertyLink,
+    startTime: Date.now(),
+    phase: 'instructions',
+    retryCount: 0,
+    instructions: promptData.instructions,
+    propertyMessage: promptData.propertyLink,
+    originalPrompt: promptData.originalPrompt,
+    maxRetries: promptSplittingState.maxRetries || 3
+  };
+  
+  updateSplittingAnalytics('split_started');
+  
+  console.log(`📋 Phase 1: Sending instructions (${promptData.instructions.length} chars)`);
+  console.log(`🔗 Phase 2 ready: Property link (${promptData.propertyLink.length} chars)`);
+  
+  try {
+    // Retry loop for the entire splitting process
+    for (let attempt = 1; attempt <= splittingSession.maxRetries; attempt++) {
+    splittingSession.retryCount = attempt - 1;
+    
+    try {
+      console.log(`🔄 Attempt ${attempt}/${splittingSession.maxRetries} for prompt splitting`);
+      
+      // Phase 1: Send instructions and wait for confirmation
+      const phase1Success = await sendInstructionsAndWaitForConfirmation(promptData.instructions);
+      
+      if (phase1Success) {
+        console.log('✅ Phase 1 completed successfully, proceeding to Phase 2');
+        splittingSession.phase = 'property';
+        
+        // Small delay before sending property link
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Phase 2: Send property link
+        const phase2Success = await sendPropertyLink(promptData.propertyLink);
+        
+        if (phase2Success) {
+          console.log('✅ Two-phase prompt splitting completed successfully');
+          splittingSession.completedAt = Date.now();
+          const duration = splittingSession.completedAt - splittingSession.startTime;
+          updateSplittingAnalytics('split_success', { duration: duration });
+          
+          // Keep only last 50 timing measurements
+          if (promptSplittingState.analytics.averageConfirmationTime.length > 50) {
+            promptSplittingState.analytics.averageConfirmationTime.shift();
+          }
+          
+          await savePromptSplittingAnalytics();
+          return true;
+        } else {
+          console.log(`⚠️ Phase 2 failed on attempt ${attempt}`);
+          if (attempt < splittingSession.maxRetries) {
+            console.log(`🔄 Retrying in 2 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            splittingSession.phase = 'instructions'; // Reset to instructions phase
+            continue;
+          }
+        }
+      } else {
+        console.log(`⚠️ Phase 1 failed on attempt ${attempt}`);
+        if (attempt < splittingSession.maxRetries) {
+          console.log(`🔄 Retrying in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error during splitting attempt ${attempt}:`, error);
+      if (attempt < splittingSession.maxRetries) {
+        console.log(`🔄 Retrying after error in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        splittingSession.phase = 'instructions'; // Reset to instructions phase
+        continue;
+             }
+     }
+     
+     console.log(`❌ All ${splittingSession.maxRetries} attempts failed, prompt splitting unsuccessful`);
+     updateSplittingAnalytics('split_failed', { reason: 'Max retries reached' });
+     return false;
+   } finally {
+  // Clean up session
+  if (splittingSession) {
+    console.log(`🧹 Cleaning up splitting session: ${splittingSession.id}`);
+    splittingSession = null;
+  }
+}
+
+// Function to send instructions and wait for confirmation
+async function sendInstructionsAndWaitForConfirmation(instructionText) {
+  console.log('📝 Sending instructions phase...');
+  
+  const maxAttempts = 3;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`📝 Instructions attempt ${attempt}/${maxAttempts}`);
+      
+      const inputField = await waitForInputField(5000);
+      if (!inputField) {
+        throw new Error('Could not find input field');
+      }
+      
+      // Insert instruction text
+      await insertTextIntoInput(inputField, instructionText);
+      
+      // Submit the message
+      const submitSuccess = await submitMessage();
+      if (!submitSuccess) {
+        throw new Error('Failed to submit message');
+      }
+      
+      // Wait for confirmation response
+      console.log('⏳ Waiting for ChatGPT confirmation...');
+      const confirmationReceived = await waitForConfirmationResponse();
+      
+      if (confirmationReceived) {
+        console.log('✅ Confirmation received successfully');
+        updateSplittingAnalytics('confirmation_received', { responseTime: Date.now() - splittingSession.startTime });
+        return true;
+      } else {
+        console.log(`❌ No confirmation received on attempt ${attempt}`);
+        if (attempt < maxAttempts) {
+          console.log(`🔄 Retrying instructions in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error sending instructions (attempt ${attempt}):`, error);
+      if (attempt < maxAttempts) {
+        console.log(`🔄 Retrying after error in 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+    }
+  }
+  
+  console.log(`❌ All ${maxAttempts} instruction attempts failed`);
+  updateSplittingAnalytics('split_failed', { reason: 'Max retries reached for instructions' });
+  return false;
+}
+
+// Function to wait for confirmation response from ChatGPT
+function waitForConfirmationResponse() {
+  return new Promise((resolve) => {
+    let confirmationTimeout;
+    let checkInterval;
+    let lastMessageText = '';
+    
+    const cleanup = () => {
+      if (confirmationTimeout) clearTimeout(confirmationTimeout);
+      if (checkInterval) clearInterval(checkInterval);
+    };
+    
+    // Set timeout
+    confirmationTimeout = setTimeout(() => {
+      console.log('⏰ Confirmation timeout reached');
+      cleanup();
+      resolve(false);
+    }, promptSplittingState.confirmationTimeout);
+    
+    // Check for confirmation every 500ms
+    checkInterval = setInterval(() => {
+      try {
+        const messages = getLatestChatGPTMessages();
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          const messageText = latestMessage.textContent || latestMessage.innerText || '';
+          
+          // Only check if message has changed (to avoid checking same message repeatedly)
+          if (messageText !== lastMessageText && messageText.length > 10) {
+            lastMessageText = messageText;
+            console.log(`🔍 Checking message for confirmation: "${messageText.substring(0, 100)}..."`);
+            
+            if (detectConfirmation(messageText)) {
+              console.log('✅ Confirmation detected in ChatGPT response');
+              cleanup();
+              resolve(true);
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for confirmation:', error);
+      }
+    }, 500);
+  });
+}
+
+// Function to send property link in phase 2
+async function sendPropertyLink(propertyLinkText) {
+  console.log('🔗 Sending property link phase...');
+  
+  const maxAttempts = 3;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`🔗 Property link attempt ${attempt}/${maxAttempts}`);
+      
+      const inputField = await waitForInputField(5000);
+      if (!inputField) {
+        throw new Error('Could not find input field');
+      }
+      
+      // Insert property link text
+      await insertTextIntoInput(inputField, propertyLinkText);
+      
+      // Submit the message
+      const submitSuccess = await submitMessage();
+      
+      if (submitSuccess) {
+        console.log('✅ Property link sent successfully');
+        return true;
+      } else {
+        throw new Error('Failed to submit property link message');
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error sending property link (attempt ${attempt}):`, error);
+      if (attempt < maxAttempts) {
+        console.log(`🔄 Retrying property link in 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+    }
+  }
+  
+  console.log(`❌ All ${maxAttempts} property link attempts failed`);
+  updateSplittingAnalytics('split_failed', { reason: 'Max retries reached for property link' });
+  return false;
+}
+
+// Function to get latest ChatGPT messages
+function getLatestChatGPTMessages() {
+  const messageSelectors = [
+    '[data-message-author-role="assistant"]',
+    '[data-message-id] [data-message-author-role="assistant"]',
+    '.group.w-full.text-token-text-primary',
+    '.group.final-completion',
+    '.prose.result-streaming',
+    '.prose',
+    '[class*="markdown"]',
+    '[class*="message"][class*="assistant"]',
+    '.message.assistant',
+    '.group.assistant',
+    '[class*="assistant"]'
+  ];
+  
+  for (const selector of messageSelectors) {
+    const elements = document.querySelectorAll(selector);
+    if (elements.length > 0) {
+      return Array.from(elements);
+    }
+  }
+  
+  return [];
+}
+
+// Function to insert text into input field
+async function insertTextIntoInput(inputField, text) {
+  if (inputField.tagName === 'TEXTAREA') {
+    inputField.value = '';
+    inputField.focus();
+    inputField.value = text;
+    
+    // Trigger input events
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    
+  } else if (inputField.contentEditable === 'true') {
+    inputField.textContent = '';
+    inputField.focus();
+    inputField.textContent = text;
+    
+    // Trigger input events for contenteditable
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // Also try composition events which some modern inputs use
+    inputField.dispatchEvent(new CompositionEvent('compositionstart'));
+    inputField.dispatchEvent(new CompositionEvent('compositionend'));
+  }
+  
+  // Ensure the field has focus
+  inputField.focus();
+  
+  console.log(`✅ Text inserted into input field: ${text.length} characters`);
 }
 
 // Function to extract key information from ChatGPT response
@@ -575,6 +1052,15 @@ function setupResponseMonitor() {
     console.log('🎯 Processing completed response for:', currentUrl);
     console.log('📝 Final response length:', messageText.length);
     
+    // Check if we're in a splitting session and this might be a confirmation
+    if (splittingSession && splittingSession.phase === 'instructions') {
+      console.log('🔍 Checking if this is a confirmation response for splitting session');
+      if (detectConfirmation(messageText)) {
+        console.log('✅ Confirmation detected during splitting session, but will be handled by confirmation listener');
+        return; // Let the confirmation listener handle this
+      }
+    }
+    
     // Clear any existing timer
     if (completionTimers.has(currentUrl)) {
       clearTimeout(completionTimers.get(currentUrl));
@@ -963,9 +1449,12 @@ function waitForInputField(maxWait = 10000) {
   });
 }
 
-// Function to insert text into ChatGPT input
+// Function to insert text into ChatGPT input with prompt splitting support
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
+  
+  // Load prompt splitting settings
+  await loadPromptSplittingSettings();
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
@@ -976,10 +1465,12 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   currentPropertyAnalysis = {
     url: propertyLink,
     timestamp: Date.now(),
-    sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    splittingEnabled: promptSplittingState.isEnabled
   };
   
   console.log('🎯 New property analysis session started:', currentPropertyAnalysis.sessionId);
+  console.log(`📋 Prompt splitting enabled: ${promptSplittingState.isEnabled}`);
   
   // Clear any previous processed messages for this property to allow fresh analysis
   if (processedMessagesPerProperty.has(propertyLink)) {
@@ -988,9 +1479,6 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   }
   
   try {
-    // Wait for input field to be available
-    const inputField = await waitForInputField(5000);
-    
     // Get custom prompt from storage or use default
     const result = await safeChromeFall(
       () => chrome.storage.local.get(['customPrompt']),
@@ -1051,45 +1539,50 @@ Focus on data accuracy and practical investment considerations that would be val
 
 Property Link: {PROPERTY_URL}`;
 
-    // Replace variables in the prompt
-    const prompt = promptTemplate
+    // Determine if we should use prompt splitting
+    if (shouldSplitPrompt(promptTemplate, propertyLink)) {
+      console.log('🔀 Using prompt splitting approach for this property');
+      currentPropertyAnalysis.usedSplitting = true;
+      
+      // Split the prompt
+      const splitData = splitPrompt(promptTemplate, propertyLink);
+      
+      // Attempt two-phase approach
+      const splittingSuccess = await executeTwoPhasePromptSplit(splitData, propertyLink);
+      
+      if (splittingSuccess) {
+        console.log('✅ Prompt splitting completed successfully');
+        return true;
+      } else {
+        console.log('⚠️ Prompt splitting failed, falling back to single prompt');
+        currentPropertyAnalysis.usedFallback = true;
+        updateSplittingAnalytics('fallback_used', { reason: 'Two-phase split failed' });
+        
+        // Fall through to single prompt approach
+      }
+    } else {
+      console.log('📝 Using single prompt approach (splitting disabled or prompt too short)');
+      currentPropertyAnalysis.usedSplitting = false;
+    }
+    
+    // Single prompt approach (original method or fallback)
+    const fullPrompt = promptTemplate
       .replace('{PROPERTY_URL}', propertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
     
-    console.log('Inserting prompt into input field:', inputField);
+    console.log(`📝 Sending single prompt (${fullPrompt.length} chars)`);
     
-    // Clear existing content first
-    if (inputField.tagName === 'TEXTAREA') {
-      inputField.value = '';
-      inputField.focus();
-      inputField.value = prompt;
-      
-      // Trigger input events
-      inputField.dispatchEvent(new Event('input', { bubbles: true }));
-      inputField.dispatchEvent(new Event('change', { bubbles: true }));
-      
-    } else if (inputField.contentEditable === 'true') {
-      inputField.textContent = '';
-      inputField.focus();
-      inputField.textContent = prompt;
-      
-      // Trigger input events for contenteditable
-      inputField.dispatchEvent(new Event('input', { bubbles: true }));
-      inputField.dispatchEvent(new Event('change', { bubbles: true }));
-      
-      // Also try composition events which some modern inputs use
-      inputField.dispatchEvent(new CompositionEvent('compositionstart'));
-      inputField.dispatchEvent(new CompositionEvent('compositionend'));
-    }
+    // Wait for input field to be available
+    const inputField = await waitForInputField(5000);
     
-    // Ensure the field has focus
-    inputField.focus();
+    // Insert the full prompt
+    await insertTextIntoInput(inputField, fullPrompt);
     
-    console.log('Prompt inserted successfully');
+    console.log('✅ Single prompt inserted successfully');
     return true;
     
   } catch (error) {
-    console.error('Failed to insert prompt:', error);
+    console.error('❌ Failed to insert prompt:', error);
     return false;
   }
 }
@@ -1098,46 +1591,49 @@ Property Link: {PROPERTY_URL}`;
 function submitMessage() {
   console.log('Attempting to auto-submit message...');
   
-  // Wait a bit for the input to be processed
-  setTimeout(() => {
-    // Try to find and click the send button
-    const sendButtonSelectors = [
-      // Updated selectors for current ChatGPT
-      'button[data-testid="send-button"]',
-      'button[aria-label*="Send"]',
-      'button[title*="Send"]',
-      'button[class*="send"]',
+  return new Promise((resolve) => {
+    // Wait a bit for the input to be processed
+    setTimeout(() => {
+      // Try to find and click the send button
+      const sendButtonSelectors = [
+        // Updated selectors for current ChatGPT
+        'button[data-testid="send-button"]',
+        'button[aria-label*="Send"]',
+        'button[title*="Send"]',
+        'button[class*="send"]',
+        
+        // Look for buttons with send icons
+        'button svg[data-icon="send"]',
+        'button svg[class*="send"]',
+        
+        // Fallback selectors
+        '.send-button',
+        'button[type="submit"]'
+      ];
       
-      // Look for buttons with send icons
-      'button svg[data-icon="send"]',
-      'button svg[class*="send"]',
-      
-      // Fallback selectors
-      '.send-button',
-      'button[type="submit"]'
-    ];
-    
-    for (const selector of sendButtonSelectors) {
-      try {
-        const button = document.querySelector(selector);
-        if (button) {
-          // Find the actual button element if we found an SVG
-          const actualButton = button.tagName === 'BUTTON' ? button : button.closest('button');
-          if (actualButton && !actualButton.disabled && actualButton.offsetParent !== null) {
-            console.log('Found send button, clicking:', actualButton);
-            actualButton.click();
-            return true;
+      for (const selector of sendButtonSelectors) {
+        try {
+          const button = document.querySelector(selector);
+          if (button) {
+            // Find the actual button element if we found an SVG
+            const actualButton = button.tagName === 'BUTTON' ? button : button.closest('button');
+            if (actualButton && !actualButton.disabled && actualButton.offsetParent !== null) {
+              console.log('✅ Found send button, clicking:', actualButton);
+              actualButton.click();
+              resolve(true);
+              return;
+            }
           }
+        } catch (e) {
+          console.log(`Error with send button selector ${selector}:`, e);
         }
-      } catch (e) {
-        console.log(`Error with send button selector ${selector}:`, e);
       }
-    }
-    
-    // If no send button found, user will need to press Enter or click send manually
-    console.log('Send button not found, user needs to send manually');
-    return false;
-  }, 1000);
+      
+      // If no send button found, user will need to press Enter or click send manually
+      console.log('⚠️ Send button not found, user needs to send manually');
+      resolve(false);
+    }, 1000);
+  });
 }
 
 // Initialize extension only on ChatGPT
@@ -1195,6 +1691,9 @@ if (isChatGPTSite()) {
   // Setup response monitoring
   setupResponseMonitor();
   
+  // Initialize prompt splitting settings
+  loadPromptSplittingSettings();
+  
   // Listen for messages from popup or background script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Content script received message:', request);
@@ -1204,7 +1703,13 @@ if (isChatGPTSite()) {
       sendResponse({
         active: true,
         site: window.location.hostname,
-        url: window.location.href
+        url: window.location.href,
+        promptSplittingEnabled: promptSplittingState.isEnabled,
+        splittingSession: splittingSession ? {
+          id: splittingSession.id,
+          phase: splittingSession.phase,
+          startTime: splittingSession.startTime
+        } : null
       });
       
     } else if (request.action === 'analyzeProperty') {
@@ -1219,7 +1724,11 @@ if (isChatGPTSite()) {
             // Optionally auto-submit (uncomment the next line if desired)
             // submitMessage();
             
-            sendResponse({ success: true });
+            sendResponse({ 
+              success: true, 
+              usedSplitting: currentPropertyAnalysis?.usedSplitting || false,
+              splittingSessionId: splittingSession?.id || null
+            });
           } else {
             sendResponse({ success: false, error: 'Could not find or access input field' });
           }
@@ -1231,6 +1740,39 @@ if (isChatGPTSite()) {
       
       // Return true to indicate we'll send response asynchronously
       return true;
+      
+    } else if (request.action === 'updatePromptSplittingSettings') {
+      console.log('Updating prompt splitting settings:', request.settings);
+      
+      // Update the settings
+      promptSplittingState = { ...promptSplittingState, ...request.settings };
+      
+      // Save to storage
+      (async () => {
+        try {
+          await safeChromeFall(() => chrome.storage.local.set({ 
+            promptSplittingSettings: promptSplittingState 
+          }));
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('Error saving prompt splitting settings:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+      })();
+      
+      return true;
+      
+    } else if (request.action === 'getPromptSplittingAnalytics') {
+      console.log('Retrieving prompt splitting analytics');
+      sendResponse({
+        success: true,
+        analytics: promptSplittingState.analytics,
+        currentSession: splittingSession ? {
+          id: splittingSession.id,
+          phase: splittingSession.phase,
+          duration: Date.now() - splittingSession.startTime
+        } : null
+      });
     }
   });
   

@@ -551,6 +551,20 @@
           <div class="spinner"></div>
           Checking status...
         </div>
+        
+        <!-- Prompt Splitting Status Indicator -->
+        <div id="splittingStatus" class="card hidden" style="margin-top: var(--space-md); padding: var(--space-sm);">
+          <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+            <div id="splittingIcon" style="font-size: 16px;">🔀</div>
+            <div style="flex: 1;">
+              <div id="splittingPhase" style="font-weight: var(--font-weight-medium); font-size: var(--font-size-sm);">Prompt Splitting Active</div>
+              <div id="splittingDetails" style="font-size: var(--font-size-sm); color: var(--text-secondary);">Phase 1: Sending instructions...</div>
+            </div>
+          </div>
+          <div id="splittingProgress" class="hidden" style="width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;">
+            <div id="splittingProgressBar" style="height: 100%; background: var(--primary); width: 0%; transition: width 0.3s ease;"></div>
+          </div>
+        </div>
       </section>
       
       <!-- Property Analysis Section -->
@@ -660,6 +674,80 @@
                 
                 <div id="defaultPromptDisplay" class="card hidden" style="margin-top: var(--space-md); background: var(--secondary-background);">
                   <!-- Default prompt will be shown here -->
+                </div>
+              </div>
+            </div>
+            
+            <!-- Prompt Splitting Settings -->
+            <div class="collapsible" style="margin-bottom: var(--space-md);">
+              <button class="collapsible-header" id="toggleSplittingBtn">
+                <span>🔀 Prompt Splitting</span>
+                <span class="collapsible-icon">▼</span>
+              </button>
+              
+              <div class="collapsible-content hidden" id="splittingSettingsContent">
+                <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
+                  Improve link fetching by splitting long prompts into two phases
+                </p>
+                
+                <div class="form-group">
+                  <label style="display: flex; align-items: center; gap: var(--space-sm); cursor: pointer;">
+                    <input type="checkbox" id="enableSplitting" style="margin: 0;">
+                    <span>Enable prompt splitting</span>
+                  </label>
+                </div>
+                
+                <div id="splittingAdvancedSettings" class="hidden">
+                  <div class="form-group">
+                    <label for="lengthThreshold" class="form-label">Length Threshold (characters)</label>
+                    <input type="number" id="lengthThreshold" class="form-input" min="500" max="10000" value="2000">
+                    <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                      Split prompts longer than this threshold
+                    </small>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="confirmationTimeout" class="form-label">Confirmation Timeout (seconds)</label>
+                    <input type="number" id="confirmationTimeout" class="form-input" min="10" max="120" value="30">
+                    <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                      Maximum time to wait for ChatGPT confirmation
+                    </small>
+                  </div>
+                </div>
+                
+                <div class="btn-group">
+                  <button id="toggleAdvancedSplitting" class="btn btn-ghost btn-sm">
+                    ⚙️ Advanced
+                  </button>
+                  <button id="viewSplittingAnalytics" class="btn btn-ghost btn-sm">
+                    📊 Analytics
+                  </button>
+                  <button id="saveSplittingSettings" class="btn btn-primary btn-sm">
+                    💾 Save
+                  </button>
+                </div>
+                
+                <!-- Analytics Display -->
+                <div id="splittingAnalytics" class="card hidden" style="margin-top: var(--space-md); background: var(--secondary-background);">
+                  <h4 style="margin: 0 0 var(--space-sm) 0; font-size: var(--font-size-sm);">Performance Analytics</h4>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); font-size: var(--font-size-sm);">
+                    <div>
+                      <strong>Split Attempts:</strong>
+                      <span id="splitAttempts">0</span>
+                    </div>
+                    <div>
+                      <strong>Success Rate:</strong>
+                      <span id="successRate">0%</span>
+                    </div>
+                    <div>
+                      <strong>Fallback Uses:</strong>
+                      <span id="fallbackUses">0</span>
+                    </div>
+                    <div>
+                      <strong>Avg. Time:</strong>
+                      <span id="averageTime">0s</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
