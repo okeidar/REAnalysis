@@ -1546,7 +1546,7 @@ function getInputType(columnType) {
   }
 }
 
-// Export function (updated for new column structure)
+// Export function (updated for comprehensive data extraction)
 async function exportPropertyHistory() {
   try {
     const [historyResult, columnResult] = await Promise.all([
@@ -1567,25 +1567,90 @@ async function exportPropertyHistory() {
       .filter(col => col.enabled)
       .sort((a, b) => (a.order || 0) - (b.order || 0));
     
-    // Helper function to extract numeric value
+    // Enhanced helper function to extract data from ChatGPT analysis
+    const extractFromAnalysis = (analysisText) => {
+      if (!analysisText) return {};
+      
+      const text = analysisText.toLowerCase();
+      const originalText = analysisText;
+      
+      // Extract price
+      const priceMatch = originalText.match(/price[:\-\s]*\$?([\d,]+)/i) || 
+                         originalText.match(/asking[:\-\s]*\$?([\d,]+)/i) ||
+                         originalText.match(/\$([0-9,]+)/);
+      const price = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : null;
+      
+      // Extract bedrooms
+      const bedroomMatch = originalText.match(/bedroom[s]?[:\-\s]*(\d+(?:\.\d+)?)/i) ||
+                          originalText.match(/(\d+)[:\-\s]*bedroom/i);
+      const bedrooms = bedroomMatch ? parseFloat(bedroomMatch[1]) : null;
+      
+      // Extract bathrooms
+      const bathroomMatch = originalText.match(/bathroom[s]?[:\-\s]*(\d+(?:\.\d+)?)/i) ||
+                           originalText.match(/(\d+(?:\.\d+)?)[:\-\s]*bathroom/i);
+      const bathrooms = bathroomMatch ? parseFloat(bathroomMatch[1]) : null;
+      
+      // Extract square footage
+      const sqftMatch = originalText.match(/square\s+footage?[:\-\s]*([\d,]+)/i) ||
+                       originalText.match(/sq\.?\s*ft\.?[:\-\s]*([\d,]+)/i) ||
+                       originalText.match(/([\d,]+)\s*sq\.?\s*ft\.?/i);
+      const squareFeet = sqftMatch ? parseInt(sqftMatch[1].replace(/,/g, '')) : null;
+      
+      // Extract year built
+      const yearMatch = originalText.match(/year\s+built[:\-\s]*(\d{4})/i) ||
+                       originalText.match(/built[:\-\s]*(\d{4})/i) ||
+                       originalText.match(/(\d{4})\s*built/i);
+      const yearBuilt = yearMatch ? parseInt(yearMatch[1]) : null;
+      
+      // Extract property type
+      const typeMatch = originalText.match(/property\s+type[:\-\s]*([^\n\r,.;]+)/i) ||
+                       originalText.match(/type[:\-\s]*(single family|condo|townhouse|apartment|duplex|house)[^\n\r,.;]*/i);
+      const propertyType = typeMatch ? typeMatch[1].trim() : null;
+      
+      // Extract rental income
+      const rentalMatch = originalText.match(/rental\s+income[:\-\s]*\$?([\d,]+)/i) ||
+                         originalText.match(/estimated\s+monthly\s+rental[:\-\s]*\$?([\d,]+)/i) ||
+                         originalText.match(/monthly\s+rent[:\-\s]*\$?([\d,]+)/i);
+      const rentalIncome = rentalMatch ? parseInt(rentalMatch[1].replace(/,/g, '')) : null;
+      
+      // Extract location score
+      const locationMatch = originalText.match(/location[^0-9]*(\d+)\/10/i) ||
+                           originalText.match(/neighborhood[^0-9]*(\d+)\/10/i) ||
+                           originalText.match(/(\d+)\/10[^0-9]*location/i);
+      const locationScore = locationMatch ? `${locationMatch[1]}/10` : null;
+      
+      // Extract rental growth potential
+      const growthMatch = originalText.match(/rental\s+growth\s+potential[:\-\s]*(high|strong|moderate|low|limited)/i) ||
+                         originalText.match(/growth\s+potential[:\-\s]*(high|strong|moderate|low|limited)/i);
+      const growthPotential = growthMatch ? growthMatch[1] : null;
+      
+      // Extract neighborhood name
+      const neighborhoodMatch = originalText.match(/neighborhood[:\-\s]*([^\n\r,.;]+)/i) ||
+                               originalText.match(/area[:\-\s]*([^\n\r,.;]+)/i);
+      const neighborhood = neighborhoodMatch ? neighborhoodMatch[1].trim() : null;
+      
+      return {
+        price,
+        bedrooms,
+        bathrooms,
+        squareFeet,
+        yearBuilt,
+        propertyType,
+        rentalIncome,
+        locationScore,
+        growthPotential,
+        neighborhood
+      };
+    };
+    
+    // Helper function to extract numeric value with fallback
     const extractNumber = (str) => {
       if (!str) return '';
       const match = str.toString().replace(/[,$]/g, '').match(/[\d.]+/);
       return match ? parseFloat(match[0]) : '';
     };
     
-    // Helper function to clean text for Excel
-    const cleanText = (text) => {
-      if (!text) return '';
-      return text
-        .replace(/"/g, '""')  // Escape quotes
-        .replace(/[\r\n]+/g, ' | ')  // Replace line breaks with separator
-        .replace(/\s+/g, ' ')  // Normalize whitespace
-        .trim()
-        .substring(0, 500);  // Limit length
-    };
-    
-    // Helper function to estimate rental income based on property data
+    // Helper function to estimate rental income (fallback)
     const estimateRentalIncome = (data, price) => {
       if (!price) return '';
       
@@ -1596,14 +1661,14 @@ async function exportPropertyHistory() {
       if (data.propertyType) {
         const type = data.propertyType.toLowerCase();
         if (type.includes('apartment') || type.includes('condo')) {
-          monthlyRent *= 0.9; // Slightly lower for apartments/condos
+          monthlyRent *= 0.9;
         } else if (type.includes('single family') || type.includes('house')) {
-          monthlyRent *= 1.1; // Slightly higher for houses
+          monthlyRent *= 1.1;
         }
       }
       
       // Adjust based on bedrooms
-      const bedrooms = extractNumber(data.bedrooms);
+      const bedrooms = data.bedrooms || extractNumber(data.bedrooms);
       if (bedrooms) {
         if (bedrooms <= 1) monthlyRent *= 0.8;
         else if (bedrooms >= 4) monthlyRent *= 1.2;
@@ -1612,120 +1677,98 @@ async function exportPropertyHistory() {
       return Math.round(monthlyRent);
     };
     
-    // Helper function to extract location score from analysis
-    const extractLocationScore = (analysis) => {
+    // Helper function to infer location score (fallback)
+    const inferLocationScore = (analysis) => {
       if (!analysis) return '';
       
-      const text = (analysis.marketAnalysis || '') + ' ' + (analysis.pros || '') + ' ' + (analysis.neighborhood || '');
-      const lowerText = text.toLowerCase();
-      
-      // Look for explicit scores first
-      const scoreMatch = text.match(/location[^\d]*(\d+)\/10/i) || text.match(/neighborhood[^\d]*(\d+)\/10/i);
-      if (scoreMatch) return `${scoreMatch[1]}/10`;
-      
-      // Infer score based on keywords
+      const text = analysis.toLowerCase();
       let score = 5; // Default neutral score
       
-      if (lowerText.includes('excellent location') || lowerText.includes('prime location')) score = 9;
-      else if (lowerText.includes('great location') || lowerText.includes('desirable')) score = 8;
-      else if (lowerText.includes('good location') || lowerText.includes('convenient')) score = 7;
-      else if (lowerText.includes('decent location') || lowerText.includes('accessible')) score = 6;
-      else if (lowerText.includes('average location') || lowerText.includes('moderate')) score = 5;
-      else if (lowerText.includes('poor location') || lowerText.includes('remote')) score = 3;
-      else if (lowerText.includes('bad location') || lowerText.includes('undesirable')) score = 2;
+      if (text.includes('excellent location') || text.includes('prime location')) score = 9;
+      else if (text.includes('great location') || text.includes('desirable')) score = 8;
+      else if (text.includes('good location') || text.includes('convenient')) score = 7;
+      else if (text.includes('decent location') || text.includes('accessible')) score = 6;
+      else if (text.includes('average location') || text.includes('moderate')) score = 5;
+      else if (text.includes('poor location') || text.includes('remote')) score = 3;
+      else if (text.includes('bad location') || text.includes('undesirable')) score = 2;
       
-      // Positive location indicators
-      if (lowerText.includes('near schools') || lowerText.includes('good schools')) score += 1;
-      if (lowerText.includes('public transport') || lowerText.includes('transit')) score += 1;
-      if (lowerText.includes('shopping') || lowerText.includes('restaurants')) score += 0.5;
-      if (lowerText.includes('safe') || lowerText.includes('low crime')) score += 1;
+      // Positive indicators
+      if (text.includes('near schools') || text.includes('good schools')) score += 1;
+      if (text.includes('public transport') || text.includes('transit')) score += 1;
+      if (text.includes('shopping') || text.includes('restaurants')) score += 0.5;
+      if (text.includes('safe') || text.includes('low crime')) score += 1;
       
-      // Negative location indicators
-      if (lowerText.includes('high crime') || lowerText.includes('unsafe')) score -= 2;
-      if (lowerText.includes('noisy') || lowerText.includes('busy road')) score -= 1;
-      if (lowerText.includes('far from') || lowerText.includes('isolated')) score -= 1;
+      // Negative indicators
+      if (text.includes('high crime') || text.includes('unsafe')) score -= 2;
+      if (text.includes('noisy') || text.includes('busy road')) score -= 1;
+      if (text.includes('far from') || text.includes('isolated')) score -= 1;
       
       score = Math.max(1, Math.min(10, Math.round(score)));
       return `${score}/10`;
     };
     
-    // Helper function to assess rental growth potential
-    const assessRentalGrowthPotential = (analysis) => {
-      if (!analysis) return '';
+    // Helper function to infer rental growth potential (fallback)
+    const inferRentalGrowthPotential = (analysis) => {
+      if (!analysis) return 'Moderate';
       
-      const text = (analysis.marketAnalysis || '') + ' ' + (analysis.investmentPotential || '') + ' ' + (analysis.neighborhood || '');
-      const lowerText = text.toLowerCase();
+      const text = analysis.toLowerCase();
       
-      // High growth indicators
-      if (lowerText.includes('growing area') || lowerText.includes('development') || 
-          lowerText.includes('gentrification') || lowerText.includes('upcoming')) {
-        return 'High';
-      }
+      if (text.includes('growing area') || text.includes('development') || 
+          text.includes('gentrification') || text.includes('upcoming')) return 'High';
       
-      // Strong growth indicators
-      if (lowerText.includes('strong rental market') || lowerText.includes('high demand') ||
-          lowerText.includes('good investment') || lowerText.includes('appreciating')) {
-        return 'Strong';
-      }
+      if (text.includes('strong rental market') || text.includes('high demand') ||
+          text.includes('good investment') || text.includes('appreciating')) return 'Strong';
       
-      // Moderate growth indicators
-      if (lowerText.includes('stable') || lowerText.includes('steady') ||
-          lowerText.includes('moderate') || lowerText.includes('average growth')) {
-        return 'Moderate';
-      }
+      if (text.includes('declining') || text.includes('saturated market') ||
+          text.includes('poor prospects') || text.includes('stagnant')) return 'Low';
       
-      // Low growth indicators
-      if (lowerText.includes('declining') || lowerText.includes('saturated market') ||
-          lowerText.includes('poor prospects') || lowerText.includes('stagnant')) {
-        return 'Low';
-      }
+      if (text.includes('limited') || text.includes('slow growth') ||
+          text.includes('mature market')) return 'Limited';
       
-      // Limited growth indicators
-      if (lowerText.includes('limited') || lowerText.includes('slow growth') ||
-          lowerText.includes('mature market')) {
-        return 'Limited';
-      }
-      
-      return 'Moderate'; // Default
+      return 'Moderate';
     };
     
     // Create CSV content
     const headers = enabledColumns.map(col => col.name);
     const csvRows = history.map(item => {
       return enabledColumns.map(column => {
-        // Simplified data extraction
-        const data = item.analysis ? item.analysis.extractedData : {};
-        const price = extractNumber(data.price);
+        // First try to extract from analysis text, then fall back to stored data
+        const analysisData = extractFromAnalysis(item.analysis?.fullAnalysis || '');
+        const storedData = item.analysis?.extractedData || {};
+        
+        // Merge analysis data with stored data (analysis takes priority)
+        const data = { ...storedData, ...analysisData };
         
         switch (column.id) {
           case 'price':
+            const price = data.price || extractNumber(storedData.price);
             return price ? `$${price.toLocaleString()}` : '';
             
           case 'bedrooms':
-            return extractNumber(data.bedrooms) || '';
+            return data.bedrooms || extractNumber(storedData.bedrooms) || '';
             
           case 'bathrooms':
-            return extractNumber(data.bathrooms) || '';
+            return data.bathrooms || extractNumber(storedData.bathrooms) || '';
             
           case 'squareFeet':
-            const sqft = extractNumber(data.squareFeet);
+            const sqft = data.squareFeet || extractNumber(storedData.squareFeet);
             return sqft ? sqft.toLocaleString() : '';
             
           case 'yearBuilt':
-            return extractNumber(data.yearBuilt) || '';
+            return data.yearBuilt || extractNumber(storedData.yearBuilt) || '';
             
           case 'propertyType':
-            return `"${data.propertyType || ''}"`;
+            return `"${data.propertyType || storedData.propertyType || ''}"`;
             
           case 'estimatedRentalIncome':
-            const rental = estimateRentalIncome(data, price);
+            const rental = data.rentalIncome || estimateRentalIncome(data, data.price || extractNumber(storedData.price));
             return rental ? `$${rental.toLocaleString()}` : '';
             
           case 'locationScore':
-            return extractLocationScore(item.analysis);
+            return data.locationScore || inferLocationScore(item.analysis?.fullAnalysis || '');
             
           case 'rentalGrowthPotential':
-            return `"${assessRentalGrowthPotential(item.analysis)}"`;
+            return `"${data.growthPotential || inferRentalGrowthPotential(item.analysis?.fullAnalysis || '')}"`;
             
           case 'address':
             return `"${item.url}"`;
@@ -1737,15 +1780,16 @@ async function exportPropertyHistory() {
             return `"${item.date}"`;
             
           case 'pricePerSqFt':
-            const sqftForCalc = extractNumber(data.squareFeet);
-            return (price && sqftForCalc) ? `$${(price / sqftForCalc).toFixed(2)}` : '';
+            const priceForCalc = data.price || extractNumber(storedData.price);
+            const sqftForCalc = data.squareFeet || extractNumber(storedData.squareFeet);
+            return (priceForCalc && sqftForCalc) ? `$${(priceForCalc / sqftForCalc).toFixed(2)}` : '';
             
           case 'propertyAge':
-            const yearBuilt = extractNumber(data.yearBuilt);
+            const yearBuilt = data.yearBuilt || extractNumber(storedData.yearBuilt);
             return yearBuilt ? new Date().getFullYear() - yearBuilt : '';
             
           case 'neighborhood':
-            return `"${data.neighborhood || ''}"`;
+            return `"${data.neighborhood || storedData.neighborhood || ''}"`;
             
           default:
             if (column.isCustom) {
@@ -1770,7 +1814,7 @@ async function exportPropertyHistory() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showSuccess(`Excel file exported with ${enabledColumns.length} columns!`);
+    showSuccess(`Excel file exported with ${enabledColumns.length} columns and enhanced data extraction!`);
   } catch (error) {
     console.error('Error exporting property history:', error);
     showError('Failed to export property history');
