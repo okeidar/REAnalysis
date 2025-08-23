@@ -1019,12 +1019,15 @@ function toggleDefaultPrompt() {
 // Function to get the current prompt (custom or dynamic based on columns)
 async function getCurrentPrompt() {
   try {
-    const result = await chrome.storage.local.get(['customPrompt']);
+    const result = await chrome.storage.local.get(['customPrompt', 'columnConfiguration']);
     if (result.customPrompt) {
       return result.customPrompt;
-    } else {
-      // Generate dynamic prompt based on column configuration
+    } else if (result.columnConfiguration && result.columnConfiguration.length > 0) {
+      // Generate dynamic prompt based on column configuration only if user has configured columns
       return await generateDynamicPrompt();
+    } else {
+      // Use comprehensive default prompt when no custom prompt and no column config
+      return DEFAULT_PROMPT;
     }
   } catch (error) {
     console.error('Error getting current prompt:', error);

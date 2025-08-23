@@ -1296,7 +1296,7 @@ function combinePromptSectionsContent(sections) {
   const validSections = sections.filter(section => section.length > 0);
   
   if (validSections.length === 0) {
-    return getDefaultPrompt();
+    return getComprehensiveDefaultPrompt();
   }
   
   return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
@@ -1329,6 +1329,61 @@ function getDefaultPrompt() {
 
 **ANALYSIS STRUCTURE:**
 Please organize your response with clear sections based on the data points requested above.
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
+
+function getComprehensiveDefaultPrompt() {
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+**REQUIRED DATA EXTRACTION:**
+1. **Price**: Exact asking price (include currency symbol)
+2. **Bedrooms**: Number of bedrooms (numeric)
+3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
+4. **Square Footage**: Total square footage (numeric)
+5. **Year Built**: Construction year (4-digit year)
+6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
+7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
+8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections:
+
+**PROPERTY DETAILS:**
+- List all the required data points above in a clear format
+- Include any additional relevant specifications (lot size, parking, etc.)
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Provide your location score (X/10) with detailed justification
+- Analyze proximity to schools, shopping, transportation, employment centers
+- Assess neighborhood safety, walkability, and future development plans
+- Comment on property taxes, HOA fees, and local regulations
+
+**RENTAL INCOME ANALYSIS:**
+- Provide your estimated monthly rental income with reasoning
+- Compare to local rental comps if possible
+- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
+  * Population growth trends
+  * Economic development in the area
+  * New construction and inventory levels
+  * Employment opportunities and job market
+  * Infrastructure improvements planned
+
+**INVESTMENT SUMMARY:**
+- Overall investment grade and reasoning
+- Top 3 advantages (pros)
+- Top 3 concerns or limitations (cons)
+- Any red flags or warning signs
+- Price comparison to market value
+- Recommendation for this property as a rental investment
 
 **FORMAT REQUIREMENTS:**
 - Use clear headings and bullet points
@@ -1386,17 +1441,22 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
         promptTemplate = result.customPrompt;
         promptSource = 'custom';
         console.log('📋 Using custom prompt from storage');
-      } else {
-        // Generate dynamic prompt based on enabled columns
+      } else if (result.columnConfiguration && result.columnConfiguration.length > 0) {
+        // Generate dynamic prompt based on enabled columns only if user has configured columns
         promptTemplate = await generateDynamicPromptForContent(result.columnConfiguration);
         promptSource = 'dynamic';
         console.log('🔧 Generated dynamic prompt based on column configuration');
+      } else {
+        // Use comprehensive default prompt when no custom prompt and no column config
+        promptTemplate = getComprehensiveDefaultPrompt();
+        promptSource = 'comprehensive_default';
+        console.log('📋 Using comprehensive default prompt (no custom settings)');
       }
     } catch (error) {
       console.error('Error getting prompt configuration:', error);
-      promptTemplate = getDefaultPrompt();
-      promptSource = 'default';
-      console.log('⚠️ Falling back to default prompt due to error');
+      promptTemplate = getComprehensiveDefaultPrompt();
+      promptSource = 'comprehensive_default';
+      console.log('⚠️ Falling back to comprehensive default prompt due to error');
     }
 
     // Replace variables in the prompt
