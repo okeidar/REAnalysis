@@ -361,6 +361,39 @@
         <button id="showDefaultBtn" class="btn btn-link btn-small">📄 View Default Prompt</button>
         <div id="defaultPromptDisplay" class="default-prompt-display" style="display: none;"></div>
       </div>
+      
+      <div class="setting-item">
+        <label>Excel Export Column Configuration:</label>
+        <div class="column-config-section">
+          <div class="column-config-header">
+            <p>Customize which columns to include in Excel export and their order:</p>
+            <div class="column-actions">
+              <button id="selectAllColumnsBtn" class="btn btn-link btn-small">✅ Select All</button>
+              <button id="deselectAllColumnsBtn" class="btn btn-link btn-small">❌ Deselect All</button>
+              <button id="resetColumnsBtn" class="btn btn-link btn-small">🔄 Reset to Default</button>
+            </div>
+          </div>
+          
+          <div id="columnConfigList" class="column-config-list">
+            <!-- Column items will be populated by JavaScript -->
+          </div>
+          
+          <div class="column-help">
+            <p><strong>Tips:</strong></p>
+            <ul>
+              <li>Check/uncheck boxes to include/exclude columns</li>
+              <li>Drag and drop to reorder columns</li>
+              <li>Changes are saved automatically</li>
+              <li>Use "Select All" to include all available columns</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="setting-actions">
+          <button id="saveColumnsBtn" class="btn btn-primary btn-small">💾 Save Column Settings</button>
+          <button id="previewColumnsBtn" class="btn btn-secondary btn-small">👁️ Preview Export</button>
+        </div>
+      </div>
     </div>
   </div>
   

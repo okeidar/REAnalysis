@@ -5,7 +5,9 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
     successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
     propertyHistorySection, settingsSection, settingsToggle, toggleSettingsBtn, settingsContent,
-    customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay;
+    customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
+    columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
+    saveColumnsBtn, previewColumnsBtn;
 
 // Global variables
 let currentTab = null;
@@ -41,6 +43,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   resetPromptBtn = document.getElementById('resetPromptBtn');
   showDefaultBtn = document.getElementById('showDefaultBtn');
   defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
+  
+  // Column configuration elements
+  columnConfigList = document.getElementById('columnConfigList');
+  selectAllColumnsBtn = document.getElementById('selectAllColumnsBtn');
+  deselectAllColumnsBtn = document.getElementById('deselectAllColumnsBtn');
+  resetColumnsBtn = document.getElementById('resetColumnsBtn');
+  saveColumnsBtn = document.getElementById('saveColumnsBtn');
+  previewColumnsBtn = document.getElementById('previewColumnsBtn');
 
   // Set up event listeners
   if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
@@ -68,6 +78,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
   if (resetPromptBtn) resetPromptBtn.addEventListener('click', resetToDefaultPrompt);
   if (showDefaultBtn) showDefaultBtn.addEventListener('click', toggleDefaultPrompt);
+  
+  // Column configuration event listeners
+  if (selectAllColumnsBtn) selectAllColumnsBtn.addEventListener('click', selectAllColumns);
+  if (deselectAllColumnsBtn) deselectAllColumnsBtn.addEventListener('click', deselectAllColumns);
+  if (resetColumnsBtn) resetColumnsBtn.addEventListener('click', resetColumnsToDefault);
+  if (saveColumnsBtn) saveColumnsBtn.addEventListener('click', saveColumnSettings);
+  if (previewColumnsBtn) previewColumnsBtn.addEventListener('click', previewExportColumns);
 
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -81,6 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load initial data and check site status
   await loadPropertyHistory();
   await loadCustomPrompt();
+  await loadColumnConfiguration();
   await initializePopup();
   
   // Set up periodic refresh for pending analyses
@@ -358,14 +376,26 @@ async function clearPropertyHistory() {
   }
 }
 
-function exportPropertyHistory() {
-  chrome.storage.local.get(['propertyHistory'], (result) => {
-    const history = result.propertyHistory || [];
+async function exportPropertyHistory() {
+  try {
+    // Get both property history and column configuration
+    const [historyResult, columnResult] = await Promise.all([
+      chrome.storage.local.get(['propertyHistory']),
+      chrome.storage.local.get(['columnConfiguration'])
+    ]);
+    
+    const history = historyResult.propertyHistory || [];
+    const columnConfig = columnResult.columnConfiguration || DEFAULT_COLUMNS;
     
     if (history.length === 0) {
       showError('No properties to export');
       return;
     }
+    
+    // Get enabled columns in the correct order
+    const enabledColumns = columnConfig
+      .filter(col => col.enabled)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
     
     // Helper function to clean text for Excel
     const cleanText = (text) => {
@@ -396,27 +426,8 @@ function exportPropertyHistory() {
       return 'TBD';
     };
     
-    // Enhanced Excel comparison format with scoring and metrics
-    const headers = [
-      // Property Identification
-      'Property ID', 'Address/URL', 'Source', 'Analysis Date',
-      
-      // Core Property Metrics (Sortable/Comparable)
-      'Price ($)', 'Bedrooms', 'Bathrooms', 'Square Feet', 'Price per Sq Ft',
-      'Year Built', 'Property Age', 'Property Type', 'Neighborhood',
-      
-      // Value Analysis Scores (1-10 scale for easy comparison)
-      'Overall Score', 'Investment Score', 'Market Score', 'Location Score', 'Condition Score',
-      
-      // Financial Metrics
-      'Est. Monthly Payment', 'Price vs Market', 'Investment Potential', 'Value Rating',
-      
-      // Pros/Cons Summary (Key Points Only)
-      'Top 3 Pros', 'Top 3 Cons', 'Red Flags Count', 'Key Concerns',
-      
-      // Detailed Analysis (Expandable)
-      'Market Analysis', 'Investment Details', 'All Pros', 'All Cons', 'Red Flags Detail'
-    ];
+    // Create headers from enabled columns
+    const headers = enabledColumns.map(col => col.name);
     
     const csvRows = history.map((item, index) => {
       const analysis = item.analysis;
@@ -532,53 +543,80 @@ function exportPropertyHistory() {
         return count;
       };
       
-      return [
-        // Property Identification
-        `"PROP-${(index + 1).toString().padStart(3, '0')}"`, // Property ID
-        `"${item.url}"`, // Address/URL
-        `"${item.domain}"`, // Source
-        `"${new Date(item.date).toLocaleDateString()}"`, // Analysis Date
-        
-        // Core Property Metrics
-        price || '', // Price ($)
-        bedrooms || '', // Bedrooms
-        bathrooms || '', // Bathrooms
-        sqft || '', // Square Feet
-        pricePerSqFt || '', // Price per Sq Ft
-        yearBuilt || '', // Year Built
-        propertyAge || '', // Property Age
-        `"${data.propertyType || ''}"`, // Property Type
-        `"${data.neighborhood || ''}"`, // Neighborhood
-        
-        // Value Analysis Scores (1-10)
-        analysis ? calculateOverallScore() : '', // Overall Score
-        analysis ? calculateInvestmentScore() : '', // Investment Score
-        analysis ? calculateMarketScore() : '', // Market Score
-        analysis ? calculateLocationScore() : '', // Location Score
-        analysis ? calculateConditionScore() : '', // Condition Score
-        
-        // Financial Metrics
-        price ? estimateMonthlyPayment() : '', // Est. Monthly Payment
-        analysis ? getInvestmentScore(data.marketAnalysis) : '', // Price vs Market
-        `"${data.investmentPotential ? cleanText(data.investmentPotential).substring(0, 100) : ''}"`, // Investment Potential
-        analysis ? getInvestmentScore(data.investmentPotential) : '', // Value Rating
-        
-        // Pros/Cons Summary
-        `"${extractTopPoints(data.pros, 3)}"`, // Top 3 Pros
-        `"${extractTopPoints(data.cons, 3)}"`, // Top 3 Cons
-        analysis ? countRedFlags() : 0, // Red Flags Count
-        `"${data.redFlags ? cleanText(data.redFlags).substring(0, 100) : ''}"`, // Key Concerns
-        
-        // Detailed Analysis
-        `"${cleanText(data.marketAnalysis)}"`, // Market Analysis
-        `"${cleanText(data.investmentPotential)}"`, // Investment Details
-        `"${cleanText(data.pros)}"`, // All Pros
-        `"${cleanText(data.cons)}"`, // All Cons
-        `"${cleanText(data.redFlags)}"` // Red Flags Detail
-      ].join(',');
+      // Generate data for enabled columns in the correct order
+      const rowData = enabledColumns.map(column => {
+        switch (column.id) {
+          case 'propertyId':
+            return `"PROP-${(index + 1).toString().padStart(3, '0')}"`;
+          case 'address':
+            return `"${item.url}"`;
+          case 'source':
+            return `"${item.domain}"`;
+          case 'analysisDate':
+            return `"${new Date(item.date).toLocaleDateString()}"`;
+          case 'price':
+            return price || '';
+          case 'bedrooms':
+            return bedrooms || '';
+          case 'bathrooms':
+            return bathrooms || '';
+          case 'squareFeet':
+            return sqft || '';
+          case 'pricePerSqFt':
+            return pricePerSqFt || '';
+          case 'yearBuilt':
+            return yearBuilt || '';
+          case 'propertyAge':
+            return propertyAge || '';
+          case 'propertyType':
+            return `"${data.propertyType || ''}"`;
+          case 'neighborhood':
+            return `"${data.neighborhood || ''}"`;
+          case 'overallScore':
+            return analysis ? calculateOverallScore() : '';
+          case 'investmentScore':
+            return analysis ? calculateInvestmentScore() : '';
+          case 'marketScore':
+            return analysis ? calculateMarketScore() : '';
+          case 'locationScore':
+            return analysis ? calculateLocationScore() : '';
+          case 'conditionScore':
+            return analysis ? calculateConditionScore() : '';
+          case 'monthlyPayment':
+            return price ? estimateMonthlyPayment() : '';
+          case 'priceVsMarket':
+            return analysis ? getInvestmentScore(data.marketAnalysis) : '';
+          case 'investmentPotential':
+            return `"${data.investmentPotential ? cleanText(data.investmentPotential).substring(0, 100) : ''}"`;
+          case 'valueRating':
+            return analysis ? getInvestmentScore(data.investmentPotential) : '';
+          case 'topPros':
+            return `"${extractTopPoints(data.pros, 3)}"`;
+          case 'topCons':
+            return `"${extractTopPoints(data.cons, 3)}"`;
+          case 'redFlagsCount':
+            return analysis ? countRedFlags() : 0;
+          case 'keyConcerns':
+            return `"${data.redFlags ? cleanText(data.redFlags).substring(0, 100) : ''}"`;
+          case 'marketAnalysis':
+            return `"${cleanText(data.marketAnalysis)}"`;
+          case 'investmentDetails':
+            return `"${cleanText(data.investmentPotential)}"`;
+          case 'allPros':
+            return `"${cleanText(data.pros)}"`;
+          case 'allCons':
+            return `"${cleanText(data.cons)}"`;
+          case 'redFlagsDetail':
+            return `"${cleanText(data.redFlags)}"`;
+          default:
+            return '""';
+        }
+      });
+      
+      return rowData.join(',');
     });
     
-    // Add comprehensive summary statistics row
+    // Add summary row with enabled columns
     const analyzedProperties = history.filter(item => item.analysis);
     if (analyzedProperties.length > 0) {
       const prices = analyzedProperties.map(item => {
@@ -590,38 +628,29 @@ function exportPropertyHistory() {
       const minPrice = prices.length > 0 ? Math.min(...prices) : '';
       const maxPrice = prices.length > 0 ? Math.max(...prices) : '';
       
-      // Calculate average scores
-      const scores = analyzedProperties.map(item => {
-        const data = item.analysis.extractedData;
-        const investment = data.investmentPotential ? 5 : ''; // Simplified for summary
-        return investment;
-      }).filter(s => s !== '');
+      // Generate summary row data for enabled columns
+      const summaryData = enabledColumns.map(column => {
+        switch (column.id) {
+          case 'propertyId':
+            return '"SUMMARY"';
+          case 'address':
+            return '""';
+          case 'source':
+            return '"Summary Statistics"';
+          case 'analysisDate':
+            return `"${new Date().toLocaleDateString()}"`;
+          case 'price':
+            return avgPrice || '';
+          case 'topPros':
+            return `"${analyzedProperties.length} properties analyzed"`;
+          case 'topCons':
+            return `"Price range: $${minPrice}-$${maxPrice}"`;
+          default:
+            return '""';
+        }
+      });
       
-      const avgInvestmentScore = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '';
-      
-      csvRows.push([
-        // Property Identification
-        '"SUMMARY"', '""', '"Summary Statistics"', `"${new Date().toLocaleDateString()}"`,
-        
-        // Core Property Metrics
-        avgPrice || '', // Average Price
-        '""', '""', '""', '""', '""', '""', '""', '""',
-        
-        // Value Analysis Scores
-        avgInvestmentScore || '', // Average Overall Score
-        '""', '""', '""', '""',
-        
-        // Financial Metrics
-        '""', '""', '""', '""',
-        
-        // Summary Info
-        `"${analyzedProperties.length} properties analyzed"`,
-        `"Price range: $${minPrice}-$${maxPrice}"`,
-        '""', '""',
-        
-        // Detailed columns (empty for summary)
-        '""', '""', '""', '""', '""'
-      ].join(','));
+      csvRows.push(summaryData.join(','));
     }
     
     const csvContent = headers.join(',') + '\n' + csvRows.join('\n');
@@ -637,8 +666,11 @@ function exportPropertyHistory() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showSuccess('Enhanced Excel comparison table exported successfully!');
-  });
+    showSuccess(`Enhanced Excel comparison table exported with ${enabledColumns.length} columns!`);
+  } catch (error) {
+    console.error('Error exporting property history:', error);
+    showError('Failed to export property history');
+  }
 }
 
 // Helper function to validate property link
@@ -1004,4 +1036,287 @@ async function getCurrentPrompt() {
     console.error('Error getting current prompt:', error);
     return DEFAULT_PROMPT;
   }
+}
+
+// Default column configuration
+const DEFAULT_COLUMNS = [
+  // Property Identification
+  { id: 'propertyId', name: 'Property ID', description: 'Unique identifier for the property', category: 'identification', enabled: true },
+  { id: 'address', name: 'Address/URL', description: 'Property address or listing URL', category: 'identification', enabled: true },
+  { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: true },
+  { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: true },
+  
+  // Core Property Metrics
+  { id: 'price', name: 'Price ($)', description: 'Property listing price', category: 'metrics', enabled: true },
+  { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'metrics', enabled: true },
+  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'metrics', enabled: true },
+  { id: 'squareFeet', name: 'Square Feet', description: 'Property size in square feet', category: 'metrics', enabled: true },
+  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'metrics', enabled: true },
+  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'metrics', enabled: true },
+  { id: 'propertyAge', name: 'Property Age', description: 'Age of the property in years', category: 'metrics', enabled: true },
+  { id: 'propertyType', name: 'Property Type', description: 'Type of property (house, condo, etc.)', category: 'metrics', enabled: true },
+  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood', category: 'metrics', enabled: true },
+  
+  // Value Analysis Scores
+  { id: 'overallScore', name: 'Overall Score', description: 'Overall property score (1-10)', category: 'scores', enabled: true },
+  { id: 'investmentScore', name: 'Investment Score', description: 'Investment potential score (1-10)', category: 'scores', enabled: true },
+  { id: 'marketScore', name: 'Market Score', description: 'Market value score (1-10)', category: 'scores', enabled: true },
+  { id: 'locationScore', name: 'Location Score', description: 'Location quality score (1-10)', category: 'scores', enabled: true },
+  { id: 'conditionScore', name: 'Condition Score', description: 'Property condition score (1-10)', category: 'scores', enabled: true },
+  
+  // Financial Metrics
+  { id: 'monthlyPayment', name: 'Est. Monthly Payment', description: 'Estimated monthly mortgage payment', category: 'financial', enabled: true },
+  { id: 'priceVsMarket', name: 'Price vs Market', description: 'Price comparison to market value', category: 'financial', enabled: true },
+  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment potential summary', category: 'financial', enabled: false },
+  { id: 'valueRating', name: 'Value Rating', description: 'Overall value rating', category: 'financial', enabled: true },
+  
+  // Analysis Summary
+  { id: 'topPros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: true },
+  { id: 'topCons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: true },
+  { id: 'redFlagsCount', name: 'Red Flags Count', description: 'Number of warning indicators', category: 'analysis', enabled: true },
+  { id: 'keyConcerns', name: 'Key Concerns', description: 'Primary issues summary', category: 'analysis', enabled: false },
+  
+  // Detailed Analysis
+  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Detailed market assessment', category: 'analysis', enabled: false },
+  { id: 'investmentDetails', name: 'Investment Details', description: 'Complete investment analysis', category: 'analysis', enabled: false },
+  { id: 'allPros', name: 'All Pros', description: 'Complete advantages list', category: 'analysis', enabled: false },
+  { id: 'allCons', name: 'All Cons', description: 'Complete disadvantages list', category: 'analysis', enabled: false },
+  { id: 'redFlagsDetail', name: 'Red Flags Detail', description: 'Detailed warning information', category: 'analysis', enabled: false }
+];
+
+// Column Configuration Functions
+async function loadColumnConfiguration() {
+  try {
+    const result = await chrome.storage.local.get(['columnConfiguration']);
+    const savedConfig = result.columnConfiguration;
+    
+    let columnConfig;
+    if (savedConfig && Array.isArray(savedConfig)) {
+      // Merge saved config with default columns (in case new columns were added)
+      columnConfig = DEFAULT_COLUMNS.map(defaultCol => {
+        const saved = savedConfig.find(col => col.id === defaultCol.id);
+        return saved ? { ...defaultCol, ...saved } : defaultCol;
+      });
+      
+      // Add any saved columns that aren't in defaults (shouldn't happen, but just in case)
+      savedConfig.forEach(savedCol => {
+        if (!DEFAULT_COLUMNS.find(col => col.id === savedCol.id)) {
+          columnConfig.push(savedCol);
+        }
+      });
+    } else {
+      columnConfig = [...DEFAULT_COLUMNS];
+    }
+    
+    renderColumnConfiguration(columnConfig);
+    return columnConfig;
+  } catch (error) {
+    console.error('Error loading column configuration:', error);
+    renderColumnConfiguration(DEFAULT_COLUMNS);
+    return DEFAULT_COLUMNS;
+  }
+}
+
+function renderColumnConfiguration(columns) {
+  if (!columnConfigList) return;
+  
+  columnConfigList.innerHTML = '';
+  
+  columns.forEach((column, index) => {
+    const columnItem = document.createElement('div');
+    columnItem.className = 'column-item';
+    columnItem.draggable = true;
+    columnItem.dataset.columnId = column.id;
+    columnItem.dataset.index = index;
+    
+    columnItem.innerHTML = `
+      <div class="column-drag-handle">⋮⋮</div>
+      <input type="checkbox" class="column-checkbox" ${column.enabled ? 'checked' : ''}>
+      <div class="column-info">
+        <div class="column-name">${column.name}</div>
+        <div class="column-description">${column.description}</div>
+      </div>
+      <div class="column-category ${column.category}">${column.category}</div>
+      <div class="column-count">${index + 1}</div>
+    `;
+    
+    // Add event listeners
+    const checkbox = columnItem.querySelector('.column-checkbox');
+    checkbox.addEventListener('change', () => {
+      column.enabled = checkbox.checked;
+      updateColumnCount();
+    });
+    
+    // Drag and drop functionality
+    columnItem.addEventListener('dragstart', handleDragStart);
+    columnItem.addEventListener('dragover', handleDragOver);
+    columnItem.addEventListener('drop', handleDrop);
+    columnItem.addEventListener('dragend', handleDragEnd);
+    
+    columnConfigList.appendChild(columnItem);
+  });
+  
+  updateColumnCount();
+}
+
+// Drag and Drop Functions
+let draggedElement = null;
+
+function handleDragStart(e) {
+  draggedElement = e.target;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/html', e.target.outerHTML);
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  
+  const targetItem = e.target.closest('.column-item');
+  if (targetItem && targetItem !== draggedElement) {
+    targetItem.classList.add('drag-over');
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  
+  const targetItem = e.target.closest('.column-item');
+  if (targetItem && targetItem !== draggedElement) {
+    const container = targetItem.parentNode;
+    const draggedIndex = parseInt(draggedElement.dataset.index);
+    const targetIndex = parseInt(targetItem.dataset.index);
+    
+    if (draggedIndex < targetIndex) {
+      container.insertBefore(draggedElement, targetItem.nextSibling);
+    } else {
+      container.insertBefore(draggedElement, targetItem);
+    }
+    
+    // Update the configuration order
+    reorderColumns();
+  }
+  
+  // Clean up drag classes
+  document.querySelectorAll('.column-item').forEach(item => {
+    item.classList.remove('drag-over');
+  });
+}
+
+function handleDragEnd(e) {
+  e.target.classList.remove('dragging');
+  draggedElement = null;
+  
+  // Clean up any remaining drag classes
+  document.querySelectorAll('.column-item').forEach(item => {
+    item.classList.remove('drag-over');
+  });
+}
+
+function reorderColumns() {
+  const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
+  columnItems.forEach((item, index) => {
+    item.dataset.index = index;
+    const countElement = item.querySelector('.column-count');
+    if (countElement) {
+      countElement.textContent = index + 1;
+    }
+  });
+}
+
+function updateColumnCount() {
+  const enabledCount = columnConfigList.querySelectorAll('.column-checkbox:checked').length;
+  const totalCount = columnConfigList.querySelectorAll('.column-checkbox').length;
+  
+  // Update any count displays if needed
+  console.log(`Columns: ${enabledCount}/${totalCount} enabled`);
+}
+
+// Column Action Functions
+function selectAllColumns() {
+  const checkboxes = columnConfigList.querySelectorAll('.column-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+  });
+  showSuccess('All columns selected');
+}
+
+function deselectAllColumns() {
+  const checkboxes = columnConfigList.querySelectorAll('.column-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change'));
+  });
+  showSuccess('All columns deselected');
+}
+
+async function resetColumnsToDefault() {
+  if (confirm('Are you sure you want to reset column configuration to default? This will overwrite your current settings.')) {
+    try {
+      await chrome.storage.local.set({ columnConfiguration: DEFAULT_COLUMNS });
+      renderColumnConfiguration(DEFAULT_COLUMNS);
+      showSuccess('Column configuration reset to default');
+    } catch (error) {
+      console.error('Error resetting columns:', error);
+      showError('Failed to reset column configuration');
+    }
+  }
+}
+
+async function saveColumnSettings() {
+  try {
+    const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
+    const columnConfig = columnItems.map((item, index) => {
+      const columnId = item.dataset.columnId;
+      const checkbox = item.querySelector('.column-checkbox');
+      const defaultColumn = DEFAULT_COLUMNS.find(col => col.id === columnId);
+      
+      return {
+        ...defaultColumn,
+        enabled: checkbox.checked,
+        order: index
+      };
+    });
+    
+    await chrome.storage.local.set({ columnConfiguration: columnConfig });
+    showSuccess('Column settings saved successfully!');
+  } catch (error) {
+    console.error('Error saving column settings:', error);
+    showError('Failed to save column settings');
+  }
+}
+
+function previewExportColumns() {
+  const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
+  const enabledColumns = columnItems
+    .filter(item => item.querySelector('.column-checkbox').checked)
+    .map(item => {
+      const columnId = item.dataset.columnId;
+      const defaultColumn = DEFAULT_COLUMNS.find(col => col.id === columnId);
+      return defaultColumn.name;
+    });
+  
+  if (enabledColumns.length === 0) {
+    showError('No columns selected for export');
+    return;
+  }
+  
+  const previewText = `Export Preview (${enabledColumns.length} columns):\n\n${enabledColumns.join(', ')}`;
+  
+  // Create or update preview display
+  let previewDiv = document.querySelector('.column-preview');
+  if (!previewDiv) {
+    previewDiv = document.createElement('div');
+    previewDiv.className = 'column-preview';
+    columnConfigList.parentNode.appendChild(previewDiv);
+  }
+  
+  previewDiv.innerHTML = `
+    <div class="column-preview-title">Export Preview (${enabledColumns.length} columns)</div>
+    ${enabledColumns.join(' • ')}
+  `;
+  
+  showSuccess(`Preview generated for ${enabledColumns.length} columns`);
 }
