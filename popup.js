@@ -868,7 +868,9 @@ async function initializePopup() {
 }
 
 // Default prompt for property analysis
-const DEFAULT_PROMPT = `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+const DEFAULT_PROMPT = `Please analyze this property listing: {PROPERTY_URL}
+
+You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 **REQUIRED DATA EXTRACTION:**
 1. **Price**: Exact asking price (include currency symbol)
@@ -919,9 +921,7 @@ Please organize your response with clear sections:
 - Categorize rental growth potential clearly
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
 
 // Settings Functions
 async function loadCustomPrompt() {
@@ -1245,7 +1245,9 @@ function combinePromptSections(sections) {
     return DEFAULT_PROMPT;
   }
   
-  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+  return `Please analyze this property listing: {PROPERTY_URL}
+
+You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 ${validSections.join('\n\n')}
 
@@ -1259,9 +1261,7 @@ Please organize your response with clear sections based on the data points reque
 - Categorize rental growth potential clearly if requested
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
 }
 
 // Column Configuration Functions

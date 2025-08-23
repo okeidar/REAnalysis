@@ -1299,7 +1299,9 @@ function combinePromptSectionsContent(sections) {
     return getComprehensiveDefaultPrompt();
   }
   
-  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+  return `Please analyze this property listing: {PROPERTY_URL}
+
+You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 ${validSections.join('\n\n')}
 
@@ -1313,13 +1315,13 @@ Please organize your response with clear sections based on the data points reque
 - Categorize rental growth potential clearly if requested
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
 }
 
 function getDefaultPrompt() {
-  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+  return `Please analyze this property listing: {PROPERTY_URL}
+
+You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 **REQUIRED DATA EXTRACTION:**
 1. **Street Name**: Property street address (e.g., "123 Main Street")
@@ -1335,13 +1337,24 @@ Please organize your response with clear sections based on the data points reque
 - Include specific numbers and percentages where possible
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
+}
 
-Property Link: {PROPERTY_URL}`;
+function getSimpleTestPrompt() {
+  return `Analyze this property: {PROPERTY_URL}
+
+Please provide:
+1. Property price
+2. Number of bedrooms
+3. Property type
+
+Keep your response concise.`;
 }
 
 function getComprehensiveDefaultPrompt() {
-  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+  return `Please analyze this property listing: {PROPERTY_URL}
+
+You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 **REQUIRED DATA EXTRACTION:**
 1. **Price**: Exact asking price (include currency symbol)
@@ -1390,9 +1403,7 @@ Please organize your response with clear sections:
 - Include specific numbers and percentages where possible
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
 }
 
 // Function to insert text into ChatGPT input
@@ -1447,16 +1458,16 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
         promptSource = 'dynamic';
         console.log('🔧 Generated dynamic prompt based on column configuration');
       } else {
-        // Use comprehensive default prompt when no custom prompt and no column config
-        promptTemplate = getComprehensiveDefaultPrompt();
-        promptSource = 'comprehensive_default';
-        console.log('📋 Using comprehensive default prompt (no custom settings)');
+        // Use simple test prompt when no custom prompt and no column config (for testing)
+        promptTemplate = getSimpleTestPrompt();
+        promptSource = 'simple_test';
+        console.log('📋 Using simple test prompt (no custom settings)');
       }
     } catch (error) {
       console.error('Error getting prompt configuration:', error);
-      promptTemplate = getComprehensiveDefaultPrompt();
-      promptSource = 'comprehensive_default';
-      console.log('⚠️ Falling back to comprehensive default prompt due to error');
+      promptTemplate = getSimpleTestPrompt(); // Temporarily use simple prompt for testing
+      promptSource = 'simple_test';
+      console.log('⚠️ Falling back to simple test prompt due to error');
     }
 
     // Replace variables in the prompt
@@ -1472,11 +1483,12 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Safety check: ensure property URL is included even if placeholder was missing
     let finalPrompt = prompt;
     if (!finalPrompt.includes(propertyLink)) {
-      console.log('⚠️ Property URL not found in prompt, adding it manually');
-      finalPrompt = finalPrompt + '\n\nProperty Link: ' + propertyLink;
+      console.log('⚠️ Property URL not found in prompt, adding it manually at the beginning');
+      finalPrompt = 'Please analyze this property listing: ' + propertyLink + '\n\n' + finalPrompt;
     }
     
-    console.log('📝 Final prompt with URL:', finalPrompt.substring(finalPrompt.length - 200));
+    console.log('📝 Final prompt with URL (beginning):', finalPrompt.substring(0, 150));
+    console.log('📝 Final prompt with URL (end):', finalPrompt.substring(finalPrompt.length - 200));
     console.log('🔍 Checking if URL was replaced:', finalPrompt.includes(propertyLink) ? '✅ YES' : '❌ NO');
     
     console.log('Inserting prompt into input field:', inputField);
