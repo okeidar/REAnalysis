@@ -693,6 +693,100 @@ async function handleAnalyzeClick() {
   }
 }
 
+// Initialize popup functionality
+async function initializePopup() {
+  try {
+    // Get current tab
+    const tabs = await new Promise((resolve) => {
+      chrome.tabs.query({active: true, currentWindow: true}, resolve);
+    });
+    
+    currentTab = tabs[0];
+    
+    if (!currentTab) {
+      throw new Error('No active tab found');
+    }
+    
+    console.log('Current tab:', currentTab.url);
+    
+    // Check if we're on ChatGPT
+    const isChatGPT = currentTab.url && (
+      currentTab.url.includes('chatgpt.com') || 
+      currentTab.url.includes('chat.openai.com')
+    );
+    
+    if (isChatGPT) {
+      // Try to communicate with content script
+      try {
+        const response = await sendMessageWithRetry({action: 'checkStatus'}, 2, 500);
+        
+        if (response && response.active) {
+          // Content script is active
+          statusElement.className = 'status active';
+          statusElement.innerHTML = '✅ Connected to ChatGPT';
+          contentScriptReady = true;
+          
+          // Show site info
+          if (infoElement) infoElement.style.display = 'block';
+          if (siteElement) siteElement.textContent = response.site;
+          if (urlElement) urlElement.textContent = response.url;
+          
+          // Show property link section
+          if (propertyLinkSection) propertyLinkSection.style.display = 'block';
+          
+          // Show and load property history section
+          if (propertyHistorySection) propertyHistorySection.style.display = 'block';
+          
+        } else {
+          throw new Error('Content script not responding properly');
+        }
+        
+      } catch (error) {
+        console.log('Content script communication failed, will try to inject:', error.message);
+        
+        // Content script might not be loaded, show as active anyway since we're on ChatGPT
+        statusElement.className = 'status active';
+        statusElement.innerHTML = '✅ Ready on ChatGPT';
+        
+        // Show site info
+        if (infoElement) infoElement.style.display = 'block';
+        if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
+        if (urlElement) urlElement.textContent = currentTab.url;
+        
+        // Show property link section
+        if (propertyLinkSection) propertyLinkSection.style.display = 'block';
+        
+        // Show and load property history section
+        if (propertyHistorySection) propertyHistorySection.style.display = 'block';
+        
+        // Try to inject content script
+        try {
+          await injectContentScript();
+          contentScriptReady = true;
+          statusElement.innerHTML = '✅ Connected to ChatGPT';
+        } catch (injectError) {
+          console.error('Failed to inject content script:', injectError);
+        }
+      }
+      
+    } else {
+      // Not on ChatGPT
+      statusElement.className = 'status inactive';
+      statusElement.innerHTML = '❌ Please open ChatGPT to use this extension';
+      
+      // Show site info
+      if (infoElement) infoElement.style.display = 'block';
+      if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
+      if (urlElement) urlElement.textContent = currentTab.url;
+    }
+    
+  } catch (error) {
+    console.error('Failed to initialize popup:', error);
+    statusElement.className = 'status inactive';
+    statusElement.innerHTML = '⚠️ Unable to check status';
+  }
+}
+
 // Default prompt template
 const DEFAULT_PROMPT = `Analyze this property for investment potential. Provide:
 
