@@ -1308,45 +1308,27 @@ function combinePromptSectionsContent(sections) {
     return getComprehensiveDefaultPrompt();
   }
   
-  return `Please analyze this property listing: {PROPERTY_URL}
+  return `Analyze this property: {PROPERTY_URL}
 
-You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+Please provide these details:
 
 ${validSections.join('\n\n')}
 
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections based on the data points requested above.
-
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Provide location score in X/10 format if requested
-- Categorize rental growth potential clearly if requested
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
+Use the exact format and labels shown above.`;
 }
 
 function getDefaultPrompt() {
-  return `Please analyze this property listing: {PROPERTY_URL}
+  return `Analyze this property: {PROPERTY_URL}
 
-You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+Please provide these basic details:
 
-**REQUIRED DATA EXTRACTION:**
-1. **Street Name**: Property street address (e.g., "123 Main Street")
-2. **Property Price**: Exact asking price (include currency symbol)
-3. **Number of Bedrooms**: Number of bedrooms (numeric)
-4. **Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)
+**PROPERTY DETAILS:**
+- Street Name: [address]
+- Property Price: [price with $]
+- Bedrooms: [number]
+- Property Type: [House/Apartment/Condo]
 
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections based on the data points requested above.
-
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
+Keep it simple and clear.`;
 }
 
 function getSimpleTestPrompt() {
@@ -1378,58 +1360,31 @@ Please follow this format exactly so the data can be properly extracted.`;
 }
 
 function getComprehensiveDefaultPrompt() {
-  return `Please analyze this property listing: {PROPERTY_URL}
+  return `Analyze this property: {PROPERTY_URL}
 
-You are a professional real estate investment analyst. Provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
-
-**REQUIRED DATA EXTRACTION:**
-1. **Price**: Exact asking price (include currency symbol)
-2. **Bedrooms**: Number of bedrooms (numeric)
-3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
-4. **Square Footage**: Total square footage (numeric)
-5. **Year Built**: Construction year (4-digit year)
-6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
-7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
-8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
-
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections:
+Please provide these details in a clear format:
 
 **PROPERTY DETAILS:**
-- List all the required data points above in a clear format
-- Include any additional relevant specifications (lot size, parking, etc.)
+- Street Name: [address]
+- Property Price: [price with $]
+- Bedrooms: [number]
+- Bathrooms: [number]
+- Square Feet: [number]
+- Year Built: [year]
+- Property Type: [House/Apartment/Condo]
+- Neighborhood: [area name]
 
-**LOCATION & NEIGHBORHOOD ANALYSIS:**
-- Provide your location score (X/10) with detailed justification
-- Analyze proximity to schools, shopping, transportation, employment centers
-- Assess neighborhood safety, walkability, and future development plans
-- Comment on property taxes, HOA fees, and local regulations
+**RENTAL INFO:**
+- Estimated Monthly Rent: $[amount]
+- Location Score: [X/10]
+- Growth Potential: Growth: [High/Moderate/Low]
 
-**RENTAL INCOME ANALYSIS:**
-- Provide your estimated monthly rental income with reasoning
-- Compare to local rental comps if possible
-- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
-  * Population growth trends
-  * Economic development in the area
-  * New construction and inventory levels
-  * Employment opportunities and job market
-  * Infrastructure improvements planned
+**ANALYSIS:**
+- Top 3 Pros: [advantages]
+- Top 3 Cons: [concerns] 
+- Red Flags: [warnings]
 
-**INVESTMENT SUMMARY:**
-- Overall investment grade and reasoning
-- Top 3 advantages (pros)
-- Top 3 concerns or limitations (cons)
-- Any red flags or warning signs
-- Price comparison to market value
-- Recommendation for this property as a rental investment
-
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
+Keep it organized and use the exact labels shown above.`;
 }
 
 // Function to insert text into ChatGPT input
