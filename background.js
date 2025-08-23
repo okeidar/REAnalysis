@@ -89,7 +89,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle saving property analysis data with enhanced logging
   if (request.action === 'savePropertyAnalysis') {
     console.log('🔄 Background script saving property analysis for:', request.propertyUrl);
+    console.log('🔍 Session ID:', request.sessionId);
     console.log('📊 Analysis data received:', {
+      sessionId: request.sessionId,
       hasFullResponse: !!request.analysisData?.fullResponse,
       responseLength: request.analysisData?.fullResponse?.length || 0,
       extractedDataKeys: Object.keys(request.analysisData?.extractedData || {}),
@@ -112,6 +114,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           const oldEntry = { ...history[propertyIndex] };
           history[propertyIndex].analysis = request.analysisData;
           history[propertyIndex].analysisTimestamp = Date.now();
+          history[propertyIndex].sessionId = request.sessionId;
           
           // Save updated history
           await chrome.storage.local.set({ propertyHistory: history });
@@ -134,7 +137,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             date: new Date().toLocaleDateString(),
             domain: new URL(request.propertyUrl).hostname,
             analysis: request.analysisData,
-            analysisTimestamp: Date.now()
+            analysisTimestamp: Date.now(),
+            sessionId: request.sessionId
           };
           
           history.unshift(newEntry);
