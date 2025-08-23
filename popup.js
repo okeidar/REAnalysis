@@ -1,10 +1,10 @@
-// Popup script for ChatGPT Helper Extension
+// Popup script for RE Analyzer Extension
 
 // DOM elements
 let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, analyzeBtn, 
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
     successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
-    propertyHistorySection, settingsSection, settingsToggle, toggleSettingsBtn, settingsContent,
+    propertyHistorySection, settingsSection, settingsToggle, settingsContent,
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
     columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
     saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent,
@@ -17,7 +17,7 @@ let contentScriptReady = false;
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 ChatGPT Helper popup loaded');
+  console.log('🚀 RE Analyzer popup loaded');
   
   // Get DOM elements with correct IDs from HTML
   propertyHistoryList = document.getElementById('propertyHistoryList');
@@ -36,9 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   urlElement = document.getElementById('url');
   
   // Settings elements
-  settingsSection = document.getElementById('settingsSection');
+  settingsSection = document.getElementById('settingsCollapsible');
   settingsToggle = document.getElementById('settingsToggle');
-  toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
   settingsContent = document.getElementById('settingsContent');
   customPromptTextarea = document.getElementById('customPrompt');
   savePromptBtn = document.getElementById('savePromptBtn');
@@ -66,6 +65,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   addCustomColumnBtn = document.getElementById('addCustomColumnBtn');
   cancelCustomColumnBtn = document.getElementById('cancelCustomColumnBtn');
 
+  // Set up collapsible functionality
+  setupCollapsibles();
+
   // Set up event listeners
   if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
     if (confirm('Are you sure you want to clear all property history?')) {
@@ -87,12 +89,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Settings event listeners
-  if (settingsToggle) settingsToggle.addEventListener('click', toggleSettings);
-  if (toggleSettingsBtn) toggleSettingsBtn.addEventListener('click', toggleSettingsContent);
   if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
   if (resetPromptBtn) resetPromptBtn.addEventListener('click', resetToDefaultPrompt);
   if (showDefaultBtn) showDefaultBtn.addEventListener('click', toggleDefaultPrompt);
-  if (togglePromptBtn) togglePromptBtn.addEventListener('click', togglePromptSection);
   
   // Column configuration event listeners
   if (selectAllColumnsBtn) selectAllColumnsBtn.addEventListener('click', selectAllColumns);
@@ -102,7 +101,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (previewColumnsBtn) previewColumnsBtn.addEventListener('click', previewExportColumns);
   
   // Custom column event listeners
-  if (toggleCustomColumnBtn) toggleCustomColumnBtn.addEventListener('click', toggleCustomColumnForm);
   if (addCustomColumnBtn) addCustomColumnBtn.addEventListener('click', addCustomColumn);
   if (cancelCustomColumnBtn) cancelCustomColumnBtn.addEventListener('click', clearCustomColumnForm);
 
@@ -115,8 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-
-
   // Load initial data and check site status
   await loadPropertyHistory();
   await loadCustomPrompt();
@@ -128,6 +124,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPropertyHistory();
   }, 5000); // Refresh every 5 seconds to catch pending -> analyzed transitions
 });
+
+// Collapsible functionality
+function setupCollapsibles() {
+  const collapsibles = document.querySelectorAll('.collapsible');
+  
+  collapsibles.forEach(collapsible => {
+    const header = collapsible.querySelector('.collapsible-header');
+    const content = collapsible.querySelector('.collapsible-content');
+    const icon = collapsible.querySelector('.collapsible-icon');
+    
+    if (header && content) {
+      header.addEventListener('click', () => {
+        const isExpanded = !content.classList.contains('hidden');
+        
+        if (isExpanded) {
+          content.classList.add('hidden');
+          collapsible.classList.remove('expanded');
+        } else {
+          content.classList.remove('hidden');
+          collapsible.classList.add('expanded');
+        }
+      });
+    }
+  });
+}
 
 // Helper function to show success message
 function showSuccess(message) {
@@ -207,7 +228,12 @@ function displayPropertyHistory(history) {
   if (!propertyHistoryList) return;
   
   if (history.length === 0) {
-    propertyHistoryList.innerHTML = '<div class="empty-history">No properties analyzed yet.</div>';
+    propertyHistoryList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📄</div>
+        <p>No properties analyzed yet</p>
+      </div>
+    `;
     return;
   }
   
@@ -217,22 +243,21 @@ function displayPropertyHistory(history) {
     const analysisPreview = hasAnalysis ? generateAnalysisPreview(item.analysis) : '';
     const analysisStatus = hasAnalysis ? 'analyzed' : 'pending';
     
-    // Add timestamp info for debugging
-    const debugInfo = item.analysisTimestamp ? 
-      `Analysis saved: ${new Date(item.analysisTimestamp).toLocaleTimeString()}` : 
-      'No analysis timestamp';
-    
     return `
-      <div class="history-item ${analysisStatus}" title="${debugInfo}">
-        <div class="history-item-header">
-          <button class="history-item-remove" data-index="${index}" title="Remove">×</button>
-          <a href="${item.url}" target="_blank" class="history-item-url">${item.domain}</a>
-          <div class="history-item-date">${item.date}</div>
-          <div class="analysis-status ${analysisStatus}">${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}</div>
+      <div class="history-item ${analysisStatus}">
+        <div class="history-header">
+          <a href="${item.url}" target="_blank" class="history-url">${item.domain}</a>
+          <div class="history-status ${analysisStatus}">
+            ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
+          </div>
         </div>
         ${analysisPreview}
-        ${hasAnalysis ? `<button class="view-analysis-btn" data-index="${index}">View Full Analysis</button>` : ''}
-        <button class="edit-custom-data-btn" data-index="${index}">✏️ Edit Custom Data</button>
+        <div class="history-actions">
+          ${hasAnalysis ? `<button class="btn btn-ghost btn-sm view-analysis-btn" data-index="${index}">👁️ View</button>` : ''}
+          <button class="btn btn-ghost btn-sm edit-custom-data-btn" data-index="${index}">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm history-item-remove" data-index="${index}">🗑️ Remove</button>
+        </div>
+        <button class="history-remove" data-index="${index}">×</button>
       </div>
     `;
   }).join('');
@@ -240,7 +265,7 @@ function displayPropertyHistory(history) {
   propertyHistoryList.innerHTML = historyHTML;
   
   // Add event listeners for remove buttons
-  document.querySelectorAll('.history-item-remove').forEach(btn => {
+  document.querySelectorAll('.history-item-remove, .history-remove').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const index = parseInt(e.target.getAttribute('data-index'));
       removePropertyFromHistory(index);
@@ -281,8 +306,8 @@ function generateAnalysisPreview(analysis) {
   return previewText ? `
     <div class="analysis-preview">
       <div class="analysis-summary">${previewText}</div>
-      ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 100)}${data.pros.length > 100 ? '...' : ''}</div>` : ''}
-      ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 100)}${data.cons.length > 100 ? '...' : ''}</div>` : ''}
+      ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
+      ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
     </div>
   ` : '';
 }
@@ -296,69 +321,166 @@ function showFullAnalysis(propertyItem) {
   
   // Create modal content
   const modalContent = `
-    <div class="analysis-modal-overlay" id="analysisModal">
-      <div class="analysis-modal">
-        <div class="analysis-modal-header">
-          <h3>Property Analysis</h3>
-          <button class="analysis-modal-close">×</button>
+    <div class="analysis-modal-overlay" id="analysisModal" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-lg);
+    ">
+      <div class="analysis-modal" style="
+        background: var(--background);
+        border-radius: var(--radius-md);
+        max-width: 600px;
+        max-height: 80vh;
+        width: 100%;
+        overflow: hidden;
+        box-shadow: var(--shadow-md);
+      ">
+        <div class="analysis-modal-header" style="
+          padding: var(--space-lg);
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: var(--secondary-background);
+        ">
+          <h3 style="margin: 0; font-size: var(--font-size-xl); color: var(--text-primary);">Property Analysis</h3>
+          <button class="analysis-modal-close" style="
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: var(--space-sm);
+            border-radius: var(--radius-sm);
+          ">×</button>
         </div>
-        <div class="analysis-modal-content">
-          <div class="property-url">
-            <strong>Property:</strong> <a href="${propertyItem.url}" target="_blank">${propertyItem.domain}</a>
+        <div class="analysis-modal-content" style="
+          padding: var(--space-lg);
+          max-height: calc(80vh - 80px);
+          overflow-y: auto;
+        ">
+          <div class="property-url" style="
+            margin-bottom: var(--space-md);
+            padding: var(--space-md);
+            background: #f0f9ff;
+            border-radius: var(--radius-sm);
+            border-left: 4px solid var(--primary);
+          ">
+            <strong>Property:</strong> <a href="${propertyItem.url}" target="_blank" style="color: var(--primary);">${propertyItem.domain}</a>
           </div>
           
           ${Object.keys(data).length > 0 ? `
-            <div class="extracted-data">
-              <h4>Property Details</h4>
-              ${data.price ? `<div><strong>Price:</strong> $${data.price}</div>` : ''}
-              ${data.bedrooms ? `<div><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
-              ${data.bathrooms ? `<div><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
-              ${data.squareFeet ? `<div><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
-              ${data.yearBuilt ? `<div><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
-              ${data.lotSize ? `<div><strong>Lot Size:</strong> ${data.lotSize}</div>` : ''}
-              ${data.propertyType ? `<div><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
-              ${data.neighborhood ? `<div><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
+            <div class="extracted-data" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: var(--secondary-background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Property Details</h4>
+              ${data.price ? `<div style="margin: var(--space-xs) 0;"><strong>Price:</strong> $${data.price}</div>` : ''}
+              ${data.bedrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
+              ${data.bathrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
+              ${data.squareFeet ? `<div style="margin: var(--space-xs) 0;"><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
+              ${data.yearBuilt ? `<div style="margin: var(--space-xs) 0;"><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
+              ${data.lotSize ? `<div style="margin: var(--space-xs) 0;"><strong>Lot Size:</strong> ${data.lotSize}</div>` : ''}
+              ${data.propertyType ? `<div style="margin: var(--space-xs) 0;"><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
+              ${data.neighborhood ? `<div style="margin: var(--space-xs) 0;"><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
             </div>
           ` : ''}
           
           ${data.pros ? `
-            <div class="analysis-section">
-              <h4>Pros</h4>
-              <p>${data.pros}</p>
+            <div class="analysis-section" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: var(--background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">
+              <h4 style="margin: 0 0 var(--space-sm) 0; color: #16a34a;">Pros</h4>
+              <p style="margin: 0; line-height: 1.5;">${data.pros}</p>
             </div>
           ` : ''}
           
           ${data.cons ? `
-            <div class="analysis-section">
-              <h4>Cons</h4>
-              <p>${data.cons}</p>
+            <div class="analysis-section" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: var(--background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">
+              <h4 style="margin: 0 0 var(--space-sm) 0; color: #dc2626;">Cons</h4>
+              <p style="margin: 0; line-height: 1.5;">${data.cons}</p>
             </div>
           ` : ''}
           
           ${data.marketAnalysis ? `
-            <div class="analysis-section">
-              <h4>Market Analysis</h4>
-              <p>${data.marketAnalysis}</p>
+            <div class="analysis-section" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: var(--background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">
+              <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--text-primary);">Market Analysis</h4>
+              <p style="margin: 0; line-height: 1.5;">${data.marketAnalysis}</p>
             </div>
           ` : ''}
           
           ${data.investmentPotential ? `
-            <div class="analysis-section">
-              <h4>Investment Potential</h4>
-              <p>${data.investmentPotential}</p>
+            <div class="analysis-section" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: var(--background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">
+              <h4 style="margin: 0 0 var(--space-sm) 0; color: var(--text-primary);">Investment Potential</h4>
+              <p style="margin: 0; line-height: 1.5;">${data.investmentPotential}</p>
             </div>
           ` : ''}
           
           ${data.redFlags ? `
-            <div class="analysis-section red-flags">
-              <h4>Red Flags</h4>
-              <p>${data.redFlags}</p>
+            <div class="analysis-section" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: #fef2f2;
+              border-radius: var(--radius-sm);
+              border: 1px solid #fecaca;
+            ">
+              <h4 style="margin: 0 0 var(--space-sm) 0; color: #dc2626;">Red Flags</h4>
+              <p style="margin: 0; line-height: 1.5;">${data.redFlags}</p>
             </div>
           ` : ''}
           
-          <div class="full-response">
-            <h4>Full ChatGPT Response</h4>
-            <div class="response-text">${analysis.fullResponse.replace(/\n/g, '<br>')}</div>
+          <div class="full-response" style="
+            margin-top: var(--space-lg);
+            padding: var(--space-md);
+            background: var(--secondary-background);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+          ">
+            <h4 style="margin: 0 0 var(--space-md) 0; color: var(--text-primary);">Full ChatGPT Response</h4>
+            <div class="response-text" style="
+              font-size: var(--font-size-sm);
+              line-height: 1.6;
+              color: var(--text-secondary);
+              max-height: 300px;
+              overflow-y: auto;
+              padding: var(--space-sm);
+              background: var(--background);
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--border);
+            ">${analysis.fullResponse.replace(/\n/g, '<br>')}</div>
           </div>
         </div>
       </div>
@@ -401,334 +523,10 @@ async function clearPropertyHistory() {
   try {
     await chrome.storage.local.set({ propertyHistory: [] });
     console.log('✅ Property history cleared');
+    showSuccess('History cleared successfully!');
   } catch (error) {
     console.error('Failed to clear property history:', error);
     showError('Failed to clear history');
-  }
-}
-
-// Function to get custom column value for a property
-function getCustomColumnValue(item, column) {
-  // Check if the property has custom column data stored
-  if (item.customColumns && item.customColumns[column.id]) {
-    return item.customColumns[column.id];
-  }
-  
-  // Return default value if available
-  return column.defaultValue || '';
-}
-
-async function exportPropertyHistory() {
-  try {
-    // Get both property history and column configuration
-    const [historyResult, columnResult] = await Promise.all([
-      chrome.storage.local.get(['propertyHistory']),
-      chrome.storage.local.get(['columnConfiguration'])
-    ]);
-    
-    const history = historyResult.propertyHistory || [];
-    const columnConfig = columnResult.columnConfiguration || DEFAULT_COLUMNS;
-    
-    if (history.length === 0) {
-      showError('No properties to export');
-      return;
-    }
-    
-    // Get enabled columns in the correct order
-    const enabledColumns = columnConfig
-      .filter(col => col.enabled)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-    
-    // Helper function to clean text for Excel
-    const cleanText = (text) => {
-      if (!text) return '';
-      return text
-        .replace(/"/g, '""')  // Escape quotes
-        .replace(/[\r\n]+/g, ' | ')  // Replace line breaks with separator
-        .replace(/\s+/g, ' ')  // Normalize whitespace
-        .trim()
-        .substring(0, 500);  // Limit length
-    };
-    
-    // Helper function to extract numeric value
-    const extractNumber = (str) => {
-      if (!str) return '';
-      const match = str.toString().replace(/[,$]/g, '').match(/[\d.]+/);
-      return match ? parseFloat(match[0]) : '';
-    };
-    
-    // Create simplified scoring for investment potential
-    const getInvestmentScore = (investmentText) => {
-      if (!investmentText) return '';
-      const text = investmentText.toLowerCase();
-      if (text.includes('excellent') || text.includes('strong')) return 'A';
-      if (text.includes('good') || text.includes('positive')) return 'B';
-      if (text.includes('fair') || text.includes('moderate')) return 'C';
-      if (text.includes('poor') || text.includes('weak')) return 'D';
-      return 'TBD';
-    };
-    
-    // Create headers from enabled columns
-    const headers = enabledColumns.map(col => col.name);
-    
-    const csvRows = history.map((item, index) => {
-      const analysis = item.analysis;
-      const data = analysis ? analysis.extractedData : {};
-      
-      // Extract and format numeric values
-      const price = extractNumber(data.price);
-      const sqft = extractNumber(data.squareFeet);
-      const bedrooms = extractNumber(data.bedrooms);
-      const bathrooms = extractNumber(data.bathrooms);
-      const yearBuilt = extractNumber(data.yearBuilt);
-      
-      // Calculate derived metrics
-      const pricePerSqFt = (price && sqft) ? (price / sqft).toFixed(2) : '';
-      const propertyAge = yearBuilt ? new Date().getFullYear() - yearBuilt : '';
-      
-      // Enhanced scoring functions (1-10 scale)
-      const calculateOverallScore = () => {
-        if (!analysis) return '';
-        let score = 5; // Base score
-        
-        const pros = (data.pros || '').toLowerCase();
-        const cons = (data.cons || '').toLowerCase();
-        const redFlags = (data.redFlags || '').toLowerCase();
-        
-        // Positive indicators
-        if (pros.includes('excellent') || pros.includes('great')) score += 2;
-        else if (pros.includes('good') || pros.includes('nice')) score += 1;
-        
-        // Negative indicators
-        if (cons.includes('poor') || cons.includes('bad')) score -= 2;
-        else if (cons.includes('concern') || cons.includes('issue')) score -= 1;
-        
-        // Red flags impact
-        if (redFlags.length > 100) score -= 2;
-        else if (redFlags.length > 50) score -= 1;
-        
-        return Math.max(1, Math.min(10, score));
-      };
-      
-      const calculateInvestmentScore = () => {
-        if (!data.investmentPotential) return '';
-        const text = data.investmentPotential.toLowerCase();
-        if (text.includes('excellent') || text.includes('strong')) return 9;
-        if (text.includes('very good') || text.includes('high potential')) return 8;
-        if (text.includes('good') || text.includes('positive')) return 7;
-        if (text.includes('decent') || text.includes('fair')) return 6;
-        if (text.includes('moderate') || text.includes('average')) return 5;
-        if (text.includes('poor') || text.includes('weak')) return 3;
-        if (text.includes('bad') || text.includes('avoid')) return 2;
-        return 5;
-      };
-      
-      const calculateMarketScore = () => {
-        if (!data.marketAnalysis) return '';
-        const text = data.marketAnalysis.toLowerCase();
-        if (text.includes('undervalued') || text.includes('great deal')) return 9;
-        if (text.includes('good value') || text.includes('fair price')) return 7;
-        if (text.includes('market value') || text.includes('reasonable')) return 6;
-        if (text.includes('overpriced') || text.includes('expensive')) return 3;
-        if (text.includes('overvalued') || text.includes('too high')) return 2;
-        return 5;
-      };
-      
-      const calculateLocationScore = () => {
-        if (!data.neighborhood) return '';
-        const text = (data.neighborhood + ' ' + (data.pros || '')).toLowerCase();
-        if (text.includes('excellent location') || text.includes('prime area')) return 9;
-        if (text.includes('good location') || text.includes('desirable')) return 7;
-        if (text.includes('decent area') || text.includes('convenient')) return 6;
-        if (text.includes('remote') || text.includes('far from')) return 4;
-        if (text.includes('poor location') || text.includes('undesirable')) return 3;
-        return 5;
-      };
-      
-      const calculateConditionScore = () => {
-        if (!data.pros && !data.cons) return '';
-        const text = ((data.pros || '') + ' ' + (data.cons || '')).toLowerCase();
-        if (text.includes('excellent condition') || text.includes('move-in ready')) return 9;
-        if (text.includes('good condition') || text.includes('well maintained')) return 7;
-        if (text.includes('fair condition') || text.includes('some updates')) return 6;
-        if (text.includes('needs work') || text.includes('outdated')) return 4;
-        if (text.includes('poor condition') || text.includes('major repairs')) return 3;
-        return 5;
-      };
-      
-      // Financial calculations
-      const estimateMonthlyPayment = () => {
-        if (!price) return '';
-        const downPayment = price * 0.2; // 20% down
-        const loanAmount = price - downPayment;
-        const monthlyRate = 0.07 / 12; // Assume 7% interest
-        const numPayments = 30 * 12; // 30 years
-        const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
-        return Math.round(monthlyPayment);
-      };
-      
-      // Extract top points for summary
-      const extractTopPoints = (text, count = 3) => {
-        if (!text) return '';
-        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
-        return sentences.slice(0, count).map(s => s.trim()).join(' | ');
-      };
-      
-      const countRedFlags = () => {
-        if (!data.redFlags) return 0;
-        const text = data.redFlags.toLowerCase();
-        let count = 0;
-        const flagIndicators = ['concern', 'issue', 'problem', 'warning', 'avoid', 'risk', 'poor', 'bad'];
-        flagIndicators.forEach(flag => {
-          if (text.includes(flag)) count++;
-        });
-        return count;
-      };
-      
-      // Generate data for enabled columns in the correct order
-      const rowData = enabledColumns.map(column => {
-        switch (column.id) {
-          case 'propertyId':
-            return `"PROP-${(index + 1).toString().padStart(3, '0')}"`;
-          case 'address':
-            return `"${item.url}"`;
-          case 'source':
-            return `"${item.domain}"`;
-          case 'analysisDate':
-            return `"${new Date(item.date).toLocaleDateString()}"`;
-          case 'price':
-            return price || '';
-          case 'bedrooms':
-            return bedrooms || '';
-          case 'bathrooms':
-            return bathrooms || '';
-          case 'squareFeet':
-            return sqft || '';
-          case 'pricePerSqFt':
-            return pricePerSqFt || '';
-          case 'yearBuilt':
-            return yearBuilt || '';
-          case 'propertyAge':
-            return propertyAge || '';
-          case 'propertyType':
-            return `"${data.propertyType || ''}"`;
-          case 'neighborhood':
-            return `"${data.neighborhood || ''}"`;
-          case 'overallScore':
-            return analysis ? calculateOverallScore() : '';
-          case 'investmentScore':
-            return analysis ? calculateInvestmentScore() : '';
-          case 'marketScore':
-            return analysis ? calculateMarketScore() : '';
-          case 'locationScore':
-            return analysis ? calculateLocationScore() : '';
-          case 'conditionScore':
-            return analysis ? calculateConditionScore() : '';
-          case 'monthlyPayment':
-            return price ? estimateMonthlyPayment() : '';
-          case 'priceVsMarket':
-            return analysis ? getInvestmentScore(data.marketAnalysis) : '';
-          case 'investmentPotential':
-            return `"${data.investmentPotential ? cleanText(data.investmentPotential).substring(0, 100) : ''}"`;
-          case 'valueRating':
-            return analysis ? getInvestmentScore(data.investmentPotential) : '';
-          case 'topPros':
-            return `"${extractTopPoints(data.pros, 3)}"`;
-          case 'topCons':
-            return `"${extractTopPoints(data.cons, 3)}"`;
-          case 'redFlagsCount':
-            return analysis ? countRedFlags() : 0;
-          case 'keyConcerns':
-            return `"${data.redFlags ? cleanText(data.redFlags).substring(0, 100) : ''}"`;
-          case 'marketAnalysis':
-            return `"${cleanText(data.marketAnalysis)}"`;
-          case 'investmentDetails':
-            return `"${cleanText(data.investmentPotential)}"`;
-          case 'allPros':
-            return `"${cleanText(data.pros)}"`;
-          case 'allCons':
-            return `"${cleanText(data.cons)}"`;
-          case 'redFlagsDetail':
-            return `"${cleanText(data.redFlags)}"`;
-          default:
-            // Handle custom columns
-            if (column.isCustom) {
-              const customValue = getCustomColumnValue(item, column);
-              const formattedValue = formatCustomColumnValue(customValue, column.type);
-              
-              // For numeric types, don't quote the value for Excel calculations
-              if (['number', 'currency', 'percentage', 'rating'].includes(column.type)) {
-                const numericValue = parseFloat(formattedValue.replace(/[$%,]/g, ''));
-                return isNaN(numericValue) ? '""' : numericValue;
-              } else {
-                return `"${formattedValue}"`;
-              }
-            }
-            return '""';
-        }
-      });
-      
-      return rowData.join(',');
-    });
-    
-    // Add summary row with enabled columns
-    const analyzedProperties = history.filter(item => item.analysis);
-    if (analyzedProperties.length > 0) {
-      const prices = analyzedProperties.map(item => {
-        const price = extractNumber(item.analysis.extractedData.price);
-        return price || 0;
-      }).filter(p => p > 0);
-      
-      const avgPrice = prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(0) : '';
-      const minPrice = prices.length > 0 ? Math.min(...prices) : '';
-      const maxPrice = prices.length > 0 ? Math.max(...prices) : '';
-      
-      // Generate summary row data for enabled columns
-      const summaryData = enabledColumns.map(column => {
-        switch (column.id) {
-          case 'propertyId':
-            return '"SUMMARY"';
-          case 'address':
-            return '""';
-          case 'source':
-            return '"Summary Statistics"';
-          case 'analysisDate':
-            return `"${new Date().toLocaleDateString()}"`;
-          case 'price':
-            return avgPrice || '';
-          case 'topPros':
-            return `"${analyzedProperties.length} properties analyzed"`;
-          case 'topCons':
-            return `"Price range: $${minPrice}-$${maxPrice}"`;
-          default:
-            // For custom columns, show empty value in summary
-            if (column.isCustom) {
-              return '""';
-            }
-            return '""';
-        }
-      });
-      
-      csvRows.push(summaryData.join(','));
-    }
-    
-    const csvContent = headers.join(',') + '\n' + csvRows.join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `property-analysis-excel-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showSuccess(`Enhanced Excel comparison table exported with ${enabledColumns.length} columns!`);
-  } catch (error) {
-    console.error('Error exporting property history:', error);
-    showError('Failed to export property history');
   }
 }
 
@@ -858,7 +656,7 @@ async function handleAnalyzeClick() {
   // Disable button while processing
   if (analyzeBtn) {
     analyzeBtn.disabled = true;
-    analyzeBtn.textContent = '🔄 Analyzing...';
+    analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
   }
   
   try {
@@ -890,102 +688,8 @@ async function handleAnalyzeClick() {
   } finally {
     if (analyzeBtn) {
       analyzeBtn.disabled = false;
-      analyzeBtn.textContent = '🔍 Analyze';
+      analyzeBtn.innerHTML = '🔍 Analyze Property';
     }
-  }
-}
-
-// Initialize popup functionality
-async function initializePopup() {
-  try {
-    // Get current tab
-    const tabs = await new Promise((resolve) => {
-      chrome.tabs.query({active: true, currentWindow: true}, resolve);
-    });
-    
-    currentTab = tabs[0];
-    
-    if (!currentTab) {
-      throw new Error('No active tab found');
-    }
-    
-    console.log('Current tab:', currentTab.url);
-    
-    // Check if we're on ChatGPT
-    const isChatGPT = currentTab.url && (
-      currentTab.url.includes('chatgpt.com') || 
-      currentTab.url.includes('chat.openai.com')
-    );
-    
-    if (isChatGPT) {
-      // Try to communicate with content script
-      try {
-        const response = await sendMessageWithRetry({action: 'checkStatus'}, 2, 500);
-        
-        if (response && response.active) {
-          // Content script is active
-          statusElement.className = 'status active';
-          statusElement.textContent = '✅ Active on ChatGPT';
-          contentScriptReady = true;
-          
-          // Show site info
-          if (infoElement) infoElement.style.display = 'block';
-          if (siteElement) siteElement.textContent = response.site;
-          if (urlElement) urlElement.textContent = response.url;
-          
-          // Show property link section
-          if (propertyLinkSection) propertyLinkSection.style.display = 'block';
-          
-          // Show and load property history section
-          if (propertyHistorySection) propertyHistorySection.style.display = 'block';
-          
-        } else {
-          throw new Error('Content script not responding properly');
-        }
-        
-      } catch (error) {
-        console.log('Content script communication failed, will try to inject:', error.message);
-        
-        // Content script might not be loaded, show as active anyway since we're on ChatGPT
-        statusElement.className = 'status active';
-        statusElement.textContent = '✅ Active on ChatGPT (initializing...)';
-        
-        // Show site info
-        if (infoElement) infoElement.style.display = 'block';
-        if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
-        if (urlElement) urlElement.textContent = currentTab.url;
-        
-        // Show property link section
-        if (propertyLinkSection) propertyLinkSection.style.display = 'block';
-        
-        // Show and load property history section
-        if (propertyHistorySection) propertyHistorySection.style.display = 'block';
-        
-        // Try to inject content script
-        try {
-          await injectContentScript();
-          contentScriptReady = true;
-          statusElement.textContent = '✅ Active on ChatGPT';
-        } catch (injectError) {
-          console.error('Failed to inject content script:', injectError);
-        }
-      }
-      
-    } else {
-      // Not on ChatGPT
-      statusElement.className = 'status inactive';
-      statusElement.textContent = '❌ Not available on this site';
-      
-      // Show site info
-      if (infoElement) infoElement.style.display = 'block';
-      if (siteElement) siteElement.textContent = new URL(currentTab.url).hostname;
-      if (urlElement) urlElement.textContent = currentTab.url;
-    }
-    
-  } catch (error) {
-    console.error('Failed to initialize popup:', error);
-    statusElement.className = 'status inactive';
-    statusElement.textContent = '⚠️ Unable to check status';
   }
 }
 
@@ -1058,10 +762,10 @@ function toggleSettings() {
 }
 
 function toggleSettingsContent() {
-  if (settingsContent && toggleSettingsBtn) {
+  if (settingsContent && settingsToggle) {
     const isVisible = settingsContent.style.display !== 'none';
     settingsContent.style.display = isVisible ? 'none' : 'block';
-    toggleSettingsBtn.textContent = isVisible ? '▼' : '▲';
+    settingsToggle.textContent = isVisible ? '▼' : '▲';
   }
 }
 
@@ -1080,11 +784,14 @@ function togglePromptSection() {
 
 function toggleDefaultPrompt() {
   if (defaultPromptDisplay && showDefaultBtn) {
-    const isVisible = defaultPromptDisplay.style.display !== 'none';
-    defaultPromptDisplay.style.display = isVisible ? 'none' : 'block';
-    showDefaultBtn.textContent = isVisible ? '📄 View Default Prompt' : '📄 Hide Default Prompt';
+    const isVisible = !defaultPromptDisplay.classList.contains('hidden');
     
-    if (!isVisible) {
+    if (isVisible) {
+      defaultPromptDisplay.classList.add('hidden');
+      showDefaultBtn.textContent = '📄 View Default';
+    } else {
+      defaultPromptDisplay.classList.remove('hidden');
+      showDefaultBtn.textContent = '📄 Hide Default';
       defaultPromptDisplay.textContent = DEFAULT_PROMPT;
     }
   }
@@ -1188,21 +895,41 @@ function renderColumnConfiguration(columns) {
   columns.forEach((column, index) => {
     const columnItem = document.createElement('div');
     columnItem.className = `column-item ${column.isCustom ? 'custom-column' : ''}`;
+    columnItem.style.cssText = `
+      display: flex;
+      align-items: center;
+      padding: var(--space-sm);
+      margin-bottom: var(--space-sm);
+      background: var(--secondary-background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      gap: var(--space-sm);
+      cursor: move;
+    `;
     columnItem.draggable = true;
     columnItem.dataset.columnId = column.id;
     columnItem.dataset.index = index;
     
-    const deleteButton = column.isCustom ? `<button class="column-delete-btn" data-column-id="${column.id}">🗑️</button>` : '';
+    const deleteButton = column.isCustom ? 
+      `<button class="btn btn-ghost btn-sm column-delete-btn" data-column-id="${column.id}" style="color: #dc2626;">🗑️</button>` : '';
     
     columnItem.innerHTML = `
-      <div class="column-drag-handle">⋮⋮</div>
-      <input type="checkbox" class="column-checkbox" ${column.enabled ? 'checked' : ''}>
-      <div class="column-info">
-        <div class="column-name">${column.name}${column.isCustom ? ' (Custom)' : ''}</div>
-        <div class="column-description">${column.description}</div>
+      <div style="color: var(--text-secondary); cursor: move;">⋮⋮</div>
+      <input type="checkbox" class="column-checkbox" ${column.enabled ? 'checked' : ''} style="margin: 0;">
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: var(--font-weight-medium); font-size: var(--font-size-sm); color: var(--text-primary);">
+          ${column.name}${column.isCustom ? ' (Custom)' : ''}
+        </div>
+        <div style="font-size: var(--font-size-sm); color: var(--text-secondary); opacity: 0.8;">
+          ${column.description}
+        </div>
       </div>
-      <div class="column-category ${column.category || 'custom'}">${column.category || 'custom'}</div>
-      <div class="column-count">${index + 1}</div>
+      <div style="font-size: var(--font-size-sm); padding: 2px 6px; background: var(--border); border-radius: 3px; color: var(--text-secondary);">
+        ${column.category || 'custom'}
+      </div>
+      <div style="font-size: var(--font-size-sm); color: var(--text-secondary); min-width: 20px; text-align: center;">
+        ${index + 1}
+      </div>
       ${deleteButton}
     `;
     
@@ -1239,27 +966,21 @@ let draggedElement = null;
 
 function handleDragStart(e) {
   draggedElement = e.target;
-  e.target.classList.add('dragging');
+  e.target.style.opacity = '0.5';
   e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/html', e.target.outerHTML);
 }
 
 function handleDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
-  
-  const targetItem = e.target.closest('.column-item');
-  if (targetItem && targetItem !== draggedElement) {
-    targetItem.classList.add('drag-over');
-  }
 }
 
 function handleDrop(e) {
   e.preventDefault();
   
   const targetItem = e.target.closest('.column-item');
-  if (targetItem && targetItem !== draggedElement) {
-    const container = targetItem.parentNode;
+  if (targetItem && targetItem !== draggedElement && columnConfigList) {
+    const container = columnConfigList;
     const draggedIndex = parseInt(draggedElement.dataset.index);
     const targetIndex = parseInt(targetItem.dataset.index);
     
@@ -1272,28 +993,20 @@ function handleDrop(e) {
     // Update the configuration order
     reorderColumns();
   }
-  
-  // Clean up drag classes
-  document.querySelectorAll('.column-item').forEach(item => {
-    item.classList.remove('drag-over');
-  });
 }
 
 function handleDragEnd(e) {
-  e.target.classList.remove('dragging');
+  e.target.style.opacity = '1';
   draggedElement = null;
-  
-  // Clean up any remaining drag classes
-  document.querySelectorAll('.column-item').forEach(item => {
-    item.classList.remove('drag-over');
-  });
 }
 
 function reorderColumns() {
+  if (!columnConfigList) return;
+  
   const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
   columnItems.forEach((item, index) => {
     item.dataset.index = index;
-    const countElement = item.querySelector('.column-count');
+    const countElement = item.querySelector('[data-count]');
     if (countElement) {
       countElement.textContent = index + 1;
     }
@@ -1301,8 +1014,8 @@ function reorderColumns() {
 }
 
 function updateColumnCount() {
-  const enabledCount = columnConfigList.querySelectorAll('.column-checkbox:checked').length;
-  const totalCount = columnConfigList.querySelectorAll('.column-checkbox').length;
+  const enabledCount = columnConfigList ? columnConfigList.querySelectorAll('.column-checkbox:checked').length : 0;
+  const totalCount = columnConfigList ? columnConfigList.querySelectorAll('.column-checkbox').length : 0;
   
   // Update any count displays if needed
   console.log(`Columns: ${enabledCount}/${totalCount} enabled`);
@@ -1310,7 +1023,7 @@ function updateColumnCount() {
 
 // Column Action Functions
 function selectAllColumns() {
-  const checkboxes = columnConfigList.querySelectorAll('.column-checkbox');
+  const checkboxes = columnConfigList ? columnConfigList.querySelectorAll('.column-checkbox') : [];
   checkboxes.forEach(checkbox => {
     checkbox.checked = true;
     checkbox.dispatchEvent(new Event('change'));
@@ -1319,7 +1032,7 @@ function selectAllColumns() {
 }
 
 function deselectAllColumns() {
-  const checkboxes = columnConfigList.querySelectorAll('.column-checkbox');
+  const checkboxes = columnConfigList ? columnConfigList.querySelectorAll('.column-checkbox') : [];
   checkboxes.forEach(checkbox => {
     checkbox.checked = false;
     checkbox.dispatchEvent(new Event('change'));
@@ -1342,6 +1055,11 @@ async function resetColumnsToDefault() {
 
 async function saveColumnSettings() {
   try {
+    if (!columnConfigList) {
+      showError('Column configuration not available');
+      return;
+    }
+    
     const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
     const columnConfig = columnItems.map((item, index) => {
       const columnId = item.dataset.columnId;
@@ -1350,7 +1068,7 @@ async function saveColumnSettings() {
       
       return {
         ...defaultColumn,
-        enabled: checkbox.checked,
+        enabled: checkbox ? checkbox.checked : false,
         order: index
       };
     });
@@ -1364,13 +1082,21 @@ async function saveColumnSettings() {
 }
 
 function previewExportColumns() {
+  if (!columnConfigList) {
+    showError('Column configuration not available');
+    return;
+  }
+  
   const columnItems = Array.from(columnConfigList.querySelectorAll('.column-item'));
   const enabledColumns = columnItems
-    .filter(item => item.querySelector('.column-checkbox').checked)
+    .filter(item => {
+      const checkbox = item.querySelector('.column-checkbox');
+      return checkbox && checkbox.checked;
+    })
     .map(item => {
       const columnId = item.dataset.columnId;
       const defaultColumn = DEFAULT_COLUMNS.find(col => col.id === columnId);
-      return defaultColumn.name;
+      return defaultColumn ? defaultColumn.name : 'Unknown';
     });
   
   if (enabledColumns.length === 0) {
@@ -1378,37 +1104,10 @@ function previewExportColumns() {
     return;
   }
   
-  const previewText = `Export Preview (${enabledColumns.length} columns):\n\n${enabledColumns.join(', ')}`;
-  
-  // Create or update preview display
-  let previewDiv = document.querySelector('.column-preview');
-  if (!previewDiv) {
-    previewDiv = document.createElement('div');
-    previewDiv.className = 'column-preview';
-    columnConfigList.parentNode.appendChild(previewDiv);
-  }
-  
-  previewDiv.innerHTML = `
-    <div class="column-preview-title">Export Preview (${enabledColumns.length} columns)</div>
-    ${enabledColumns.join(' • ')}
-  `;
-  
-  showSuccess(`Preview generated for ${enabledColumns.length} columns`);
+  showSuccess(`Preview: ${enabledColumns.length} columns selected - ${enabledColumns.slice(0, 3).join(', ')}${enabledColumns.length > 3 ? '...' : ''}`);
 }
 
 // Custom Column Management Functions
-function toggleCustomColumnForm() {
-  if (customColumnForm && toggleCustomColumnBtn) {
-    const isVisible = customColumnForm.style.display !== 'none';
-    customColumnForm.style.display = isVisible ? 'none' : 'block';
-    toggleCustomColumnBtn.textContent = isVisible ? '▼' : '▲';
-    
-    if (!isVisible) {
-      clearCustomColumnForm();
-    }
-  }
-}
-
 function clearCustomColumnForm() {
   if (customColumnName) customColumnName.value = '';
   if (customColumnType) customColumnType.value = 'text';
@@ -1468,9 +1167,8 @@ async function addCustomColumn() {
     // Re-render the column list
     renderColumnConfiguration(updatedColumns);
     
-    // Clear form and hide it
+    // Clear form
     clearCustomColumnForm();
-    toggleCustomColumnForm();
     
     showSuccess(`Custom column "${name}" added successfully!`);
     
@@ -1532,127 +1230,248 @@ function formatCustomColumnValue(value, type) {
       const numberValue = parseFloat(value);
       return isNaN(numberValue) ? value : numberValue.toLocaleString();
     case 'text':
-         default:
-       return value.toString();
-   }
- }
- 
- // Function to show custom data editor
- async function showCustomDataEditor(propertyItem, propertyIndex) {
-   try {
-     // Get current column configuration to find custom columns
-     const result = await chrome.storage.local.get(['columnConfiguration']);
-     const columnConfig = result.columnConfiguration || DEFAULT_COLUMNS;
-     const customColumns = columnConfig.filter(col => col.isCustom && col.enabled);
-     
-     if (customColumns.length === 0) {
-       showError('No custom columns are configured. Add custom columns in settings first.');
-       return;
-     }
-     
-     // Create modal
-     const modal = document.createElement('div');
-     modal.className = 'modal-overlay';
-     modal.innerHTML = `
-       <div class="custom-data-modal">
-         <div class="custom-data-modal-header">
-           <h3>✏️ Edit Custom Data</h3>
-           <button class="custom-data-modal-close">✕</button>
-         </div>
-         <div class="custom-data-modal-content">
-           <div class="property-info">
-             <strong>Property:</strong> ${propertyItem.url}
-           </div>
-           <form id="customDataForm" class="custom-data-form">
-             ${customColumns.map(column => `
-               <div class="form-group">
-                 <label for="custom_${column.id}">${column.name}:</label>
-                 <input 
-                   type="${getInputType(column.type)}" 
-                   id="custom_${column.id}" 
-                   class="form-input" 
-                   placeholder="${column.description}"
-                   value="${getCustomColumnValue(propertyItem, column)}"
-                   ${column.type === 'rating' ? 'min="1" max="10"' : ''}
-                 >
-                 <small class="form-help">Type: ${column.type}${column.defaultValue ? ` (Default: ${column.defaultValue})` : ''}</small>
-               </div>
-             `).join('')}
-           </form>
-         </div>
-         <div class="custom-data-modal-actions">
-           <button id="saveCustomDataBtn" class="btn btn-primary">💾 Save Changes</button>
-           <button id="cancelCustomDataBtn" class="btn btn-secondary">❌ Cancel</button>
-         </div>
-       </div>
-     `;
-     
-     document.body.appendChild(modal);
-     
-     // Add event listeners
-     const closeBtn = modal.querySelector('.custom-data-modal-close');
-     const saveBtn = modal.querySelector('#saveCustomDataBtn');
-     const cancelBtn = modal.querySelector('#cancelCustomDataBtn');
-     
-     const closeModal = () => modal.remove();
-     
-     closeBtn.addEventListener('click', closeModal);
-     cancelBtn.addEventListener('click', closeModal);
-     modal.addEventListener('click', (e) => {
-       if (e.target === modal) closeModal();
-     });
-     
-     saveBtn.addEventListener('click', async () => {
-       try {
-         // Collect form data
-         const customData = {};
-         customColumns.forEach(column => {
-           const input = document.getElementById(`custom_${column.id}`);
-           if (input && input.value.trim()) {
-             customData[column.id] = input.value.trim();
-           }
-         });
-         
-         // Update property with custom data
-         const historyResult = await chrome.storage.local.get(['propertyHistory']);
-         const history = historyResult.propertyHistory || [];
-         
-         if (history[propertyIndex]) {
-           history[propertyIndex].customColumns = customData;
-           await chrome.storage.local.set({ propertyHistory: history });
-           
-           // Refresh the display
-           displayPropertyHistory(history);
-           
-           closeModal();
-           showSuccess('Custom data saved successfully!');
-         }
-         
-       } catch (error) {
-         console.error('Error saving custom data:', error);
-         showError('Failed to save custom data');
-       }
-     });
-     
-   } catch (error) {
-     console.error('Error showing custom data editor:', error);
-     showError('Failed to open custom data editor');
-   }
- }
- 
- // Helper function to get appropriate input type for column type
- function getInputType(columnType) {
-   switch (columnType) {
-     case 'number':
-     case 'currency':
-     case 'percentage':
-     case 'rating':
-       return 'number';
-     case 'date':
-       return 'date';
-     case 'boolean':
-       return 'checkbox';
-     default:
-       return 'text';
-   }
- }
+    default:
+      return value.toString();
+  }
+}
+
+// Function to show custom data editor
+async function showCustomDataEditor(propertyItem, propertyIndex) {
+  try {
+    // Get current column configuration to find custom columns
+    const result = await chrome.storage.local.get(['columnConfiguration']);
+    const columnConfig = result.columnConfiguration || DEFAULT_COLUMNS;
+    const customColumns = columnConfig.filter(col => col.isCustom && col.enabled);
+    
+    if (customColumns.length === 0) {
+      showError('No custom columns are configured. Add custom columns in settings first.');
+      return;
+    }
+    
+    // Create modal (simplified for space)
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-lg);
+    `;
+    
+    modal.innerHTML = `
+      <div style="
+        background: var(--background);
+        border-radius: var(--radius-md);
+        max-width: 500px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+      ">
+        <div style="
+          padding: var(--space-lg);
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+          <h3 style="margin: 0; font-size: var(--font-size-xl);">✏️ Edit Custom Data</h3>
+          <button class="close-btn" style="
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+          ">✕</button>
+        </div>
+        <div style="padding: var(--space-lg);">
+          <div style="
+            background: #f0f9ff;
+            padding: var(--space-md);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-lg);
+            border-left: 4px solid var(--primary);
+          ">
+            <strong>Property:</strong> ${propertyItem.url}
+          </div>
+          <form class="custom-form">
+            ${customColumns.map(column => `
+              <div style="margin-bottom: var(--space-md);">
+                <label style="
+                  display: block;
+                  font-weight: var(--font-weight-medium);
+                  margin-bottom: var(--space-sm);
+                ">${column.name}:</label>
+                <input 
+                  type="${getInputType(column.type)}" 
+                  data-column-id="${column.id}"
+                  value="${getCustomColumnValue(propertyItem, column)}"
+                  placeholder="${column.description}"
+                  style="
+                    width: 100%;
+                    padding: var(--space-md);
+                    border: 1px solid var(--border);
+                    border-radius: var(--radius-md);
+                    font-family: inherit;
+                  "
+                  ${column.type === 'rating' ? 'min="1" max="10"' : ''}
+                >
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Type: ${column.type}${column.defaultValue ? ` (Default: ${column.defaultValue})` : ''}
+                </small>
+              </div>
+            `).join('')}
+          </form>
+        </div>
+        <div style="
+          padding: var(--space-lg);
+          border-top: 1px solid var(--border);
+          display: flex;
+          gap: var(--space-md);
+          justify-content: flex-end;
+        ">
+          <button class="cancel-btn btn btn-secondary btn-sm">❌ Cancel</button>
+          <button class="save-btn btn btn-primary btn-sm">💾 Save Changes</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    const closeBtn = modal.querySelector('.close-btn');
+    const saveBtn = modal.querySelector('.save-btn');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    
+    const closeModal = () => modal.remove();
+    
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    
+    saveBtn.addEventListener('click', async () => {
+      try {
+        // Collect form data
+        const customData = {};
+        const inputs = modal.querySelectorAll('input[data-column-id]');
+        inputs.forEach(input => {
+          if (input.value.trim()) {
+            customData[input.dataset.columnId] = input.value.trim();
+          }
+        });
+        
+        // Update property with custom data
+        const historyResult = await chrome.storage.local.get(['propertyHistory']);
+        const history = historyResult.propertyHistory || [];
+        
+        if (history[propertyIndex]) {
+          history[propertyIndex].customColumns = customData;
+          await chrome.storage.local.set({ propertyHistory: history });
+          
+          // Refresh the display
+          displayPropertyHistory(history);
+          
+          closeModal();
+          showSuccess('Custom data saved successfully!');
+        }
+        
+      } catch (error) {
+        console.error('Error saving custom data:', error);
+        showError('Failed to save custom data');
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error showing custom data editor:', error);
+    showError('Failed to open custom data editor');
+  }
+}
+
+// Helper function to get appropriate input type for column type
+function getInputType(columnType) {
+  switch (columnType) {
+    case 'number':
+    case 'currency':
+    case 'percentage':
+    case 'rating':
+      return 'number';
+    case 'date':
+      return 'date';
+    case 'boolean':
+      return 'checkbox';
+    default:
+      return 'text';
+  }
+}
+
+// Export function (simplified version for space)
+async function exportPropertyHistory() {
+  try {
+    const [historyResult, columnResult] = await Promise.all([
+      chrome.storage.local.get(['propertyHistory']),
+      chrome.storage.local.get(['columnConfiguration'])
+    ]);
+    
+    const history = historyResult.propertyHistory || [];
+    const columnConfig = columnResult.columnConfiguration || DEFAULT_COLUMNS;
+    
+    if (history.length === 0) {
+      showError('No properties to export');
+      return;
+    }
+    
+    // Get enabled columns in the correct order
+    const enabledColumns = columnConfig
+      .filter(col => col.enabled)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    // Create CSV content (simplified)
+    const headers = enabledColumns.map(col => col.name);
+    const csvRows = history.map(item => {
+      return enabledColumns.map(column => {
+        // Simplified data extraction
+        const data = item.analysis ? item.analysis.extractedData : {};
+        switch (column.id) {
+          case 'address': return `"${item.url}"`;
+          case 'source': return `"${item.domain}"`;
+          case 'analysisDate': return `"${item.date}"`;
+          case 'price': return data.price || '';
+          case 'bedrooms': return data.bedrooms || '';
+          case 'bathrooms': return data.bathrooms || '';
+          default:
+            if (column.isCustom) {
+              const customValue = getCustomColumnValue(item, column);
+              return `"${formatCustomColumnValue(customValue, column.type)}"`;
+            }
+            return '""';
+        }
+      }).join(',');
+    });
+    
+    const csvContent = headers.join(',') + '\n' + csvRows.join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `property-analysis-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showSuccess(`Excel file exported with ${enabledColumns.length} columns!`);
+  } catch (error) {
+    console.error('Error exporting property history:', error);
+    showError('Failed to export property history');
+  }
+}
