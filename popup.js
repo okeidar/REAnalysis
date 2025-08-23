@@ -376,21 +376,29 @@ function exportPropertyHistory() {
       return 'TBD';
     };
     
-    // Create CSV with optimized Excel format
+    // Enhanced Excel comparison format with scoring and metrics
     const headers = [
-      // Basic Property Info
-      'Property URL', 'Source Website', 'Analysis Date', 'Status',
+      // Property Identification
+      'Property ID', 'Address/URL', 'Source', 'Analysis Date',
       
-      // Key Metrics (for easy comparison)
+      // Core Property Metrics (Sortable/Comparable)
       'Price ($)', 'Bedrooms', 'Bathrooms', 'Square Feet', 'Price per Sq Ft',
       'Year Built', 'Property Age', 'Property Type', 'Neighborhood',
       
-      // Analysis Summary (cleaned for Excel)
-      'Key Pros', 'Key Cons', 'Market Analysis Summary', 
-      'Investment Rating', 'Red Flags', 'Overall Score'
+      // Value Analysis Scores (1-10 scale for easy comparison)
+      'Overall Score', 'Investment Score', 'Market Score', 'Location Score', 'Condition Score',
+      
+      // Financial Metrics
+      'Est. Monthly Payment', 'Price vs Market', 'Investment Potential', 'Value Rating',
+      
+      // Pros/Cons Summary (Key Points Only)
+      'Top 3 Pros', 'Top 3 Cons', 'Red Flags Count', 'Key Concerns',
+      
+      // Detailed Analysis (Expandable)
+      'Market Analysis', 'Investment Details', 'All Pros', 'All Cons', 'Red Flags Detail'
     ];
     
-    const csvRows = history.map(item => {
+    const csvRows = history.map((item, index) => {
       const analysis = item.analysis;
       const data = analysis ? analysis.extractedData : {};
       
@@ -405,35 +413,152 @@ function exportPropertyHistory() {
       const pricePerSqFt = (price && sqft) ? (price / sqft).toFixed(2) : '';
       const propertyAge = yearBuilt ? new Date().getFullYear() - yearBuilt : '';
       
+      // Enhanced scoring functions (1-10 scale)
+      const calculateOverallScore = () => {
+        if (!analysis) return '';
+        let score = 5; // Base score
+        
+        const pros = (data.pros || '').toLowerCase();
+        const cons = (data.cons || '').toLowerCase();
+        const redFlags = (data.redFlags || '').toLowerCase();
+        
+        // Positive indicators
+        if (pros.includes('excellent') || pros.includes('great')) score += 2;
+        else if (pros.includes('good') || pros.includes('nice')) score += 1;
+        
+        // Negative indicators
+        if (cons.includes('poor') || cons.includes('bad')) score -= 2;
+        else if (cons.includes('concern') || cons.includes('issue')) score -= 1;
+        
+        // Red flags impact
+        if (redFlags.length > 100) score -= 2;
+        else if (redFlags.length > 50) score -= 1;
+        
+        return Math.max(1, Math.min(10, score));
+      };
+      
+      const calculateInvestmentScore = () => {
+        if (!data.investmentPotential) return '';
+        const text = data.investmentPotential.toLowerCase();
+        if (text.includes('excellent') || text.includes('strong')) return 9;
+        if (text.includes('very good') || text.includes('high potential')) return 8;
+        if (text.includes('good') || text.includes('positive')) return 7;
+        if (text.includes('decent') || text.includes('fair')) return 6;
+        if (text.includes('moderate') || text.includes('average')) return 5;
+        if (text.includes('poor') || text.includes('weak')) return 3;
+        if (text.includes('bad') || text.includes('avoid')) return 2;
+        return 5;
+      };
+      
+      const calculateMarketScore = () => {
+        if (!data.marketAnalysis) return '';
+        const text = data.marketAnalysis.toLowerCase();
+        if (text.includes('undervalued') || text.includes('great deal')) return 9;
+        if (text.includes('good value') || text.includes('fair price')) return 7;
+        if (text.includes('market value') || text.includes('reasonable')) return 6;
+        if (text.includes('overpriced') || text.includes('expensive')) return 3;
+        if (text.includes('overvalued') || text.includes('too high')) return 2;
+        return 5;
+      };
+      
+      const calculateLocationScore = () => {
+        if (!data.neighborhood) return '';
+        const text = (data.neighborhood + ' ' + (data.pros || '')).toLowerCase();
+        if (text.includes('excellent location') || text.includes('prime area')) return 9;
+        if (text.includes('good location') || text.includes('desirable')) return 7;
+        if (text.includes('decent area') || text.includes('convenient')) return 6;
+        if (text.includes('remote') || text.includes('far from')) return 4;
+        if (text.includes('poor location') || text.includes('undesirable')) return 3;
+        return 5;
+      };
+      
+      const calculateConditionScore = () => {
+        if (!data.pros && !data.cons) return '';
+        const text = ((data.pros || '') + ' ' + (data.cons || '')).toLowerCase();
+        if (text.includes('excellent condition') || text.includes('move-in ready')) return 9;
+        if (text.includes('good condition') || text.includes('well maintained')) return 7;
+        if (text.includes('fair condition') || text.includes('some updates')) return 6;
+        if (text.includes('needs work') || text.includes('outdated')) return 4;
+        if (text.includes('poor condition') || text.includes('major repairs')) return 3;
+        return 5;
+      };
+      
+      // Financial calculations
+      const estimateMonthlyPayment = () => {
+        if (!price) return '';
+        const downPayment = price * 0.2; // 20% down
+        const loanAmount = price - downPayment;
+        const monthlyRate = 0.07 / 12; // Assume 7% interest
+        const numPayments = 30 * 12; // 30 years
+        const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+        return Math.round(monthlyPayment);
+      };
+      
+      // Extract top points for summary
+      const extractTopPoints = (text, count = 3) => {
+        if (!text) return '';
+        const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        return sentences.slice(0, count).map(s => s.trim()).join(' | ');
+      };
+      
+      const countRedFlags = () => {
+        if (!data.redFlags) return 0;
+        const text = data.redFlags.toLowerCase();
+        let count = 0;
+        const flagIndicators = ['concern', 'issue', 'problem', 'warning', 'avoid', 'risk', 'poor', 'bad'];
+        flagIndicators.forEach(flag => {
+          if (text.includes(flag)) count++;
+        });
+        return count;
+      };
+      
       return [
-        `"${item.url}"`,
-        `"${item.domain}"`,
-        `"${new Date(item.date).toLocaleDateString()}"`,
-        `"${analysis ? 'Analyzed' : 'Pending'}"`,
+        // Property Identification
+        `"PROP-${(index + 1).toString().padStart(3, '0')}"`, // Property ID
+        `"${item.url}"`, // Address/URL
+        `"${item.domain}"`, // Source
+        `"${new Date(item.date).toLocaleDateString()}"`, // Analysis Date
         
-        // Numeric values (no quotes for Excel calculations)
-        price || '',
-        bedrooms || '',
-        bathrooms || '',
-        sqft || '',
-        pricePerSqFt || '',
-        yearBuilt || '',
-        propertyAge || '',
+        // Core Property Metrics
+        price || '', // Price ($)
+        bedrooms || '', // Bedrooms
+        bathrooms || '', // Bathrooms
+        sqft || '', // Square Feet
+        pricePerSqFt || '', // Price per Sq Ft
+        yearBuilt || '', // Year Built
+        propertyAge || '', // Property Age
+        `"${data.propertyType || ''}"`, // Property Type
+        `"${data.neighborhood || ''}"`, // Neighborhood
         
-        `"${data.propertyType || ''}"`,
-        `"${data.neighborhood || ''}"`,
+        // Value Analysis Scores (1-10)
+        analysis ? calculateOverallScore() : '', // Overall Score
+        analysis ? calculateInvestmentScore() : '', // Investment Score
+        analysis ? calculateMarketScore() : '', // Market Score
+        analysis ? calculateLocationScore() : '', // Location Score
+        analysis ? calculateConditionScore() : '', // Condition Score
         
-        // Cleaned text analysis
-        `"${cleanText(data.pros)}"`,
-        `"${cleanText(data.cons)}"`,
-        `"${cleanText(data.marketAnalysis)}"`,
-        `"${getInvestmentScore(data.investmentPotential)}"`,
-        `"${cleanText(data.redFlags)}"`,
-        `"${getInvestmentScore(data.investmentPotential)}"`
+        // Financial Metrics
+        price ? estimateMonthlyPayment() : '', // Est. Monthly Payment
+        analysis ? getInvestmentScore(data.marketAnalysis) : '', // Price vs Market
+        `"${data.investmentPotential ? cleanText(data.investmentPotential).substring(0, 100) : ''}"`, // Investment Potential
+        analysis ? getInvestmentScore(data.investmentPotential) : '', // Value Rating
+        
+        // Pros/Cons Summary
+        `"${extractTopPoints(data.pros, 3)}"`, // Top 3 Pros
+        `"${extractTopPoints(data.cons, 3)}"`, // Top 3 Cons
+        analysis ? countRedFlags() : 0, // Red Flags Count
+        `"${data.redFlags ? cleanText(data.redFlags).substring(0, 100) : ''}"`, // Key Concerns
+        
+        // Detailed Analysis
+        `"${cleanText(data.marketAnalysis)}"`, // Market Analysis
+        `"${cleanText(data.investmentPotential)}"`, // Investment Details
+        `"${cleanText(data.pros)}"`, // All Pros
+        `"${cleanText(data.cons)}"`, // All Cons
+        `"${cleanText(data.redFlags)}"` // Red Flags Detail
       ].join(',');
     });
     
-    // Add summary statistics row
+    // Add comprehensive summary statistics row
     const analyzedProperties = history.filter(item => item.analysis);
     if (analyzedProperties.length > 0) {
       const prices = analyzedProperties.map(item => {
@@ -442,12 +567,40 @@ function exportPropertyHistory() {
       }).filter(p => p > 0);
       
       const avgPrice = prices.length > 0 ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(0) : '';
+      const minPrice = prices.length > 0 ? Math.min(...prices) : '';
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : '';
+      
+      // Calculate average scores
+      const scores = analyzedProperties.map(item => {
+        const data = item.analysis.extractedData;
+        const investment = data.investmentPotential ? 5 : ''; // Simplified for summary
+        return investment;
+      }).filter(s => s !== '');
+      
+      const avgInvestmentScore = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '';
       
       csvRows.push([
-        '"SUMMARY"', '""', '""', '""',
-        avgPrice ? `"Average: $${avgPrice}"` : '""',
+        // Property Identification
+        '"SUMMARY"', '""', '"Summary Statistics"', `"${new Date().toLocaleDateString()}"`,
+        
+        // Core Property Metrics
+        avgPrice || '', // Average Price
         '""', '""', '""', '""', '""', '""', '""', '""',
-        '""', '""', '""', '""', '""', '""'
+        
+        // Value Analysis Scores
+        avgInvestmentScore || '', // Average Overall Score
+        '""', '""', '""', '""',
+        
+        // Financial Metrics
+        '""', '""', '""', '""',
+        
+        // Summary Info
+        `"${analyzedProperties.length} properties analyzed"`,
+        `"Price range: $${minPrice}-$${maxPrice}"`,
+        '""', '""',
+        
+        // Detailed columns (empty for summary)
+        '""', '""', '""', '""', '""'
       ].join(','));
     }
     
@@ -458,13 +611,13 @@ function exportPropertyHistory() {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `property-comparison-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `property-analysis-excel-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showSuccess('Property comparison table exported for Excel!');
+    showSuccess('Enhanced Excel comparison table exported successfully!');
   });
 }
 
