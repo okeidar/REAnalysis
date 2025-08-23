@@ -74,11 +74,60 @@
     .main-content {
       padding: 24px 20px;
     }
-    
+
+    .section-container {
+      margin-bottom: 24px;
+      padding: 20px;
+      background: rgba(248, 250, 252, 0.6);
+      border-radius: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .section-container:hover {
+      background: rgba(248, 250, 252, 0.9);
+      border-color: rgba(203, 213, 225, 0.8);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .section-container:last-child {
+      margin-bottom: 0;
+    }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      margin: -20px -20px 16px -20px;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+      border-bottom: 1px solid #e2e8f0;
+      border-radius: 12px 12px 0 0;
+    }
+
+    .section-divider-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(148, 163, 184, 0.3) 0%, transparent 100%);
+      margin-left: 16px;
+    }
+
     .status {
       padding: 16px;
       border-radius: 12px;
-      margin: 20px 0;
+      margin: 0;
       text-align: center;
       font-size: 14px;
       font-weight: 500;
@@ -111,11 +160,12 @@
     }
     
     .info {
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      background: #ffffff;
       padding: 16px;
-      border-radius: 12px;
-      border: none;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
       margin: 12px 0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .info-label {
@@ -135,12 +185,12 @@
     }
 
     .property-link-section {
-      background: white;
-      padding: 24px;
-      border-radius: 16px;
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
       border: none;
-      margin: 20px 0;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      margin: 0;
+      box-shadow: none;
     }
 
     .section-title {
@@ -151,6 +201,11 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
     
     .section-title .emoji {
@@ -265,13 +320,14 @@
     }
     
     .footer {
-      background: #f8fafc;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
       margin-top: 0;
       padding: 16px 20px;
-      border-top: 1px solid #e2e8f0;
+      border-top: 2px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
     }
     
     .version {
@@ -394,6 +450,193 @@
       display: flex;
       justify-content: center;
     }
+
+    .section-container {
+      margin-bottom: 24px;
+    }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .section-divider-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #475569;
+      background: #f8fafc;
+      padding: 4px 10px;
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Settings Section Styles */
+    .settings-section {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      margin: 0;
+      overflow: visible;
+    }
+
+    .settings-content {
+      padding: 0;
+      border-top: none;
+    }
+
+    .setting-item {
+      margin-bottom: 16px;
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .featured-setting {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 2px solid #0ea5e9;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1), 0 2px 4px -1px rgba(14, 165, 233, 0.06);
+    }
+
+    .collapsible-setting {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .collapsible-setting .setting-header {
+      background: #f8fafc;
+      padding: 12px 16px;
+      margin: 0;
+      border-bottom: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .collapsible-setting .setting-header:hover {
+      background: #f1f5f9;
+    }
+
+    /* Section Type Variations */
+    .section-container.status-section {
+      background: linear-gradient(135deg, rgba(220, 252, 231, 0.3) 0%, rgba(187, 247, 208, 0.3) 100%);
+      border-color: rgba(34, 197, 94, 0.2);
+    }
+
+    .section-container.status-section .section-divider {
+      background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+      border-bottom-color: rgba(34, 197, 94, 0.2);
+    }
+
+    .section-container.info-section {
+      background: linear-gradient(135deg, rgba(219, 234, 254, 0.3) 0%, rgba(191, 219, 254, 0.3) 100%);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .section-container.info-section .section-divider {
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+      border-bottom-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .section-container.analysis-section {
+      background: linear-gradient(135deg, rgba(254, 240, 138, 0.3) 0%, rgba(253, 224, 71, 0.3) 100%);
+      border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    .section-container.analysis-section .section-divider {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde047 100%);
+      border-bottom-color: rgba(245, 158, 11, 0.2);
+    }
+
+    .section-container.history-section {
+      background: linear-gradient(135deg, rgba(233, 213, 255, 0.3) 0%, rgba(196, 181, 253, 0.3) 100%);
+      border-color: rgba(147, 51, 234, 0.2);
+    }
+
+    .section-container.history-section .section-divider {
+      background: linear-gradient(135deg, #e9d5ff 0%, #c4b5fd 100%);
+      border-bottom-color: rgba(147, 51, 234, 0.2);
+    }
+
+    .section-container.settings-section {
+      background: linear-gradient(135deg, rgba(254, 226, 226, 0.3) 0%, rgba(252, 165, 165, 0.3) 100%);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .section-container.settings-section .section-divider {
+      background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%);
+      border-bottom-color: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Animation and Interaction Enhancements */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .section-container {
+      animation: fadeInUp 0.3s ease forwards;
+    }
+
+    .section-container:nth-child(1) { animation-delay: 0.1s; }
+    .section-container:nth-child(2) { animation-delay: 0.2s; }
+    .section-container:nth-child(3) { animation-delay: 0.3s; }
+    .section-container:nth-child(4) { animation-delay: 0.4s; }
+    .section-container:nth-child(5) { animation-delay: 0.5s; }
+
+    /* Enhanced Visual Feedback */
+    .section-container:hover .section-divider {
+      background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    }
+
+    .section-container.status-section:hover .section-divider {
+      background: linear-gradient(135deg, #bbf7d0 0%, #86efac 100%);
+    }
+
+    .section-container.info-section:hover .section-divider {
+      background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+    }
+
+    .section-container.analysis-section:hover .section-divider {
+      background: linear-gradient(135deg, #fde047 0%, #facc15 100%);
+    }
+
+    .section-container.history-section:hover .section-divider {
+      background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+    }
+
+    .section-container.settings-section:hover .section-divider {
+      background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+    }
+
+    /* Responsive Enhancements */
+    @media (max-width: 400px) {
+      .section-container {
+        padding: 16px;
+        margin-bottom: 20px;
+      }
+      
+      .section-divider {
+        margin: -16px -16px 12px -16px;
+        padding: 10px 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -408,59 +651,80 @@
     
     <div class="main-content">
   
-  <div id="status" class="status loading">
-    Checking status...
-  </div>
-  
-  <div id="info" style="display: none;">
-    <div class="info">
-      <div class="info-label">Current Site</div>
-      <div class="info-value" id="site">-</div>
-    </div>
-    
-    <div class="info">
-      <div class="info-label">URL</div>
-      <div class="info-value" id="url">-</div>
+  <!-- Status Section -->
+  <div class="section-container status-section">
+    <div id="status" class="status loading">
+      Checking status...
     </div>
   </div>
   
-  <div id="propertyLinkSection" class="property-link-section" style="display: none;">
-    <div class="section-title">
-      <span class="emoji">🏡</span> Property Link Analyzer
-    </div>
-    <textarea 
-      id="propertyLinkInput" 
-      class="link-input" 
-      placeholder="Paste a property link here (e.g., Zillow, Realtor.com, etc.)..."
-      rows="2"
-    ></textarea>
-    <div class="action-buttons">
-      <button id="pasteBtn" class="btn btn-secondary">📋 Paste</button>
-      <button id="analyzeBtn" class="btn btn-primary">🔍 Analyze</button>
-    </div>
-    <div id="successMessage" class="success-message"></div>
-    <div id="errorMessage" class="error-message"></div>
-  </div>
-  
-  <div id="propertyHistorySection" class="property-link-section" style="display: none;">
-    <div class="section-title">
-      <span class="emoji">📊</span> Analyzed Properties History
-      <button id="clearHistoryBtn" class="btn-clear">🗑️</button>
-    </div>
-    <div id="propertyHistoryList" class="property-history-list">
-      <div class="empty-history">No properties analyzed yet.</div>
-    </div>
-    <div class="history-actions">
-      <button id="exportHistoryBtn" class="btn btn-secondary btn-small">📤 Export</button>
+  <!-- Site Information Section -->
+  <div class="section-container info-section">
+    <div id="info" style="display: none;">
+      <div class="section-divider">
+        <span class="section-divider-text">📍 Current Site Information</span>
+      </div>
+      <div class="info">
+        <div class="info-label">Current Site</div>
+        <div class="info-value" id="site">-</div>
+      </div>
+      
+      <div class="info">
+        <div class="info-label">URL</div>
+        <div class="info-value" id="url">-</div>
+      </div>
     </div>
   </div>
   
-  <div id="settingsSection" class="settings-section" style="display: block;">
-    <div class="section-title">
-      <span class="emoji">⚙️</span> Export & Analysis Settings
-      <button id="toggleSettingsBtn" class="btn-toggle">▲</button>
+  <!-- Property Link Analyzer Section -->
+  <div class="section-container analysis-section">
+    <div class="section-divider">
+      <span class="section-divider-text">🏡 Property Analysis</span>
     </div>
-    <div id="settingsContent" class="settings-content" style="display: block;">
+    <div id="propertyLinkSection" class="property-link-section" style="display: none;">
+      <div class="section-title">
+        <span class="emoji">🏡</span> Property Link Analyzer
+      </div>
+      <textarea 
+        id="propertyLinkInput" 
+        class="link-input" 
+        placeholder="Paste a property link here (e.g., Zillow, Realtor.com, etc.)..."
+        rows="2"
+      ></textarea>
+      <div class="action-buttons">
+        <button id="pasteBtn" class="btn btn-secondary">📋 Paste</button>
+        <button id="analyzeBtn" class="btn btn-primary">🔍 Analyze</button>
+      </div>
+      <div id="successMessage" class="success-message"></div>
+      <div id="errorMessage" class="error-message"></div>
+    </div>
+  </div>
+  
+  <!-- Property History Section -->
+  <div class="section-container history-section">
+    <div class="section-divider">
+      <span class="section-divider-text">📊 Analysis History</span>
+    </div>
+    <div id="propertyHistorySection" class="property-link-section" style="display: none;">
+      <div class="section-title">
+        <span class="emoji">📊</span> Analyzed Properties History
+        <button id="clearHistoryBtn" class="btn-clear">🗑️</button>
+      </div>
+      <div id="propertyHistoryList" class="property-history-list">
+        <div class="empty-history">No properties analyzed yet.</div>
+      </div>
+      <div class="history-actions">
+        <button id="exportHistoryBtn" class="btn btn-secondary btn-small">📤 Export</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Settings Section -->
+  <div class="section-container settings-section">
+    <div class="section-divider">
+      <span class="section-divider-text">⚙️ Configuration</span>
+    </div>
+    <div id="settingsSection" class="settings-section" style="display: block;">
       <div class="setting-item featured-setting">
         <div class="setting-header">
           <label>📊 Excel Export Column Configuration</label>
