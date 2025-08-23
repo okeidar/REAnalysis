@@ -1065,7 +1065,20 @@ List 5-7 concerns or risks:
 Property Link: {PROPERTY_URL}
 Analysis Date: {DATE}
 
-Visit the property link and provide specific data where possible. Use local market research and current rental data to support your analysis. Focus on actionable investment insights and concrete numbers.`;
+**IMPORTANT**: Please copy and paste the key property details from the above link into this chat, then I'll provide my analysis. I need the following information to complete the investment analysis:
+
+• Asking Price
+• Bedrooms/Bathrooms
+• Square Footage
+• Year Built
+• Property Type
+• Address/Location
+• Property Description
+• Any HOA fees
+• Days on Market
+• Any photos or condition details you can share
+
+Once you provide these details, I'll give you the comprehensive investment analysis using the framework above. Focus on actionable investment insights and concrete numbers based on the information you provide.`;
 
 // Settings Functions
 async function loadCustomPrompt() {
