@@ -48,11 +48,34 @@ function extractPropertyAnalysisData(responseText) {
   
   const analysis = {
     fullResponse: responseText,
+    fullAnalysis: responseText, // Store full analysis for Excel export
     extractedData: {},
     timestamp: Date.now()
   };
   
-  // Enhanced extraction with multiple strategies for each data type
+  // First, try to extract from the structured format sections
+  const structuredSections = extractStructuredSections(responseText);
+  if (structuredSections.propertyDetails) {
+    console.log('✅ Found structured PROPERTY DETAILS section');
+    extractFromPropertyDetails(structuredSections.propertyDetails, analysis);
+  }
+  
+  if (structuredSections.locationAnalysis) {
+    console.log('✅ Found structured LOCATION & NEIGHBORHOOD ANALYSIS section');
+    extractFromLocationAnalysis(structuredSections.locationAnalysis, analysis);
+  }
+  
+  if (structuredSections.rentalAnalysis) {
+    console.log('✅ Found structured RENTAL INCOME ANALYSIS section');
+    extractFromRentalAnalysis(structuredSections.rentalAnalysis, analysis);
+  }
+  
+  if (structuredSections.investmentSummary) {
+    console.log('✅ Found structured INVESTMENT SUMMARY section');
+    extractFromInvestmentSummary(structuredSections.investmentSummary, analysis);
+  }
+  
+  // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
   const extractors = {
     // Price extraction with comprehensive patterns
     price: {
@@ -71,9 +94,12 @@ function extractPropertyAnalysisData(responseText) {
     // Bedroom extraction
     bedrooms: {
       patterns: [
+        /(?:bedroom)[s]?[:\s]*(\d+)/gi,
+        /(?:bedrooms)[:\s]*(\d+)/gi,
         /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
-        /(?:bed(?:room)?s?|br)[:\s]*(\d+)/gi,
-        /(\d+)\s*(?:bedroom|bed)/gi
+        /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
+        /\b(\d+)\s*bed\b/gi,
+        /(\d+)\s*(?:bed)/gi
       ],
       validator: (value) => {
         const num = parseInt(value);
@@ -144,35 +170,228 @@ function extractPropertyAnalysisData(responseText) {
     }
   };
   
-  // Extract data using multiple patterns per field
-  for (const [fieldName, extractor] of Object.entries(extractors)) {
-    let bestMatch = null;
-    let bestScore = 0;
+  // Function to extract structured sections from the new prompt format
+  function extractStructuredSections(text) {
+    const sections = {};
     
-    for (const pattern of extractor.patterns) {
-      pattern.lastIndex = 0; // Reset regex
-      let match;
-      while ((match = pattern.exec(responseText)) !== null) {
-        for (let i = 1; i < match.length; i++) {
-          if (match[i] && match[i].trim()) {
-            const value = match[i].trim();
-            if (extractor.validator(value)) {
-              const score = calculateMatchScore(match, fieldName);
-              if (score > bestScore) {
-                bestMatch = value;
-                bestScore = score;
+    // Extract PROPERTY DETAILS section
+    const propertyDetailsMatch = text.match(/\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
+    if (propertyDetailsMatch) {
+      sections.propertyDetails = propertyDetailsMatch[1].trim();
+    }
+    
+    // Extract LOCATION & NEIGHBORHOOD ANALYSIS section
+    const locationMatch = text.match(/\*\*LOCATION\s+&\s+NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
+    if (locationMatch) {
+      sections.locationAnalysis = locationMatch[1].trim();
+    }
+    
+    // Extract RENTAL INCOME ANALYSIS section
+    const rentalMatch = text.match(/\*\*RENTAL\s+INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
+    if (rentalMatch) {
+      sections.rentalAnalysis = rentalMatch[1].trim();
+    }
+    
+    // Extract INVESTMENT SUMMARY section
+    const investmentMatch = text.match(/\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
+    if (investmentMatch) {
+      sections.investmentSummary = investmentMatch[1].trim();
+    }
+    
+    return sections;
+  }
+  
+  // Function to extract data from PROPERTY DETAILS section
+  function extractFromPropertyDetails(text, analysis) {
+    // Extract specific data points with enhanced patterns
+    const patterns = {
+      price: [
+        /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)/g
+      ],
+      bedrooms: [
+        /(?:bedroom)[s]?[:\s]*(\d+)/gi,
+        /(?:bedrooms)[:\s]*(\d+)/gi,
+        /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
+        /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
+        /\b(\d+)\s*bed\b/gi
+      ],
+      bathrooms: [
+        /(?:bathroom)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
+        /(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b)/gi,
+        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi
+      ],
+      squareFeet: [
+        /(?:square\s+footage)[:\s]*([\d,]+)/gi,
+        /([\d,]+)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi
+      ],
+      yearBuilt: [
+        /(?:year\s+built)[:\s]*(\d{4})/gi,
+        /(?:built)[:\s]*(\d{4})/gi,
+        /(\d{4})\s*(?:built)/gi
+      ],
+      propertyType: [
+        /(?:property\s+type)[:\s]*([^\n,]+)/gi,
+        /(?:type)[:\s]*(single\s+family|condo|townhouse|apartment|duplex|house|home)[^\n,]*/gi
+      ]
+    };
+    
+    for (const [key, patternArray] of Object.entries(patterns)) {
+      if (!analysis.extractedData[key]) { // Only set if not already extracted
+        let bestMatch = null;
+        
+        // Try each pattern until we find a match
+        for (const pattern of patternArray) {
+          pattern.lastIndex = 0; // Reset regex
+          const match = pattern.exec(text);
+          
+          if (match && match[1]) {
+            const value = match[1].trim();
+            
+            // Validate the extracted value
+            if (validateExtractedValue(key, value)) {
+              bestMatch = value;
+              break; // Use the first valid match
+            }
+          }
+        }
+        
+        if (bestMatch) {
+          analysis.extractedData[key] = bestMatch;
+          console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+        }
+      }
+    }
+  }
+  
+  // Helper function to validate extracted values
+  function validateExtractedValue(key, value) {
+    switch (key) {
+      case 'bedrooms':
+        const bedrooms = parseInt(value);
+        return bedrooms >= 0 && bedrooms <= 20;
+      case 'bathrooms':
+        const bathrooms = parseFloat(value);
+        return bathrooms >= 0 && bathrooms <= 20;
+      case 'squareFeet':
+        const sqft = parseInt(value.replace(/,/g, ''));
+        return sqft >= 100 && sqft <= 50000;
+      case 'yearBuilt':
+        const year = parseInt(value);
+        return year >= 1800 && year <= new Date().getFullYear();
+      case 'price':
+        const price = parseFloat(value.replace(/,/g, ''));
+        return price >= 10000 && price <= 50000000;
+      default:
+        return value && value.length > 0;
+    }
+  }
+  
+  // Function to extract data from LOCATION & NEIGHBORHOOD ANALYSIS section
+  function extractFromLocationAnalysis(text, analysis) {
+    // Extract location score in X/10 format
+    const locationScoreMatch = text.match(/(\d+)\/10/);
+    if (locationScoreMatch) {
+      analysis.extractedData.locationScore = `${locationScoreMatch[1]}/10`;
+      console.log(`✅ Extracted location score:`, analysis.extractedData.locationScore);
+    }
+    
+    // Store the full location analysis
+    analysis.extractedData.locationAnalysis = text.substring(0, 1000);
+    console.log(`✅ Stored location analysis (${text.length} chars)`);
+  }
+  
+  // Function to extract data from RENTAL INCOME ANALYSIS section
+  function extractFromRentalAnalysis(text, analysis) {
+    // Extract estimated monthly rental income
+    const rentalIncomeMatch = text.match(/\$?([\d,]+)\s*(?:per\s+month|monthly|\/month)/gi);
+    if (rentalIncomeMatch && rentalIncomeMatch[0]) {
+      const match = rentalIncomeMatch[0].match(/\$?([\d,]+)/);
+      if (match) {
+        analysis.extractedData.estimatedRentalIncome = match[1].replace(/,/g, '');
+        console.log(`✅ Extracted estimated rental income:`, analysis.extractedData.estimatedRentalIncome);
+      }
+    }
+    
+    // Extract rental growth potential with Excel-friendly format
+    const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
+    if (growthMatch && growthMatch[0]) {
+      // Check if it already has "Growth:" prefix
+      if (growthMatch[0].toLowerCase().includes('growth:')) {
+        analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
+      } else {
+        const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+        if (match) {
+          analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+        }
+      }
+      console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
+    }
+    
+    // Store the full rental analysis
+    analysis.extractedData.rentalAnalysis = text.substring(0, 1000);
+    console.log(`✅ Stored rental analysis (${text.length} chars)`);
+  }
+  
+  // Function to extract data from INVESTMENT SUMMARY section
+  function extractFromInvestmentSummary(text, analysis) {
+    // Extract pros (Top 3 advantages)
+    const prosMatch = text.match(/(?:top\s+3\s+advantages|advantages)[:\s]*([\s\S]*?)(?=(?:top\s+3\s+concerns|concerns|cons|limitations)|$)/gi);
+    if (prosMatch && prosMatch[0]) {
+      analysis.extractedData.pros = prosMatch[0].replace(/(?:top\s+3\s+advantages|advantages)[:\s]*/gi, '').trim().substring(0, 500);
+      console.log(`✅ Extracted pros from Investment Summary`);
+    }
+    
+    // Extract cons (Top 3 concerns)
+    const consMatch = text.match(/(?:top\s+3\s+concerns|concerns|limitations)[:\s]*([\s\S]*?)(?=(?:red\s+flags|recommendation)|$)/gi);
+    if (consMatch && consMatch[0]) {
+      analysis.extractedData.cons = consMatch[0].replace(/(?:top\s+3\s+concerns|concerns|limitations)[:\s]*/gi, '').trim().substring(0, 500);
+      console.log(`✅ Extracted cons from Investment Summary`);
+    }
+    
+    // Extract red flags
+    const redFlagsMatch = text.match(/(?:red\s+flags|warning\s+signs)[:\s]*([\s\S]*?)(?=(?:price\s+comparison|recommendation)|$)/gi);
+    if (redFlagsMatch && redFlagsMatch[0]) {
+      analysis.extractedData.redFlags = redFlagsMatch[0].replace(/(?:red\s+flags|warning\s+signs)[:\s]*/gi, '').trim().substring(0, 500);
+      console.log(`✅ Extracted red flags from Investment Summary`);
+    }
+    
+    // Store the full investment summary
+    analysis.extractedData.investmentSummary = text.substring(0, 1000);
+    console.log(`✅ Stored investment summary (${text.length} chars)`);
+  }
+  
+  // Extract data using multiple patterns per field (fallback for basic data)
+  for (const [fieldName, extractor] of Object.entries(extractors)) {
+    if (!analysis.extractedData[fieldName]) { // Only extract if not already found in structured sections
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      for (const pattern of extractor.patterns) {
+        pattern.lastIndex = 0; // Reset regex
+        let match;
+        while ((match = pattern.exec(responseText)) !== null) {
+          for (let i = 1; i < match.length; i++) {
+            if (match[i] && match[i].trim()) {
+              const value = match[i].trim();
+              if (extractor.validator(value)) {
+                const score = calculateMatchScore(match, fieldName);
+                if (score > bestScore) {
+                  bestMatch = value;
+                  bestScore = score;
+                }
               }
             }
           }
         }
       }
-    }
-    
-    if (bestMatch) {
-      analysis.extractedData[fieldName] = bestMatch;
-      console.log(`✅ Extracted ${fieldName}:`, bestMatch);
-    } else {
-      console.log(`❌ Failed to extract ${fieldName}`);
+      
+      if (bestMatch) {
+        analysis.extractedData[fieldName] = bestMatch;
+        console.log(`✅ Extracted ${fieldName}:`, bestMatch);
+      } else {
+        console.log(`❌ Failed to extract ${fieldName}`);
+      }
     }
   }
   
@@ -202,184 +421,45 @@ function extractPropertyAnalysisData(responseText) {
     return score;
   }
   
-  // Enhanced neighborhood extraction
-  const neighborhoodPatterns = [
-    /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/gi,
-    /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/gi,
-    /(?:in|near)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/gi,
-    /(?:community|subdivision)[:\s]*([^.\n,]+)/gi
-  ];
-  
-  let bestNeighborhood = null;
-  let bestNeighborhoodScore = 0;
-  
-  for (const pattern of neighborhoodPatterns) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(responseText)) !== null) {
-      if (match[1]) {
-        let neighborhood = match[1].trim();
-        // Enhanced validation
-        if (neighborhood.length > 3 && neighborhood.length < 100 &&
-            !neighborhood.match(/^(the|this|that|which|excellent|good|great|today|market|property|analysis|listing)$/i) &&
-            !neighborhood.match(/^\d+/) &&
-            !neighborhood.match(/^(and|or|but|with|for|from|very|quite|really)$/i)) {
-          
-          const score = calculateMatchScore(match, 'neighborhood');
-          if (score > bestNeighborhoodScore) {
-            bestNeighborhood = neighborhood;
-            bestNeighborhoodScore = score;
-          }
-        }
-      }
-    }
-  }
-  
-  if (bestNeighborhood) {
-    analysis.extractedData.neighborhood = bestNeighborhood;
-    console.log(`✅ Extracted neighborhood:`, bestNeighborhood);
-  } else {
-    console.log(`❌ Failed to extract neighborhood`);
-  }
-  
-  // Comprehensive section extraction with multiple strategies
-  const sectionExtractors = {
-    pros: {
-      keywords: ['pros', 'advantages', 'positives', 'strengths', 'benefits', 'good', 'excellent', 'great'],
-      patterns: [
-        /(?:\*\*\s*)?(?:pros?|advantages?|positives?|strengths?|benefits?|good\s*points?|excellent\s*features?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|market|investment|red\s*flags?|neighborhood|location|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:pros?|advantages?|positives?|strengths?|benefits?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:positive\s*aspects?|good\s*features?|advantages?)[:\s]*([^]*?)(?=\n\s*(?:negative|cons?|disadvantages?)|$)/gi
-      ]
-    },
-    cons: {
-      keywords: ['cons', 'disadvantages', 'negatives', 'concerns', 'weaknesses', 'drawbacks', 'issues'],
-      patterns: [
-        /(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|concerns?|weaknesses?|drawbacks?|issues?|problems?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|advantages?|market|investment|red\s*flags?|neighborhood|location|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|concerns?|weaknesses?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:negative\s*aspects?|concerns?|issues?)[:\s]*([^]*?)(?=\n\s*(?:positive|pros?|advantages?)|$)/gi
-      ]
-    },
-    marketAnalysis: {
-      keywords: ['market analysis', 'market assessment', 'price evaluation', 'market', 'pricing', 'value'],
-      patterns: [
-        /(?:\*\*\s*)?(?:market\s*analysis|market\s*assessment|price\s*evaluation|market\s*value|pricing\s*analysis)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|investment|red\s*flags?|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:market|pricing|value)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:price\s*(?:is|seems|appears)|market\s*(?:suggests|indicates|shows))[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
-      ]
-    },
-    investmentPotential: {
-      keywords: ['investment potential', 'investment analysis', 'investment', 'roi', 'return'],
-      patterns: [
-        /(?:\*\*\s*)?(?:investment\s*potential|investment\s*analysis|investment\s*outlook|roi|return\s*on\s*investment)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|red\s*flags?|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:investment|roi)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:as\s*an\s*investment|investment\s*wise|good\s*investment)[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
-      ]
-    },
-    redFlags: {
-      keywords: ['red flags', 'concerns', 'warnings', 'issues', 'problems', 'caution'],
-      patterns: [
-        /(?:\*\*\s*)?(?:red\s*flags?|concerns?|warnings?|issues?|problems?|cautions?|potential\s*issues?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|investment|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:red\s*flags?|warnings?|concerns?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:be\s*(?:careful|cautious|aware)\s*(?:of|about)|watch\s*out\s*for)[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
-      ]
-    },
-    neighborhood: {
-      keywords: ['neighborhood', 'location', 'area', 'community', 'district'],
-      patterns: [
-        /(?:\*\*\s*)?(?:neighborhood|location|area\s*analysis|community|district)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|investment|red\s*flags?|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
-        /(?:\*\*\s*)?(?:neighborhood|location|area)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
-        /(?:the\s*(?:neighborhood|area|location)\s*(?:is|has|offers))[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
-      ]
-    }
-  };
-  
-  // Enhanced section extraction function
-  function extractSectionContent(extractor, text) {
-    let bestMatch = null;
-    let bestScore = 0;
+  // Enhanced neighborhood extraction (only if not already extracted from structured sections)
+  if (!analysis.extractedData.neighborhood) {
+    const neighborhoodPatterns = [
+      /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/gi,
+      /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/gi,
+      /(?:in|near)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/gi,
+      /(?:community|subdivision)[:\s]*([^.\n,]+)/gi
+    ];
     
-    for (const pattern of extractor.patterns) {
-      pattern.lastIndex = 0; // Reset regex
+    let bestNeighborhood = null;
+    let bestNeighborhoodScore = 0;
+    
+    for (const pattern of neighborhoodPatterns) {
+      pattern.lastIndex = 0;
       let match;
-      while ((match = pattern.exec(text)) !== null) {
-        if (match[1] && match[1].trim()) {
-          let content = cleanSectionContent(match[1].trim());
-          if (content.length > 20) { // Minimum meaningful content length
-            const score = calculateSectionScore(match, content, extractor.keywords);
-            if (score > bestScore) {
-              bestMatch = content;
-              bestScore = score;
+      while ((match = pattern.exec(responseText)) !== null) {
+        if (match[1]) {
+          let neighborhood = match[1].trim();
+          // Enhanced validation
+          if (neighborhood.length > 3 && neighborhood.length < 100 &&
+              !neighborhood.match(/^(the|this|that|which|excellent|good|great|today|market|property|analysis|listing)$/i) &&
+              !neighborhood.match(/^\d+/) &&
+              !neighborhood.match(/^(and|or|but|with|for|from|very|quite|really)$/i)) {
+            
+            const score = calculateMatchScore(match, 'neighborhood');
+            if (score > bestNeighborhoodScore) {
+              bestNeighborhood = neighborhood;
+              bestNeighborhoodScore = score;
             }
           }
         }
       }
     }
     
-    return bestMatch;
-  }
-  
-  // Enhanced content cleaning function
-  function cleanSectionContent(content) {
-    return content
-      .replace(/^\*\*.*?\*\*\s*/gm, '') // Remove markdown headers
-      .replace(/^#+\s*/gm, '') // Remove markdown headers
-      .replace(/^[•\-\*\+]\s*/gm, '') // Remove bullet points
-      .replace(/^\d+\.\s*/gm, '') // Remove numbered lists
-      .replace(/\n+/g, ' ') // Replace newlines with spaces
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/^[:\s\-\•]+/, '') // Remove leading punctuation and spaces
-      .replace(/[:\s\-\•]+$/, '') // Remove trailing punctuation and spaces
-      .trim();
-  }
-  
-  // Function to score section matches
-  function calculateSectionScore(match, content, keywords) {
-    let score = content.length / 100; // Base score on content length
-    
-    // Boost score for keyword density
-    const contentLower = content.toLowerCase();
-    for (const keyword of keywords) {
-      if (contentLower.includes(keyword.toLowerCase())) {
-        score += 2;
-      }
-    }
-    
-    // Boost score for structured content (lists, multiple sentences)
-    if (content.includes('.') && content.split('.').length > 2) {
-      score += 1;
-    }
-    
-    // Penalize very short content
-    if (content.length < 50) {
-      score *= 0.5;
-    }
-    
-    return score;
-  }
-  
-  // Extract all sections
-  for (const [sectionName, extractor] of Object.entries(sectionExtractors)) {
-    const content = extractSectionContent(extractor, responseText);
-    if (content) {
-      analysis.extractedData[sectionName] = content.substring(0, 1000); // Increased limit
-      console.log(`✅ Extracted ${sectionName} (${content.length} chars):`, content.substring(0, 150) + '...');
+    if (bestNeighborhood) {
+      analysis.extractedData.neighborhood = bestNeighborhood;
+      console.log(`✅ Extracted neighborhood:`, bestNeighborhood);
     } else {
-      console.log(`❌ Failed to extract ${sectionName}`);
-      
-      // Fallback: try to find any mention of the keywords
-      for (const keyword of extractor.keywords) {
-        const fallbackPattern = new RegExp(`(.*${keyword}.*)`, 'gi');
-        const fallbackMatch = responseText.match(fallbackPattern);
-        if (fallbackMatch && fallbackMatch[0] && fallbackMatch[0].length > 30) {
-          const fallbackContent = cleanSectionContent(fallbackMatch[0]);
-          if (fallbackContent.length > 20) {
-            analysis.extractedData[sectionName] = fallbackContent.substring(0, 500);
-            console.log(`🔄 Fallback extracted ${sectionName}:`, fallbackContent.substring(0, 100) + '...');
-            break;
-          }
-        }
-      }
+      console.log(`❌ Failed to extract neighborhood`);
     }
   }
   
@@ -404,7 +484,10 @@ function extractPropertyAnalysisData(responseText) {
                          analysis.extractedData.cons ||
                          analysis.extractedData.marketAnalysis ||
                          analysis.extractedData.investmentPotential ||
-                         analysis.extractedData.redFlags;
+                         analysis.extractedData.redFlags ||
+                         analysis.extractedData.locationScore ||
+                         analysis.extractedData.estimatedRentalIncome ||
+                         analysis.extractedData.rentalGrowthPotential;
   
   if (!hasPropertyData) {
     console.log('⚠️ No meaningful data extracted from response');
@@ -415,7 +498,6 @@ function extractPropertyAnalysisData(responseText) {
   }
   
   console.log('✅ Successfully extracted meaningful property analysis data');
-  
   console.log('✅ Meaningful property data found, analysis ready for save');
   return analysis;
 }
@@ -914,13 +996,58 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       () => chrome.storage.local.get(['customPrompt']),
       { customPrompt: null }
     );
-    const promptTemplate = result.customPrompt || `Analyze this property for investment potential. Provide:
+    const promptTemplate = result.customPrompt || `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
-• Price analysis & investment metrics
-• Neighborhood & market overview  
-• Rental income potential
-• Key pros & cons
-• Investment recommendation
+**REQUIRED DATA EXTRACTION:**
+1. **Price**: Exact asking price (include currency symbol)
+2. **Bedrooms**: Number of bedrooms (numeric)
+3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
+4. **Square Footage**: Total square footage (numeric)
+5. **Year Built**: Construction year (4-digit year)
+6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
+7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
+8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections:
+
+**PROPERTY DETAILS:**
+- List all the required data points above in a clear format
+- Include any additional relevant specifications (lot size, parking, etc.)
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Provide your location score (X/10) with detailed justification
+- Analyze proximity to schools, shopping, transportation, employment centers
+- Assess neighborhood safety, walkability, and future development plans
+- Comment on property taxes, HOA fees, and local regulations
+
+**RENTAL INCOME ANALYSIS:**
+- Provide your estimated monthly rental income with reasoning
+- Compare to local rental comps if possible
+- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
+  * Population growth trends
+  * Economic development in the area
+  * New construction and inventory levels
+  * Employment opportunities and job market
+  * Infrastructure improvements planned
+
+**INVESTMENT SUMMARY:**
+- Overall investment grade and reasoning
+- Top 3 advantages (pros)
+- Top 3 concerns or limitations (cons)
+- Any red flags or warning signs
+- Price comparison to market value
+- Recommendation for this property as a rental investment
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format
+- Categorize rental growth potential clearly
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
 
 Property Link: {PROPERTY_URL}`;
 
