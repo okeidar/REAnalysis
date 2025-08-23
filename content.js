@@ -17,7 +17,8 @@ function isChatGPTSite() {
 function extractPropertyAnalysisData(responseText) {
   if (!responseText || typeof responseText !== 'string') return null;
   
-  console.log('Extracting property analysis from response (first 200 chars):', responseText.substring(0, 200));
+  console.log('🔍 Starting comprehensive property data extraction...');
+  console.log('📝 Response length:', responseText.length, 'characters');
   
   const analysis = {
     fullResponse: responseText,
@@ -25,198 +26,369 @@ function extractPropertyAnalysisData(responseText) {
     timestamp: Date.now()
   };
   
-  // Helper function to extract year built with fallback methods
-  function extractYearBuilt(text) {
-    const patterns = [
-      /(?:built|constructed|year)[:\s]*(\d{4})/i,
-      /(\d{4})\s*(?:built|construction)/i,
-      /built\s*in\s*(\d{4})/i,
-      /was\s*built\s*in\s*(\d{4})/i
-    ];
+  // Enhanced extraction with multiple strategies for each data type
+  const extractors = {
+    // Price extraction with comprehensive patterns
+    price: {
+      patterns: [
+        /(?:price|cost|asking|listed|sale|selling|priced)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)/g,
+        /(?:for|at|around)\s*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi
+      ],
+      validator: (value) => {
+        const num = parseFloat(value.replace(/,/g, ''));
+        return num >= 10000 && num <= 50000000; // Reasonable price range
+      }
+    },
     
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        const year = parseInt(match[1]);
-        if (year >= 1800 && year <= new Date().getFullYear()) {
-          return match[1];
-        }
+    // Bedroom extraction
+    bedrooms: {
+      patterns: [
+        /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
+        /(?:bed(?:room)?s?|br)[:\s]*(\d+)/gi,
+        /(\d+)\s*(?:bedroom|bed)/gi
+      ],
+      validator: (value) => {
+        const num = parseInt(value);
+        return num >= 0 && num <= 20;
+      }
+    },
+    
+    // Bathroom extraction
+    bathrooms: {
+      patterns: [
+        /(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b)/gi,
+        /(?:bath(?:room)?s?|ba)[:\s]*(\d+(?:\.\d+)?)/gi,
+        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi
+      ],
+      validator: (value) => {
+        const num = parseFloat(value);
+        return num >= 0 && num <= 20;
+      }
+    },
+    
+    // Square feet extraction  
+    squareFeet: {
+      patterns: [
+        /([\d,]+)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi,
+        /(?:size|area)[:\s]*([\d,]+)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi,
+        /([\d,]+)\s*(?:sf|sq\.ft\.)/gi
+      ],
+      validator: (value) => {
+        const num = parseInt(value.replace(/,/g, ''));
+        return num >= 100 && num <= 50000;
+      }
+    },
+    
+    // Year built extraction
+    yearBuilt: {
+      patterns: [
+        /(?:built|constructed|year)[:\s]*(\d{4})/gi,
+        /(\d{4})\s*(?:built|construction)/gi,
+        /(?:built|constructed)\s*(?:in\s*)?(\d{4})/gi,
+        /(?:year|date)[:\s]*(\d{4})/gi
+      ],
+      validator: (value) => {
+        const year = parseInt(value);
+        return year >= 1800 && year <= new Date().getFullYear();
+      }
+    },
+    
+    // Property type extraction
+    propertyType: {
+      patterns: [
+        /(?:property\s*type|type)[:\s]*([^.\n,]+)/gi,
+        /(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi,
+        /(?:this|the)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi
+      ],
+      validator: (value) => value && value.length > 2 && value.length < 50
+    },
+    
+    // Lot size extraction
+    lotSize: {
+      patterns: [
+        /(?:lot|land)[:\s]*([\d.,]+)\s*(?:acres?|sq\.?\s*ft\.?|sqft)/gi,
+        /([\d.,]+)\s*(?:acre|acres)\s*lot/gi
+      ],
+      validator: (value) => {
+        const num = parseFloat(value.replace(/,/g, ''));
+        return num > 0 && num < 1000;
       }
     }
-    return null;
-  }
-  
-  // Helper function to extract neighborhood with better context
-  function extractNeighborhood(text) {
-    const patterns = [
-      /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/i,
-      /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/i,
-      /(?:in)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/i
-    ];
-    
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        let neighborhood = match[1].trim();
-        // Clean up common false matches
-        if (neighborhood.length > 3 && 
-            !neighborhood.match(/^(the|this|that|which|excellent|good|great|today|market)$/i) &&
-            !neighborhood.match(/^\d+/)) {
-          return neighborhood;
-        }
-      }
-    }
-    return null;
-  }
-  
-  // Improved regex patterns to handle various formats
-  const patterns = {
-    // Price patterns - handle various formats
-    price: /(?:price|cost|asking|listed|for|at)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
-    
-    // Bedroom patterns - handle "3 bed", "3-bedroom", "3 bedrooms", etc.
-    bedrooms: /(?:(\d+)[\s-]*(?:bed(?:room)?s?|br\b))|(?:(?:bed(?:room)?s?|br)[:\s]*(\d+))/i,
-    
-    // Bathroom patterns - similar flexibility
-    bathrooms: /(?:(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b))|(?:(?:bath(?:room)?s?|ba)[:\s]*(\d+(?:\.\d+)?))/i,
-    
-    // Square feet patterns - handle "sqft", "sq ft", "square feet", etc.
-    squareFeet: /(?:(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft))|(?:(?:size|spans)[:\s]*(\d{1,3}(?:,\d{3})*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft))/i,
-    
-    // Lot size patterns
-    lotSize: /(?:lot|land)[:\s]*(\d+(?:\.\d+)?)\s*(?:acres?|sq\.?\s*ft\.?)/i,
-    
-    // Property type patterns - more flexible
-    propertyType: /(?:property\s*type|type)[:\s]*([^.\n,]+)|(?:(single\s*family|condo|townhouse|apartment|duplex|house|home))/i
   };
   
-  // Extract structured data with improved matching
-  for (const [key, pattern] of Object.entries(patterns)) {
-    const match = responseText.match(pattern);
-    if (match) {
-      // Handle multiple capture groups - take the first non-empty one
-      let value = '';
-      for (let i = 1; i < match.length; i++) {
-        if (match[i] && match[i].trim()) {
-          value = match[i].trim();
-          break;
+  // Extract data using multiple patterns per field
+  for (const [fieldName, extractor] of Object.entries(extractors)) {
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const pattern of extractor.patterns) {
+      pattern.lastIndex = 0; // Reset regex
+      let match;
+      while ((match = pattern.exec(responseText)) !== null) {
+        for (let i = 1; i < match.length; i++) {
+          if (match[i] && match[i].trim()) {
+            const value = match[i].trim();
+            if (extractor.validator(value)) {
+              const score = calculateMatchScore(match, fieldName);
+              if (score > bestScore) {
+                bestMatch = value;
+                bestScore = score;
+              }
+            }
+          }
         }
       }
-      
-      if (value) {
-        analysis.extractedData[key] = value;
-        console.log(`✅ Extracted ${key}:`, value);
-      }
+    }
+    
+    if (bestMatch) {
+      analysis.extractedData[fieldName] = bestMatch;
+      console.log(`✅ Extracted ${fieldName}:`, bestMatch);
     } else {
-      console.log(`❌ Failed to extract ${key} with regex`);
+      console.log(`❌ Failed to extract ${fieldName}`);
     }
   }
   
-  // Use helper functions for complex extractions
-  const yearBuilt = extractYearBuilt(responseText);
-  if (yearBuilt) {
-    analysis.extractedData.yearBuilt = yearBuilt;
-    console.log(`✅ Extracted yearBuilt:`, yearBuilt);
-  } else {
-    console.log(`❌ Failed to extract yearBuilt`);
+  // Helper function to score matches based on context
+  function calculateMatchScore(match, fieldName) {
+    let score = 1;
+    const context = match.input.substring(Math.max(0, match.index - 50), match.index + match[0].length + 50).toLowerCase();
+    
+    // Boost score for relevant context keywords
+    const contextBoosts = {
+      price: ['listing', 'asking', 'sale', 'cost', 'priced'],
+      bedrooms: ['bedroom', 'room', 'bed'],
+      bathrooms: ['bathroom', 'bath', 'full', 'half'],
+      squareFeet: ['square', 'footage', 'size', 'area'],
+      yearBuilt: ['built', 'constructed', 'year', 'age'],
+      propertyType: ['property', 'type', 'style'],
+      lotSize: ['lot', 'land', 'acre']
+    };
+    
+    const boosts = contextBoosts[fieldName] || [];
+    for (const boost of boosts) {
+      if (context.includes(boost)) {
+        score += 0.5;
+      }
+    }
+    
+    return score;
   }
   
-  const neighborhood = extractNeighborhood(responseText);
-  if (neighborhood) {
-    analysis.extractedData.neighborhood = neighborhood;
-    console.log(`✅ Extracted neighborhood:`, neighborhood);
+  // Enhanced neighborhood extraction
+  const neighborhoodPatterns = [
+    /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/gi,
+    /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/gi,
+    /(?:in|near)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/gi,
+    /(?:community|subdivision)[:\s]*([^.\n,]+)/gi
+  ];
+  
+  let bestNeighborhood = null;
+  let bestNeighborhoodScore = 0;
+  
+  for (const pattern of neighborhoodPatterns) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(responseText)) !== null) {
+      if (match[1]) {
+        let neighborhood = match[1].trim();
+        // Enhanced validation
+        if (neighborhood.length > 3 && neighborhood.length < 100 &&
+            !neighborhood.match(/^(the|this|that|which|excellent|good|great|today|market|property|analysis|listing)$/i) &&
+            !neighborhood.match(/^\d+/) &&
+            !neighborhood.match(/^(and|or|but|with|for|from|very|quite|really)$/i)) {
+          
+          const score = calculateMatchScore(match, 'neighborhood');
+          if (score > bestNeighborhoodScore) {
+            bestNeighborhood = neighborhood;
+            bestNeighborhoodScore = score;
+          }
+        }
+      }
+    }
+  }
+  
+  if (bestNeighborhood) {
+    analysis.extractedData.neighborhood = bestNeighborhood;
+    console.log(`✅ Extracted neighborhood:`, bestNeighborhood);
   } else {
     console.log(`❌ Failed to extract neighborhood`);
   }
   
-  // Improved section extraction with multiple strategies
-  function extractSection(sectionName, keywords, text) {
-    // Strategy 1: Look for section headers
-    for (const keyword of keywords) {
-      const headerPattern = new RegExp(`\\*\\*\\s*${keyword}\\s*:?\\*\\*\\s*([^]*?)(?=\\*\\*|$)`, 'i');
-      const match = text.match(headerPattern);
-      if (match && match[1]) {
-        let content = match[1].trim();
-        content = cleanSectionContent(content);
-        if (content.length > 10) {
-          return content;
+  // Comprehensive section extraction with multiple strategies
+  const sectionExtractors = {
+    pros: {
+      keywords: ['pros', 'advantages', 'positives', 'strengths', 'benefits', 'good', 'excellent', 'great'],
+      patterns: [
+        /(?:\*\*\s*)?(?:pros?|advantages?|positives?|strengths?|benefits?|good\s*points?|excellent\s*features?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|market|investment|red\s*flags?|neighborhood|location|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:pros?|advantages?|positives?|strengths?|benefits?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:positive\s*aspects?|good\s*features?|advantages?)[:\s]*([^]*?)(?=\n\s*(?:negative|cons?|disadvantages?)|$)/gi
+      ]
+    },
+    cons: {
+      keywords: ['cons', 'disadvantages', 'negatives', 'concerns', 'weaknesses', 'drawbacks', 'issues'],
+      patterns: [
+        /(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|concerns?|weaknesses?|drawbacks?|issues?|problems?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|advantages?|market|investment|red\s*flags?|neighborhood|location|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:cons?|disadvantages?|negatives?|concerns?|weaknesses?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:negative\s*aspects?|concerns?|issues?)[:\s]*([^]*?)(?=\n\s*(?:positive|pros?|advantages?)|$)/gi
+      ]
+    },
+    marketAnalysis: {
+      keywords: ['market analysis', 'market assessment', 'price evaluation', 'market', 'pricing', 'value'],
+      patterns: [
+        /(?:\*\*\s*)?(?:market\s*analysis|market\s*assessment|price\s*evaluation|market\s*value|pricing\s*analysis)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|investment|red\s*flags?|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:market|pricing|value)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:price\s*(?:is|seems|appears)|market\s*(?:suggests|indicates|shows))[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
+      ]
+    },
+    investmentPotential: {
+      keywords: ['investment potential', 'investment analysis', 'investment', 'roi', 'return'],
+      patterns: [
+        /(?:\*\*\s*)?(?:investment\s*potential|investment\s*analysis|investment\s*outlook|roi|return\s*on\s*investment)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|red\s*flags?|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:investment|roi)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:as\s*an\s*investment|investment\s*wise|good\s*investment)[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
+      ]
+    },
+    redFlags: {
+      keywords: ['red flags', 'concerns', 'warnings', 'issues', 'problems', 'caution'],
+      patterns: [
+        /(?:\*\*\s*)?(?:red\s*flags?|concerns?|warnings?|issues?|problems?|cautions?|potential\s*issues?)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|investment|neighborhood|location|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:red\s*flags?|warnings?|concerns?)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:be\s*(?:careful|cautious|aware)\s*(?:of|about)|watch\s*out\s*for)[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
+      ]
+    },
+    neighborhood: {
+      keywords: ['neighborhood', 'location', 'area', 'community', 'district'],
+      patterns: [
+        /(?:\*\*\s*)?(?:neighborhood|location|area\s*analysis|community|district)[:\s]*(?:\*\*\s*)?\n?([^]*?)(?=\n\s*(?:\*\*\s*)?(?:pros?|cons?|market|investment|red\s*flags?|price|conclusion)[:\s]*(?:\*\*\s*)?|$)/gi,
+        /(?:\*\*\s*)?(?:neighborhood|location|area)[:\s]*(?:\*\*\s*)?([^]*?)(?=\n\n|\*\*|$)/gi,
+        /(?:the\s*(?:neighborhood|area|location)\s*(?:is|has|offers))[:\s]*([^]*?)(?=\n\s*\*\*|$)/gi
+      ]
+    }
+  };
+  
+  // Enhanced section extraction function
+  function extractSectionContent(extractor, text) {
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const pattern of extractor.patterns) {
+      pattern.lastIndex = 0; // Reset regex
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        if (match[1] && match[1].trim()) {
+          let content = cleanSectionContent(match[1].trim());
+          if (content.length > 20) { // Minimum meaningful content length
+            const score = calculateSectionScore(match, content, extractor.keywords);
+            if (score > bestScore) {
+              bestMatch = content;
+              bestScore = score;
+            }
+          }
         }
       }
     }
     
-    // Strategy 2: Look for bullet point sections
-    for (const keyword of keywords) {
-      const bulletPattern = new RegExp(`${keyword}\\s*:?\\s*\\n([^]*?)(?=\\n\\s*(?:cons?|pros?|advantages?|disadvantages?|market|investment|red flags?)\\s*:|\\n\\n|$)`, 'i');
-      const match = text.match(bulletPattern);
-      if (match && match[1]) {
-        let content = match[1].trim();
-        content = cleanSectionContent(content);
-        if (content.length > 10) {
-          return content;
-        }
-      }
-    }
-    
-    // Strategy 3: Look for inline mentions
-    for (const keyword of keywords) {
-      const inlinePattern = new RegExp(`(?:${keyword})\\s*(?:include|are)?:?\\s*([^.]*(?:\\.[^.]*){0,2})`, 'i');
-      const match = text.match(inlinePattern);
-      if (match && match[1]) {
-        let content = match[1].trim();
-        content = cleanSectionContent(content);
-        if (content.length > 20) {
-          return content;
-        }
-      }
-    }
-    
-    return null;
+    return bestMatch;
   }
   
+  // Enhanced content cleaning function
   function cleanSectionContent(content) {
     return content
       .replace(/^\*\*.*?\*\*\s*/gm, '') // Remove markdown headers
-      .replace(/^[•\-\*]\s*/gm, '') // Remove bullet points
+      .replace(/^#+\s*/gm, '') // Remove markdown headers
+      .replace(/^[•\-\*\+]\s*/gm, '') // Remove bullet points
+      .replace(/^\d+\.\s*/gm, '') // Remove numbered lists
       .replace(/\n+/g, ' ') // Replace newlines with spaces
       .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/^[:\s]+/, '') // Remove leading colons and spaces
+      .replace(/^[:\s\-\•]+/, '') // Remove leading punctuation and spaces
+      .replace(/[:\s\-\•]+$/, '') // Remove trailing punctuation and spaces
       .trim();
   }
   
-  // Extract sections using improved logic
-  const sections = {
-    pros: ['pros', 'advantages', 'positives', 'strengths', 'benefits'],
-    cons: ['cons', 'disadvantages', 'negatives', 'concerns', 'weaknesses', 'drawbacks'],
-    marketAnalysis: ['market analysis', 'market assessment', 'price evaluation', 'market'],
-    investmentPotential: ['investment potential', 'investment analysis', 'investment'],
-    redFlags: ['red flags', 'concerns', 'warnings', 'issues', 'problems']
-  };
+  // Function to score section matches
+  function calculateSectionScore(match, content, keywords) {
+    let score = content.length / 100; // Base score on content length
+    
+    // Boost score for keyword density
+    const contentLower = content.toLowerCase();
+    for (const keyword of keywords) {
+      if (contentLower.includes(keyword.toLowerCase())) {
+        score += 2;
+      }
+    }
+    
+    // Boost score for structured content (lists, multiple sentences)
+    if (content.includes('.') && content.split('.').length > 2) {
+      score += 1;
+    }
+    
+    // Penalize very short content
+    if (content.length < 50) {
+      score *= 0.5;
+    }
+    
+    return score;
+  }
   
-  for (const [key, keywords] of Object.entries(sections)) {
-    const content = extractSection(key, keywords, responseText);
+  // Extract all sections
+  for (const [sectionName, extractor] of Object.entries(sectionExtractors)) {
+    const content = extractSectionContent(extractor, responseText);
     if (content) {
-      analysis.extractedData[key] = content.substring(0, 500); // Limit length
-      console.log(`✅ Extracted ${key} (${content.length} chars):`, content.substring(0, 100) + '...');
+      analysis.extractedData[sectionName] = content.substring(0, 1000); // Increased limit
+      console.log(`✅ Extracted ${sectionName} (${content.length} chars):`, content.substring(0, 150) + '...');
     } else {
-      console.log(`❌ Failed to extract ${key}`);
+      console.log(`❌ Failed to extract ${sectionName}`);
+      
+      // Fallback: try to find any mention of the keywords
+      for (const keyword of extractor.keywords) {
+        const fallbackPattern = new RegExp(`(.*${keyword}.*)`, 'gi');
+        const fallbackMatch = responseText.match(fallbackPattern);
+        if (fallbackMatch && fallbackMatch[0] && fallbackMatch[0].length > 30) {
+          const fallbackContent = cleanSectionContent(fallbackMatch[0]);
+          if (fallbackContent.length > 20) {
+            analysis.extractedData[sectionName] = fallbackContent.substring(0, 500);
+            console.log(`🔄 Fallback extracted ${sectionName}:`, fallbackContent.substring(0, 100) + '...');
+            break;
+          }
+        }
+      }
     }
   }
   
-  console.log('Final extracted data keys:', Object.keys(analysis.extractedData));
-  console.log('Final extracted data count:', Object.keys(analysis.extractedData).length);
+  console.log('📊 Final extraction summary:');
+  console.log('Keys extracted:', Object.keys(analysis.extractedData));
+  console.log('Total data points:', Object.keys(analysis.extractedData).length);
   
-  // Only return analysis if we extracted meaningful property data
+  // Log details of what was extracted
+  for (const [key, value] of Object.entries(analysis.extractedData)) {
+    console.log(`  ${key}: ${typeof value === 'string' ? value.substring(0, 100) + (value.length > 100 ? '...' : '') : value}`);
+  }
+  
+  // More lenient validation - accept analysis if we have ANY meaningful data
   const hasPropertyData = analysis.extractedData.price || 
                          analysis.extractedData.bedrooms || 
                          analysis.extractedData.bathrooms || 
                          analysis.extractedData.squareFeet ||
                          analysis.extractedData.yearBuilt ||
-                         analysis.extractedData.propertyType;
+                         analysis.extractedData.propertyType ||
+                         analysis.extractedData.neighborhood ||
+                         analysis.extractedData.pros ||
+                         analysis.extractedData.cons ||
+                         analysis.extractedData.marketAnalysis ||
+                         analysis.extractedData.investmentPotential ||
+                         analysis.extractedData.redFlags;
   
   if (!hasPropertyData) {
-    console.log('⚠️ No meaningful property data extracted, skipping save');
-    return null;
+    console.log('⚠️ No meaningful data extracted from response');
+    console.log('📝 Response preview for debugging:', responseText.substring(0, 500));
+    // Still return the analysis with full response for manual review
+    console.log('🔄 Returning analysis with full response for manual review');
+    return analysis;
   }
+  
+  console.log('✅ Successfully extracted meaningful property analysis data');
   
   console.log('✅ Meaningful property data found, analysis ready for save');
   return analysis;
@@ -285,12 +457,16 @@ function setupResponseMonitor() {
           return;
         }
         
-        // More comprehensive property analysis detection
+        // Comprehensive property analysis detection with expanded keywords
         const propertyKeywords = [
           'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
           'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment',
           'pros', 'cons', 'advantages', 'disadvantages', 'real estate',
-          'zillow', 'realtor', 'mls', 'home', 'house', 'condo', 'townhouse'
+          'zillow', 'realtor', 'mls', 'home', 'house', 'condo', 'townhouse',
+          'apartment', 'duplex', 'villa', 'ranch', 'colonial', 'location',
+          'area', 'district', 'community', 'lot', 'land', 'acre', 'value',
+          'asking', 'listed', 'selling', 'sale', 'cost', 'mortgage',
+          'financing', 'schools', 'commute', 'walkable', 'amenities'
         ];
         
         const keywordMatches = propertyKeywords.filter(keyword => 
@@ -299,10 +475,11 @@ function setupResponseMonitor() {
         
         console.log(`Found ${keywordMatches} property keywords in response`);
         
-        // Require at least 3 property-related keywords for a match
-        if (keywordMatches >= 3) {
+        // More lenient keyword matching - require at least 2 property-related keywords
+        if (keywordMatches >= 2) {
           console.log('✅ Detected property analysis response for:', currentPropertyAnalysis.url);
           console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+          console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
           const analysisData = extractPropertyAnalysisData(messageText);
           
           if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
