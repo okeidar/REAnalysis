@@ -402,37 +402,15 @@ function setupResponseMonitor() {
   
   // Function to detect if ChatGPT is still writing (streaming)
   const isResponseStreaming = () => {
-    // Look for streaming indicators in the ChatGPT interface
-    const streamingIndicators = [
-      '.result-streaming',
-      '[class*="streaming"]',
-      '.animate-pulse',
-      '[data-testid*="streaming"]',
-      '.cursor-blink',
-      '.typing-indicator',
-      '[class*="loading"]',
-      '.text-2xl', // Sometimes ChatGPT shows a cursor
-      '[class*="animate"]'
-    ];
+    console.log('🔍 Checking if ChatGPT is still streaming...');
     
-    for (const indicator of streamingIndicators) {
-      const element = document.querySelector(indicator);
-      if (element && element.offsetHeight > 0) { // Make sure element is visible
-        console.log('🔍 Found streaming indicator:', indicator);
-        return true;
-      }
-    }
-    
-    // Check for the stop generation button as an indicator of active streaming
+    // Primary check: Look for the stop generation button
     const stopSelectors = [
-      '[data-testid*="stop"]',
-      'button[aria-label*="stop"]',
-      'button[title*="stop"]',
-      'button[aria-label*="Stop"]',
-      'button[title*="Stop"]',
-      'button:has(svg[data-icon="stop"])',
-      'button:contains("Stop")',
-      '[class*="stop"][class*="button"]'
+      'button[data-testid*="stop"]',
+      'button[aria-label*="stop" i]',
+      'button[title*="stop" i]',
+      'button:has([data-icon="stop"])',
+      '[role="button"][aria-label*="stop" i]'
     ];
     
     for (const selector of stopSelectors) {
@@ -440,30 +418,47 @@ function setupResponseMonitor() {
       if (stopButton && 
           stopButton.offsetHeight > 0 && 
           !stopButton.disabled && 
+          window.getComputedStyle(stopButton).visibility !== 'hidden' &&
           window.getComputedStyle(stopButton).display !== 'none') {
-        console.log('🔍 Found active stop button:', selector);
+        console.log('🔍 Found active stop button:', selector, stopButton);
         return true;
       }
     }
     
-    // Additional check: look for the regenerate button being disabled (indicates streaming)
-    const regenerateButton = document.querySelector('button[aria-label*="regenerate"], button[title*="regenerate"], button:contains("Regenerate")');
-    if (regenerateButton && regenerateButton.disabled) {
-      console.log('🔍 Regenerate button is disabled, likely streaming');
-      return true;
-    }
+    // Secondary check: Look for streaming indicators
+    const streamingIndicators = [
+      '.result-streaming',
+      '[class*="streaming"]',
+      '[class*="loading"]',
+      '.animate-pulse',
+      '[data-testid*="streaming"]'
+    ];
     
-    // Check for cursor or typing indicators in the message area
-    const lastMessage = document.querySelector('[data-message-author-role="assistant"]:last-of-type, .prose:last-of-type');
-    if (lastMessage) {
-      const text = lastMessage.textContent || '';
-      // Look for common streaming indicators like ending mid-sentence or incomplete formatting
-      if (text.endsWith('...') || text.match(/\*\*[^*]*$/) || text.match(/`[^`]*$/)) {
-        console.log('🔍 Message appears incomplete (streaming)');
+    for (const indicator of streamingIndicators) {
+      const element = document.querySelector(indicator);
+      if (element && element.offsetHeight > 0) {
+        console.log('🔍 Found streaming indicator:', indicator, element);
         return true;
       }
     }
     
+    // Check for disabled regenerate button (indicates generation in progress)
+    const regenerateSelectors = [
+      'button[aria-label*="regenerate" i]',
+      'button[title*="regenerate" i]',
+      'button:has([data-icon="refresh"])',
+      'button:has([data-icon="regenerate"])'
+    ];
+    
+    for (const selector of regenerateSelectors) {
+      const regenerateButton = document.querySelector(selector);
+      if (regenerateButton && regenerateButton.disabled && regenerateButton.offsetHeight > 0) {
+        console.log('🔍 Regenerate button is disabled, likely streaming:', regenerateButton);
+        return true;
+      }
+    }
+    
+    console.log('✅ No streaming indicators found - ChatGPT appears to have finished');
     return false;
   };
   
@@ -618,18 +613,66 @@ function setupResponseMonitor() {
           return;
         }
         
+        // Check if response length has changed from previous check
+        const previousBuffer = responseBuffer.get(currentUrl);
+        const currentTime = Date.now();
+        let lengthStable = false;
+        let lastLengthChangeTime = currentTime;
+        
+        if (previousBuffer) {
+          if (previousBuffer.length === messageText.length) {
+            // Length hasn't changed, use the previous length change time
+            lastLengthChangeTime = previousBuffer.lastLengthChange || previousBuffer.lastUpdated;
+            const stableTime = currentTime - lastLengthChangeTime;
+            if (stableTime > 2000) { // Length hasn't changed for 2 seconds
+              lengthStable = true;
+              console.log('📏 Response length stable for', Math.round(stableTime/1000), 'seconds, likely complete');
+            }
+          } else {
+            // Length has changed, update the change time
+            lastLengthChangeTime = currentTime;
+            console.log('📏 Response length changed:', previousBuffer.length, '->', messageText.length);
+          }
+        }
+        
         // Store/update the current response in buffer
-        responseBuffer.set(currentUrl, {
+        const bufferEntry = {
           messageText: messageText,
-          lastUpdated: Date.now(),
-          length: messageText.length
-        });
+          lastUpdated: currentTime,
+          length: messageText.length,
+          lastLengthChange: lastLengthChangeTime,
+          firstSeen: previousBuffer ? previousBuffer.firstSeen : currentTime
+        };
+        responseBuffer.set(currentUrl, bufferEntry);
+        
+        // Fallback: If we've been monitoring this response for more than 30 seconds, process it anyway
+        const monitoringTime = currentTime - bufferEntry.firstSeen;
+        if (monitoringTime > 30000 && messageText.length > 500) {
+          console.log('⏰ Fallback triggered - response has been monitored for 30+ seconds, processing anyway');
+          processCompletedResponse(messageText, currentUrl);
+          return;
+        }
         
         // Check if ChatGPT is still streaming
         const isStreaming = isResponseStreaming();
         console.log('🔄 Is ChatGPT still streaming?', isStreaming);
+        console.log('📏 Response length stable?', lengthStable);
         
-        if (isStreaming) {
+        if (lengthStable || !isStreaming) {
+          console.log('✅ Response appears complete - processing now');
+          console.log('  - Length stable:', lengthStable);
+          console.log('  - Not streaming:', !isStreaming);
+          
+          // Clear any existing timer since we're processing now
+          if (completionTimers.has(currentUrl)) {
+            clearTimeout(completionTimers.get(currentUrl));
+            completionTimers.delete(currentUrl);
+          }
+          
+          // Process immediately
+          processCompletedResponse(messageText, currentUrl);
+          
+        } else if (isStreaming) {
           console.log('⏳ ChatGPT still writing, waiting for completion...');
           
           // Clear any existing completion timer
@@ -637,44 +680,14 @@ function setupResponseMonitor() {
             clearTimeout(completionTimers.get(currentUrl));
           }
           
-          // Set a new completion timer (wait 3 seconds after last change)
+          // Set a shorter completion timer (2 seconds after last change)
           completionTimers.set(currentUrl, setTimeout(() => {
             console.log('⏰ Completion timer triggered - assuming response is complete');
             const bufferedResponse = responseBuffer.get(currentUrl);
             if (bufferedResponse) {
               processCompletedResponse(bufferedResponse.messageText, currentUrl);
             }
-          }, 3000));
-          
-        } else {
-          console.log('✅ ChatGPT appears to have finished writing');
-          
-          // Check if we have a recent change to ensure we got the final content
-          const bufferedResponse = responseBuffer.get(currentUrl);
-          if (bufferedResponse) {
-            const timeSinceLastUpdate = Date.now() - bufferedResponse.lastUpdated;
-            if (timeSinceLastUpdate < 2000) {
-              // Recent change, wait a bit more to ensure completion
-              console.log('⏳ Recent change detected, waiting for final completion...');
-              
-              if (completionTimers.has(currentUrl)) {
-                clearTimeout(completionTimers.get(currentUrl));
-              }
-              
-              completionTimers.set(currentUrl, setTimeout(() => {
-                console.log('🎯 Final completion timer triggered');
-                const finalResponse = responseBuffer.get(currentUrl);
-                if (finalResponse) {
-                  processCompletedResponse(finalResponse.messageText, currentUrl);
-                }
-              }, 2000));
-              
-            } else {
-              // No recent changes and not streaming - process now
-              console.log('🚀 Processing completed response immediately');
-              processCompletedResponse(messageText, currentUrl);
-            }
-          }
+          }, 2000));
         }
       }
       
