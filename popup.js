@@ -294,14 +294,6 @@ function generateAnalysisPreview(analysis) {
   if (!analysis || !analysis.extractedData) return '';
   
   const data = analysis.extractedData;
-  console.log('🔍 Generating preview for analysis data:', {
-    bedrooms: data.bedrooms,
-    bathrooms: data.bathrooms,
-    price: data.price,
-    squareFeet: data.squareFeet,
-    allKeys: Object.keys(data)
-  });
-  
   const preview = [];
   
   if (data.price) preview.push(`💰 ${data.price}`);

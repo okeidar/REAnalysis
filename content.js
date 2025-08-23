@@ -103,9 +103,7 @@ function extractPropertyAnalysisData(responseText) {
       ],
       validator: (value) => {
         const num = parseInt(value);
-        const isValid = num >= 0 && num <= 20;
-        console.log(`🔍 Validating bedroom value "${value}" -> ${num} -> ${isValid ? 'VALID' : 'INVALID'}`);
-        return isValid;
+        return num >= 0 && num <= 20;
       }
     },
     
@@ -205,8 +203,6 @@ function extractPropertyAnalysisData(responseText) {
   
   // Function to extract data from PROPERTY DETAILS section
   function extractFromPropertyDetails(text, analysis) {
-    console.log('🔍 Extracting from Property Details section:', text.substring(0, 200) + '...');
-    
     // Extract specific data points with enhanced patterns
     const patterns = {
       price: [
@@ -244,28 +240,18 @@ function extractPropertyAnalysisData(responseText) {
       if (!analysis.extractedData[key]) { // Only set if not already extracted
         let bestMatch = null;
         
-        console.log(`🔍 Trying to extract ${key} with ${patternArray.length} patterns...`);
-        
         // Try each pattern until we find a match
-        for (let i = 0; i < patternArray.length; i++) {
-          const pattern = patternArray[i];
+        for (const pattern of patternArray) {
           pattern.lastIndex = 0; // Reset regex
           const match = pattern.exec(text);
           
-          console.log(`  Pattern ${i + 1} for ${key}:`, pattern.source);
-          console.log(`  Match result:`, match);
-          
           if (match && match[1]) {
             const value = match[1].trim();
-            console.log(`  Extracted value for ${key}:`, value);
             
             // Validate the extracted value
             if (validateExtractedValue(key, value)) {
               bestMatch = value;
-              console.log(`  ✅ Valid ${key} value:`, value);
               break; // Use the first valid match
-            } else {
-              console.log(`  ❌ Invalid ${key} value:`, value);
             }
           }
         }
@@ -273,8 +259,6 @@ function extractPropertyAnalysisData(responseText) {
         if (bestMatch) {
           analysis.extractedData[key] = bestMatch;
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
-        } else {
-          console.log(`❌ Failed to extract ${key} from Property Details`);
         }
       }
     }
@@ -482,14 +466,6 @@ function extractPropertyAnalysisData(responseText) {
   console.log('📊 Final extraction summary:');
   console.log('Keys extracted:', Object.keys(analysis.extractedData));
   console.log('Total data points:', Object.keys(analysis.extractedData).length);
-  
-  // Enhanced debugging for bedroom and bathroom data
-  console.log('🔍 Bedroom/Bathroom extraction details:', {
-    bedrooms: analysis.extractedData.bedrooms,
-    bathrooms: analysis.extractedData.bathrooms,
-    bedroomsType: typeof analysis.extractedData.bedrooms,
-    bathroomsType: typeof analysis.extractedData.bathrooms
-  });
   
   // Log details of what was extracted
   for (const [key, value] of Object.entries(analysis.extractedData)) {
