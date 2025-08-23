@@ -77,6 +77,22 @@ function extractPropertyAnalysisData(responseText) {
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
   const extractors = {
+    // Street name extraction with enhanced patterns
+    streetName: {
+      patterns: [
+        /(?:street|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|parkway))/gi,
+        /(?:located\s+at|address)[:\s]*([^\n,]+)/gi,
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|parkway|st|ave|rd|dr|ln|blvd|pl|ct|cir|pkwy))/gi,
+        /(?:property\s+address)[:\s]*([^\n,]+)/gi,
+        /(?:listed\s+at)[:\s]*([^\n,]+)/gi
+      ],
+      validator: (value) => {
+        return value && value.length > 5 && value.length < 150 && 
+               /\d/.test(value) && // Should contain at least one number
+               !/^(the|this|that|property|listing)$/i.test(value.trim());
+      }
+    },
+    
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
@@ -157,6 +173,22 @@ function extractPropertyAnalysisData(responseText) {
       validator: (value) => value && value.length > 2 && value.length < 50
     },
     
+    // Neighborhood extraction
+    neighborhood: {
+      patterns: [
+        /(?:neighborhood|area|location|district)[:\s]*([^.\n,]+)/gi,
+        /(?:located\s*in|in\s*the)[:\s]*([^.\n,]+?)(?:\s*neighborhood|\s*area|,|\.|$)/gi,
+        /(?:in|near)\s*([A-Z][a-zA-Z\s]+?)(?:\s*area|\s*neighborhood|,|\.|$)/gi,
+        /(?:community|subdivision)[:\s]*([^.\n,]+)/gi
+      ],
+      validator: (value) => {
+        return value && value.length > 3 && value.length < 100 &&
+               !value.match(/^(the|this|that|which|excellent|good|great|today|market|property|analysis|listing)$/i) &&
+               !value.match(/^\d+/) &&
+               !value.match(/^(and|or|but|with|for|from|very|quite|really)$/i);
+      }
+    },
+    
     // Lot size extraction
     lotSize: {
       patterns: [
@@ -166,6 +198,44 @@ function extractPropertyAnalysisData(responseText) {
       validator: (value) => {
         const num = parseFloat(value.replace(/,/g, ''));
         return num > 0 && num < 1000;
+      }
+    },
+    
+    // Estimated rental income extraction
+    estimatedRentalIncome: {
+      patterns: [
+        /(?:rental\s*income|estimated\s*rent|monthly\s*rent)[:\s]*\$?([\d,]+)/gi,
+        /\$?([\d,]+)\s*(?:per\s*month|monthly|\/month)/gi,
+        /(?:rent\s*for)[:\s]*\$?([\d,]+)/gi
+      ],
+      validator: (value) => {
+        const num = parseFloat(value.replace(/,/g, ''));
+        return num >= 500 && num <= 50000; // Reasonable rent range
+      }
+    },
+    
+    // Location score extraction
+    locationScore: {
+      patterns: [
+        /(\d+)\/10/gi,
+        /(?:location|neighborhood)[^0-9]*(\d+)\s*(?:out\s*of\s*10|\/10)/gi,
+        /(?:score|rating)[:\s]*(\d+)\/10/gi
+      ],
+      validator: (value) => {
+        const num = parseInt(value);
+        return num >= 1 && num <= 10;
+      }
+    },
+    
+    // Rental growth potential extraction
+    rentalGrowthPotential: {
+      patterns: [
+        /(?:rental\s*growth|growth\s*potential)[:\s]*(?:growth:\s*)?(high|strong|moderate|low|limited)/gi,
+        /(?:growth)[:\s]*(high|strong|moderate|low|limited)/gi
+      ],
+      validator: (value) => {
+        const validValues = ['high', 'strong', 'moderate', 'low', 'limited'];
+        return validValues.includes(value.toLowerCase());
       }
     }
   };
@@ -420,6 +490,67 @@ function extractPropertyAnalysisData(responseText) {
     
     return score;
   }
+  
+  // Function to calculate investment metrics
+  function calculateInvestmentMetrics(analysis) {
+    const data = analysis.extractedData;
+    
+    // Parse numeric values
+    const price = parseFloat((data.price || '').replace(/[$,]/g, '')) || 0;
+    const sqft = parseFloat((data.squareFeet || '').replace(/[,]/g, '')) || 0;
+    const monthlyRent = parseFloat((data.estimatedRentalIncome || '').replace(/[$,]/g, '')) || 0;
+    const yearBuilt = parseInt(data.yearBuilt || 0);
+    
+    // Calculate Price per Square Foot
+    if (price > 0 && sqft > 0) {
+      data.pricePerSqFt = Math.round(price / sqft);
+      console.log(`✅ Calculated Price per Sq Ft: $${data.pricePerSqFt}`);
+    }
+    
+    // Calculate Property Age
+    if (yearBuilt > 0) {
+      data.propertyAge = new Date().getFullYear() - yearBuilt;
+      console.log(`✅ Calculated Property Age: ${data.propertyAge} years`);
+    }
+    
+    // Calculate Cap Rate (Annual return percentage)
+    if (monthlyRent > 0 && price > 0) {
+      const annualRent = monthlyRent * 12;
+      data.capRate = ((annualRent / price) * 100).toFixed(2);
+      console.log(`✅ Calculated Cap Rate: ${data.capRate}%`);
+    }
+    
+    // Calculate 1% Rule (Monthly rent to price ratio)
+    if (monthlyRent > 0 && price > 0) {
+      data.onePercentRule = ((monthlyRent / price) * 100).toFixed(2);
+      console.log(`✅ Calculated 1% Rule: ${data.onePercentRule}%`);
+    }
+    
+    // Calculate Gross Rent Multiplier
+    if (monthlyRent > 0 && price > 0) {
+      const annualRent = monthlyRent * 12;
+      data.grossRentMultiplier = (price / annualRent).toFixed(1);
+      console.log(`✅ Calculated Gross Rent Multiplier: ${data.grossRentMultiplier}`);
+    }
+    
+    // Format rental growth potential if extracted
+    if (data.rentalGrowthPotential && !data.rentalGrowthPotential.toLowerCase().startsWith('growth:')) {
+      data.rentalGrowthPotential = `Growth: ${data.rentalGrowthPotential.charAt(0).toUpperCase() + data.rentalGrowthPotential.slice(1)}`;
+    }
+    
+    // Format location score if extracted as number
+    if (data.locationScore && !data.locationScore.includes('/10')) {
+      const score = parseInt(data.locationScore);
+      if (!isNaN(score) && score >= 1 && score <= 10) {
+        data.locationScore = `${score}/10`;
+      }
+    }
+    
+    console.log('📊 Investment metrics calculated successfully');
+  }
+  
+  // Calculate investment metrics based on extracted data
+  calculateInvestmentMetrics(analysis);
   
   // Enhanced neighborhood extraction (only if not already extracted from structured sections)
   if (!analysis.extractedData.neighborhood) {
@@ -963,6 +1094,252 @@ function waitForInputField(maxWait = 10000) {
   });
 }
 
+// Dynamic prompt generation for content script
+async function generateDynamicPromptForContent(columnConfiguration) {
+  try {
+    const DEFAULT_COLUMNS = [
+      // Core Property Information (Default Export Fields - Only these 4 enabled by default)
+      { id: 'streetName', name: 'Street Name', description: 'Property street address', category: 'core', enabled: true, order: 1 },
+      { id: 'price', name: 'Property Price', description: 'Property asking price', category: 'core', enabled: true, order: 2 },
+      { id: 'bedrooms', name: 'Number of Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 3 },
+      { id: 'propertyType', name: 'Type of Property', description: 'House/Apartment classification', category: 'core', enabled: true, order: 4 },
+      
+      // Additional Property Information (Disabled by Default)
+      { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: false, order: 5 },
+      { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: false, order: 6 },
+      { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: false, order: 7 },
+      { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'core', enabled: false, order: 8 },
+      
+      // Financial Analysis (Disabled by Default)
+      { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: false, order: 9 },
+      { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'financial', enabled: false, order: 10 },
+      { id: 'capRate', name: 'Cap Rate', description: 'Annual return percentage', category: 'financial', enabled: false, order: 11 },
+      { id: 'onePercentRule', name: '1% Rule', description: 'Monthly rent to price ratio', category: 'financial', enabled: false, order: 12 },
+      { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price to annual rent ratio', category: 'financial', enabled: false, order: 13 },
+      
+      // Location & Scoring (Disabled by Default)
+      { id: 'locationScore', name: 'Location Score', description: 'Location quality score (X/10)', category: 'scoring', enabled: false, order: 14 },
+      { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Growth potential assessment', category: 'scoring', enabled: false, order: 15 },
+      
+      // Investment Analysis (Disabled by Default)
+      { id: 'pros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 16 },
+      { id: 'cons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 17 },
+      { id: 'redFlags', name: 'Red Flags', description: 'Warning indicators', category: 'analysis', enabled: false, order: 18 },
+      { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment summary', category: 'analysis', enabled: false, order: 19 },
+      { id: 'marketAnalysis', name: 'Market Analysis', description: 'Market assessment', category: 'analysis', enabled: false, order: 20 },
+      
+      // Identification (Disabled by Default)
+      { id: 'address', name: 'Property URL', description: 'Direct link to property', category: 'identification', enabled: false, order: 21 },
+      { id: 'source', name: 'Source', description: 'Website source', category: 'identification', enabled: false, order: 22 },
+      { id: 'analysisDate', name: 'Analysis Date', description: 'Date of analysis', category: 'identification', enabled: false, order: 23 }
+    ];
+    
+    const columnConfig = columnConfiguration || DEFAULT_COLUMNS;
+    
+    // Filter to enabled columns
+    const enabledColumns = columnConfig.filter(col => col.enabled);
+    
+    // Generate prompt sections based on enabled columns
+    const promptSections = [];
+    
+    // Core property details
+    const coreColumns = enabledColumns.filter(col => col.category === 'core');
+    if (coreColumns.length > 0) {
+      promptSections.push(generateCorePropertySectionContent(coreColumns));
+    }
+    
+    // Financial metrics
+    const financialColumns = enabledColumns.filter(col => col.category === 'financial');
+    if (financialColumns.length > 0) {
+      promptSections.push(generateFinancialSectionContent(financialColumns));
+    }
+    
+    // Location and scoring
+    const scoringColumns = enabledColumns.filter(col => col.category === 'scoring');
+    if (scoringColumns.length > 0) {
+      promptSections.push(generateLocationSectionContent(scoringColumns));
+    }
+    
+    // Analysis data
+    const analysisColumns = enabledColumns.filter(col => col.category === 'analysis');
+    if (analysisColumns.length > 0) {
+      promptSections.push(generateAnalysisSectionContent(analysisColumns));
+    }
+    
+    // Custom columns
+    const customColumns = enabledColumns.filter(col => col.isCustom);
+    if (customColumns.length > 0) {
+      promptSections.push(generateCustomColumnsSectionContent(customColumns));
+    }
+    
+    // Combine sections into final prompt
+    return combinePromptSectionsContent(promptSections);
+  } catch (error) {
+    console.error('Error generating dynamic prompt:', error);
+    return getDefaultPrompt();
+  }
+}
+
+function generateCorePropertySectionContent(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'streetName':
+        dataPoints.push('**Street Name**: Property street address (e.g., "123 Main Street")');
+        break;
+      case 'price':
+        dataPoints.push('**Property Price**: Exact asking price (include currency symbol)');
+        break;
+      case 'bedrooms':
+        dataPoints.push('**Number of Bedrooms**: Number of bedrooms (numeric)');
+        break;
+      case 'bathrooms':
+        dataPoints.push('**Bathrooms**: Number of bathrooms (numeric, include half baths as .5)');
+        break;
+      case 'squareFeet':
+        dataPoints.push('**Square Footage**: Total square footage (numeric)');
+        break;
+      case 'yearBuilt':
+        dataPoints.push('**Year Built**: Construction year (4-digit year)');
+        break;
+      case 'propertyType':
+        dataPoints.push('**Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)');
+        break;
+      case 'neighborhood':
+        dataPoints.push('**Neighborhood**: Property location/neighborhood name');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**REQUIRED DATA EXTRACTION:**\n${dataPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}` : '';
+}
+
+function generateFinancialSectionContent(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'estimatedRentalIncome':
+        dataPoints.push('**Estimated Monthly Rental Income**: Your professional estimate based on local market rates');
+        break;
+      case 'pricePerSqFt':
+        dataPoints.push('**Price per Square Foot**: Calculated value for investment analysis');
+        break;
+      case 'capRate':
+        dataPoints.push('**Cap Rate**: Annual return percentage based on rental income');
+        break;
+      case 'onePercentRule':
+        dataPoints.push('**1% Rule Assessment**: Monthly rent to price ratio for quick investment evaluation');
+        break;
+      case 'grossRentMultiplier':
+        dataPoints.push('**Gross Rent Multiplier**: Price to annual rent ratio for comparison');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**FINANCIAL ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateLocationSectionContent(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'locationScore':
+        dataPoints.push('**Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation');
+        break;
+      case 'rentalGrowthPotential':
+        dataPoints.push('**Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**LOCATION & MARKET ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateAnalysisSectionContent(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'pros':
+        dataPoints.push('**Top 3 Advantages**: Key property advantages for investment');
+        break;
+      case 'cons':
+        dataPoints.push('**Top 3 Cons**: Main property limitations or concerns');
+        break;
+      case 'redFlags':
+        dataPoints.push('**Red Flags**: Any warning signs or risk indicators');
+        break;
+      case 'investmentPotential':
+        dataPoints.push('**Investment Potential**: Overall investment grade and reasoning');
+        break;
+      case 'marketAnalysis':
+        dataPoints.push('**Market Analysis**: Detailed market assessment and trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**INVESTMENT ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateCustomColumnsSectionContent(customColumns) {
+  const dataPoints = customColumns.map(col => 
+    `**${col.name}**: ${col.description || 'Custom data point'}`
+  );
+  
+  return dataPoints.length > 0 ? `**CUSTOM DATA POINTS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function combinePromptSectionsContent(sections) {
+  const validSections = sections.filter(section => section.length > 0);
+  
+  if (validSections.length === 0) {
+    return getDefaultPrompt();
+  }
+  
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+${validSections.join('\n\n')}
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections based on the data points requested above.
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format if requested
+- Categorize rental growth potential clearly if requested
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
+
+function getDefaultPrompt() {
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+**REQUIRED DATA EXTRACTION:**
+1. **Street Name**: Property street address (e.g., "123 Main Street")
+2. **Property Price**: Exact asking price (include currency symbol)
+3. **Number of Bedrooms**: Number of bedrooms (numeric)
+4. **Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections based on the data points requested above.
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
+
 // Function to insert text into ChatGPT input
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
@@ -991,65 +1368,26 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Wait for input field to be available
     const inputField = await waitForInputField(5000);
     
-    // Get custom prompt from storage or use default
-    const result = await safeChromeFall(
-      () => chrome.storage.local.get(['customPrompt']),
-      { customPrompt: null }
-    );
-    const promptTemplate = result.customPrompt || `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
-
-**REQUIRED DATA EXTRACTION:**
-1. **Price**: Exact asking price (include currency symbol)
-2. **Bedrooms**: Number of bedrooms (numeric)
-3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
-4. **Square Footage**: Total square footage (numeric)
-5. **Year Built**: Construction year (4-digit year)
-6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
-7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
-8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
-
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections:
-
-**PROPERTY DETAILS:**
-- List all the required data points above in a clear format
-- Include any additional relevant specifications (lot size, parking, etc.)
-
-**LOCATION & NEIGHBORHOOD ANALYSIS:**
-- Provide your location score (X/10) with detailed justification
-- Analyze proximity to schools, shopping, transportation, employment centers
-- Assess neighborhood safety, walkability, and future development plans
-- Comment on property taxes, HOA fees, and local regulations
-
-**RENTAL INCOME ANALYSIS:**
-- Provide your estimated monthly rental income with reasoning
-- Compare to local rental comps if possible
-- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
-  * Population growth trends
-  * Economic development in the area
-  * New construction and inventory levels
-  * Employment opportunities and job market
-  * Infrastructure improvements planned
-
-**INVESTMENT SUMMARY:**
-- Overall investment grade and reasoning
-- Top 3 advantages (pros)
-- Top 3 concerns or limitations (cons)
-- Any red flags or warning signs
-- Price comparison to market value
-- Recommendation for this property as a rental investment
-
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Provide location score in X/10 format
-- Categorize rental growth potential clearly
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
+    // Get dynamic prompt based on column configuration
+    let promptTemplate;
+    try {
+      // Try to get custom prompt first, then generate dynamic prompt based on columns
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customPrompt', 'columnConfiguration']),
+        { customPrompt: null, columnConfiguration: null }
+      );
+      
+      if (result.customPrompt) {
+        // Use custom prompt if available
+        promptTemplate = result.customPrompt;
+      } else {
+        // Generate dynamic prompt based on enabled columns
+        promptTemplate = await generateDynamicPromptForContent(result.columnConfiguration);
+      }
+    } catch (error) {
+      console.error('Error getting prompt configuration:', error);
+      promptTemplate = getDefaultPrompt();
+    }
 
     // Replace variables in the prompt
     const prompt = promptTemplate

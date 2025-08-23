@@ -141,13 +141,47 @@ function setupCollapsibles() {
         if (isExpanded) {
           content.classList.add('hidden');
           collapsible.classList.remove('expanded');
+          if (icon) icon.textContent = '▼';
         } else {
           content.classList.remove('hidden');
           collapsible.classList.add('expanded');
+          if (icon) icon.textContent = '▲';
         }
       });
     }
   });
+  
+  // Add specific handlers for the custom toggle buttons
+  if (togglePromptBtn && promptContent) {
+    togglePromptBtn.addEventListener('click', () => {
+      const isVisible = !promptContent.classList.contains('hidden');
+      promptContent.classList.toggle('hidden');
+      const icon = togglePromptBtn.querySelector('.collapsible-icon');
+      if (icon) icon.textContent = isVisible ? '▼' : '▲';
+    });
+  }
+  
+  if (document.getElementById('toggleColumnsBtn')) {
+    const toggleColumnsBtn = document.getElementById('toggleColumnsBtn');
+    const columnsContent = document.getElementById('columnsContent');
+    toggleColumnsBtn.addEventListener('click', () => {
+      if (columnsContent) {
+        const isVisible = !columnsContent.classList.contains('hidden');
+        columnsContent.classList.toggle('hidden');
+        const icon = toggleColumnsBtn.querySelector('.collapsible-icon');
+        if (icon) icon.textContent = isVisible ? '▼' : '▲';
+      }
+    });
+  }
+  
+  if (toggleCustomColumnBtn && customColumnForm) {
+    toggleCustomColumnBtn.addEventListener('click', () => {
+      const isVisible = !customColumnForm.classList.contains('hidden');
+      customColumnForm.classList.toggle('hidden');
+      const icon = toggleCustomColumnBtn.querySelector('.collapsible-icon');
+      if (icon) icon.textContent = isVisible ? '▼' : '▲';
+    });
+  }
 }
 
 // Helper function to show success message
@@ -296,18 +330,32 @@ function generateAnalysisPreview(analysis) {
   const data = analysis.extractedData;
   const preview = [];
   
-  if (data.price) preview.push(`💰 ${data.price}`);
+  // Core property details
+  if (data.streetName) preview.push(`🏠 ${data.streetName.substring(0, 30)}${data.streetName.length > 30 ? '...' : ''}`);
+  if (data.price) preview.push(`💰 $${data.price}`);
   if (data.bedrooms) preview.push(`🛏️ ${data.bedrooms} bed`);
   if (data.bathrooms) preview.push(`🚿 ${data.bathrooms} bath`);
   if (data.squareFeet) preview.push(`📐 ${data.squareFeet} sq ft`);
+  if (data.propertyType) preview.push(`🏘️ ${data.propertyType}`);
+  
+  // Investment metrics
+  const metricsPreview = [];
+  if (data.capRate) metricsPreview.push(`Cap: ${data.capRate}%`);
+  if (data.onePercentRule) metricsPreview.push(`1% Rule: ${data.onePercentRule}%`);
+  if (data.pricePerSqFt) metricsPreview.push(`$/sqft: $${data.pricePerSqFt}`);
+  if (data.locationScore) metricsPreview.push(`📍 ${data.locationScore}`);
+  if (data.rentalGrowthPotential) metricsPreview.push(`📈 ${data.rentalGrowthPotential}`);
   
   const previewText = preview.join(' • ');
+  const metricsText = metricsPreview.join(' • ');
   
   return previewText ? `
     <div class="analysis-preview">
       <div class="analysis-summary">${previewText}</div>
+      ${metricsText ? `<div class="analysis-metrics" style="color: var(--primary); font-size: var(--font-size-sm); margin-top: var(--space-xs);">${metricsText}</div>` : ''}
       ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
       ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
+      ${data.redFlags ? `<div class="analysis-red-flags" style="color: #dc2626; font-size: var(--font-size-sm);">🚩 ${data.redFlags.substring(0, 60)}${data.redFlags.length > 60 ? '...' : ''}</div>` : ''}
     </div>
   ` : '';
 }
@@ -386,14 +434,46 @@ function showFullAnalysis(propertyItem) {
               border: 1px solid var(--border);
             ">
               <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Property Details</h4>
+              ${data.streetName ? `<div style="margin: var(--space-xs) 0;"><strong>Street Address:</strong> ${data.streetName}</div>` : ''}
               ${data.price ? `<div style="margin: var(--space-xs) 0;"><strong>Price:</strong> $${data.price}</div>` : ''}
               ${data.bedrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
               ${data.bathrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
               ${data.squareFeet ? `<div style="margin: var(--space-xs) 0;"><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
               ${data.yearBuilt ? `<div style="margin: var(--space-xs) 0;"><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
-              ${data.lotSize ? `<div style="margin: var(--space-xs) 0;"><strong>Lot Size:</strong> ${data.lotSize}</div>` : ''}
+              ${data.propertyAge ? `<div style="margin: var(--space-xs) 0;"><strong>Property Age:</strong> ${data.propertyAge} years</div>` : ''}
               ${data.propertyType ? `<div style="margin: var(--space-xs) 0;"><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
               ${data.neighborhood ? `<div style="margin: var(--space-xs) 0;"><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
+            </div>
+          ` : ''}
+          
+          ${(data.estimatedRentalIncome || data.pricePerSqFt || data.capRate || data.onePercentRule || data.grossRentMultiplier) ? `
+            <div class="financial-metrics" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: #f0f9ff;
+              border-radius: var(--radius-sm);
+              border: 1px solid #0ea5e9;
+            ">
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: #0369a1;">💰 Financial Metrics</h4>
+              ${data.estimatedRentalIncome ? `<div style="margin: var(--space-xs) 0;"><strong>Estimated Monthly Rent:</strong> $${data.estimatedRentalIncome}</div>` : ''}
+              ${data.pricePerSqFt ? `<div style="margin: var(--space-xs) 0;"><strong>Price per Sq Ft:</strong> $${data.pricePerSqFt}</div>` : ''}
+              ${data.capRate ? `<div style="margin: var(--space-xs) 0;"><strong>Cap Rate:</strong> ${data.capRate}%</div>` : ''}
+              ${data.onePercentRule ? `<div style="margin: var(--space-xs) 0;"><strong>1% Rule:</strong> ${data.onePercentRule}%</div>` : ''}
+              ${data.grossRentMultiplier ? `<div style="margin: var(--space-xs) 0;"><strong>Gross Rent Multiplier:</strong> ${data.grossRentMultiplier}</div>` : ''}
+            </div>
+          ` : ''}
+          
+          ${(data.locationScore || data.rentalGrowthPotential) ? `
+            <div class="location-analysis" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: #f0fdf4;
+              border-radius: var(--radius-sm);
+              border: 1px solid #22c55e;
+            ">
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: #16a34a;">📍 Location & Growth</h4>
+              ${data.locationScore ? `<div style="margin: var(--space-xs) 0;"><strong>Location Score:</strong> ${data.locationScore}</div>` : ''}
+              ${data.rentalGrowthPotential ? `<div style="margin: var(--space-xs) 0;"><strong>Rental Growth Potential:</strong> ${data.rentalGrowthPotential}</div>` : ''}
             </div>
           ` : ''}
           
@@ -936,11 +1016,16 @@ function toggleDefaultPrompt() {
   }
 }
 
-// Function to get the current prompt (custom or default)
+// Function to get the current prompt (custom or dynamic based on columns)
 async function getCurrentPrompt() {
   try {
     const result = await chrome.storage.local.get(['customPrompt']);
-    return result.customPrompt || DEFAULT_PROMPT;
+    if (result.customPrompt) {
+      return result.customPrompt;
+    } else {
+      // Generate dynamic prompt based on column configuration
+      return await generateDynamicPrompt();
+    }
   } catch (error) {
     console.error('Error getting current prompt:', error);
     return DEFAULT_PROMPT;
@@ -949,46 +1034,232 @@ async function getCurrentPrompt() {
 
 // Default column configuration
 const DEFAULT_COLUMNS = [
-  // Core Property Information
-  { id: 'price', name: 'Price', description: 'Property asking price', category: 'core', enabled: true, order: 1 },
-  { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 2 },
-  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: true, order: 3 },
-  { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: true, order: 4 },
-  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: true, order: 5 },
-  { id: 'propertyType', name: 'Property Type', description: 'Type of property (house, condo, apartment, etc.)', category: 'core', enabled: true, order: 6 },
+  // Core Property Information (Default Export Fields - Only these 4 enabled by default)
+  { id: 'streetName', name: 'Street Name', description: 'Property street address', category: 'core', enabled: true, order: 1 },
+  { id: 'price', name: 'Property Price', description: 'Property asking price', category: 'core', enabled: true, order: 2 },
+  { id: 'bedrooms', name: 'Number of Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 3 },
+  { id: 'propertyType', name: 'Type of Property', description: 'House/Apartment classification', category: 'core', enabled: true, order: 4 },
   
-  // Financial Analysis
-  { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: true, order: 7 },
+  // Additional Property Information (Disabled by Default)
+  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: false, order: 5 },
+  { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: false, order: 6 },
+  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: false, order: 7 },
+  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'core', enabled: false, order: 8 },
   
-  // Location & Scoring
-  { id: 'locationScore', name: 'Location & Neighborhood Scoring', description: 'Location quality score (e.g., 7/10, 2/10)', category: 'scoring', enabled: true, order: 8 },
-  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Assessment of rental income growth potential (Growth: High/Strong/Moderate/Low/Limited)', category: 'analysis', enabled: true, order: 9 },
+  // Financial Analysis (Disabled by Default)
+  { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: false, order: 9 },
+  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'financial', enabled: false, order: 10 },
+  { id: 'capRate', name: 'Cap Rate', description: 'Annual return percentage', category: 'financial', enabled: false, order: 11 },
+  { id: 'onePercentRule', name: '1% Rule', description: 'Monthly rent to price ratio', category: 'financial', enabled: false, order: 12 },
+  { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price to annual rent ratio', category: 'financial', enabled: false, order: 13 },
   
-  // Additional Optional Columns (disabled by default)
-  { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: false, order: 10 },
-  { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: false, order: 11 },
-  { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: false, order: 12 },
-  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'metrics', enabled: false, order: 13 },
-  { id: 'propertyAge', name: 'Property Age', description: 'Age of the property in years', category: 'metrics', enabled: false, order: 14 },
-  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'metrics', enabled: false, order: 15 },
-  { id: 'overallScore', name: 'Overall Score', description: 'Overall property score (1-10)', category: 'scores', enabled: false, order: 16 },
-  { id: 'investmentScore', name: 'Investment Score', description: 'Investment potential score (1-10)', category: 'scores', enabled: false, order: 17 },
-  { id: 'marketScore', name: 'Market Score', description: 'Market value score (1-10)', category: 'scores', enabled: false, order: 18 },
-  { id: 'conditionScore', name: 'Condition Score', description: 'Property condition score (1-10)', category: 'scores', enabled: false, order: 19 },
-  { id: 'monthlyPayment', name: 'Est. Monthly Payment', description: 'Estimated monthly mortgage payment', category: 'financial', enabled: false, order: 20 },
-  { id: 'priceVsMarket', name: 'Price vs Market', description: 'Price comparison to market value', category: 'financial', enabled: false, order: 21 },
-  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment potential summary', category: 'financial', enabled: false, order: 22 },
-  { id: 'valueRating', name: 'Value Rating', description: 'Overall value rating', category: 'financial', enabled: false, order: 23 },
-  { id: 'topPros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 24 },
-  { id: 'topCons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 25 },
-  { id: 'redFlagsCount', name: 'Red Flags Count', description: 'Number of warning indicators', category: 'analysis', enabled: false, order: 26 },
-  { id: 'keyConcerns', name: 'Key Concerns', description: 'Primary issues summary', category: 'analysis', enabled: false, order: 27 },
-  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Detailed market assessment', category: 'analysis', enabled: false, order: 28 },
-  { id: 'investmentDetails', name: 'Investment Details', description: 'Complete investment analysis', category: 'analysis', enabled: false, order: 29 },
-  { id: 'allPros', name: 'All Pros', description: 'Complete advantages list', category: 'analysis', enabled: false, order: 30 },
-  { id: 'allCons', name: 'All Cons', description: 'Complete disadvantages list', category: 'analysis', enabled: false, order: 31 },
-  { id: 'redFlagsDetail', name: 'Red Flags Detail', description: 'Detailed warning information', category: 'analysis', enabled: false, order: 32 }
+  // Location & Scoring (Disabled by Default)
+  { id: 'locationScore', name: 'Location Score', description: 'Location quality score (X/10)', category: 'scoring', enabled: false, order: 14 },
+  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Growth potential assessment', category: 'scoring', enabled: false, order: 15 },
+  
+  // Investment Analysis (Disabled by Default)
+  { id: 'pros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 16 },
+  { id: 'cons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 17 },
+  { id: 'redFlags', name: 'Red Flags', description: 'Warning indicators', category: 'analysis', enabled: false, order: 18 },
+  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment summary', category: 'analysis', enabled: false, order: 19 },
+  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Market assessment', category: 'analysis', enabled: false, order: 20 },
+  
+  // Identification (Disabled by Default)
+  { id: 'address', name: 'Property URL', description: 'Direct link to property', category: 'identification', enabled: false, order: 21 },
+  { id: 'source', name: 'Source', description: 'Website source', category: 'identification', enabled: false, order: 22 },
+  { id: 'analysisDate', name: 'Analysis Date', description: 'Date of analysis', category: 'identification', enabled: false, order: 23 }
 ];
+
+// Dynamic Prompt Generation Functions
+async function generateDynamicPrompt() {
+  try {
+    // Get user's column configuration
+    const columnResult = await chrome.storage.local.get(['columnConfiguration']);
+    const columnConfig = columnResult.columnConfiguration || DEFAULT_COLUMNS;
+    
+    // Filter to enabled columns
+    const enabledColumns = columnConfig.filter(col => col.enabled);
+    
+    // Generate prompt sections based on enabled columns
+    const promptSections = [];
+    
+    // Core property details
+    const coreColumns = enabledColumns.filter(col => col.category === 'core');
+    if (coreColumns.length > 0) {
+      promptSections.push(generateCorePropertySection(coreColumns));
+    }
+    
+    // Financial metrics
+    const financialColumns = enabledColumns.filter(col => col.category === 'financial');
+    if (financialColumns.length > 0) {
+      promptSections.push(generateFinancialSection(financialColumns));
+    }
+    
+    // Location and scoring
+    const scoringColumns = enabledColumns.filter(col => col.category === 'scoring');
+    if (scoringColumns.length > 0) {
+      promptSections.push(generateLocationSection(scoringColumns));
+    }
+    
+    // Analysis data
+    const analysisColumns = enabledColumns.filter(col => col.category === 'analysis');
+    if (analysisColumns.length > 0) {
+      promptSections.push(generateAnalysisSection(analysisColumns));
+    }
+    
+    // Custom columns
+    const customColumns = enabledColumns.filter(col => col.isCustom);
+    if (customColumns.length > 0) {
+      promptSections.push(generateCustomColumnsSection(customColumns));
+    }
+    
+    // Combine sections into final prompt
+    const dynamicPrompt = combinePromptSections(promptSections);
+    
+    return dynamicPrompt;
+  } catch (error) {
+    console.error('Error generating dynamic prompt:', error);
+    return DEFAULT_PROMPT;
+  }
+}
+
+function generateCorePropertySection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'streetName':
+        dataPoints.push('**Street Name**: Property street address (e.g., "123 Main Street")');
+        break;
+      case 'price':
+        dataPoints.push('**Property Price**: Exact asking price (include currency symbol)');
+        break;
+      case 'bedrooms':
+        dataPoints.push('**Number of Bedrooms**: Number of bedrooms (numeric)');
+        break;
+      case 'bathrooms':
+        dataPoints.push('**Bathrooms**: Number of bathrooms (numeric, include half baths as .5)');
+        break;
+      case 'squareFeet':
+        dataPoints.push('**Square Footage**: Total square footage (numeric)');
+        break;
+      case 'yearBuilt':
+        dataPoints.push('**Year Built**: Construction year (4-digit year)');
+        break;
+      case 'propertyType':
+        dataPoints.push('**Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)');
+        break;
+      case 'neighborhood':
+        dataPoints.push('**Neighborhood**: Property location/neighborhood name');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**REQUIRED DATA EXTRACTION:**\n${dataPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}` : '';
+}
+
+function generateFinancialSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'estimatedRentalIncome':
+        dataPoints.push('**Estimated Monthly Rental Income**: Your professional estimate based on local market rates');
+        break;
+      case 'pricePerSqFt':
+        dataPoints.push('**Price per Square Foot**: Calculated value for investment analysis');
+        break;
+      case 'capRate':
+        dataPoints.push('**Cap Rate**: Annual return percentage based on rental income');
+        break;
+      case 'onePercentRule':
+        dataPoints.push('**1% Rule Assessment**: Monthly rent to price ratio for quick investment evaluation');
+        break;
+      case 'grossRentMultiplier':
+        dataPoints.push('**Gross Rent Multiplier**: Price to annual rent ratio for comparison');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**FINANCIAL ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateLocationSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'locationScore':
+        dataPoints.push('**Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation');
+        break;
+      case 'rentalGrowthPotential':
+        dataPoints.push('**Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**LOCATION & MARKET ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateAnalysisSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'pros':
+        dataPoints.push('**Top 3 Advantages**: Key property advantages for investment');
+        break;
+      case 'cons':
+        dataPoints.push('**Top 3 Concerns**: Main property limitations or concerns');
+        break;
+      case 'redFlags':
+        dataPoints.push('**Red Flags**: Any warning signs or risk indicators');
+        break;
+      case 'investmentPotential':
+        dataPoints.push('**Investment Potential**: Overall investment grade and reasoning');
+        break;
+      case 'marketAnalysis':
+        dataPoints.push('**Market Analysis**: Detailed market assessment and trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**INVESTMENT ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateCustomColumnsSection(customColumns) {
+  const dataPoints = customColumns.map(col => 
+    `**${col.name}**: ${col.description || 'Custom data point'}`
+  );
+  
+  return dataPoints.length > 0 ? `**CUSTOM DATA POINTS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function combinePromptSections(sections) {
+  const validSections = sections.filter(section => section.length > 0);
+  
+  if (validSections.length === 0) {
+    return DEFAULT_PROMPT;
+  }
+  
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+${validSections.join('\n\n')}
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections based on the data points requested above.
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format if requested
+- Categorize rental growth potential clearly if requested
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
 
 // Column Configuration Functions
 async function loadColumnConfiguration() {
@@ -1371,6 +1642,15 @@ function formatCustomColumnValue(value, type) {
   }
 }
 
+// Helper function to get custom column value from property item
+function getCustomColumnValue(propertyItem, column) {
+  if (!propertyItem.customColumns || !column.isCustom) {
+    return column.defaultValue || '';
+  }
+  
+  return propertyItem.customColumns[column.id] || column.defaultValue || '';
+}
+
 // Function to show custom data editor
 async function showCustomDataEditor(propertyItem, propertyIndex) {
   try {
@@ -1742,6 +2022,9 @@ async function exportPropertyHistory() {
         const data = { ...storedData, ...analysisData };
         
         switch (column.id) {
+          case 'streetName':
+            return `"${data.streetName || storedData.streetName || ''}"`;
+            
           case 'price':
             const price = data.price || extractNumber(storedData.price);
             return price ? `$${price.toLocaleString()}` : '';
@@ -1762,15 +2045,55 @@ async function exportPropertyHistory() {
           case 'propertyType':
             return `"${data.propertyType || storedData.propertyType || ''}"`;
             
+          case 'neighborhood':
+            return `"${data.neighborhood || storedData.neighborhood || ''}"`;
+            
           case 'estimatedRentalIncome':
-            const rental = data.rentalIncome || estimateRentalIncome(data, data.price || extractNumber(storedData.price));
-            return rental ? `$${rental.toLocaleString()}` : '';
+            const rental = data.estimatedRentalIncome || data.rentalIncome || extractNumber(storedData.estimatedRentalIncome);
+            return rental ? `$${parseInt(rental).toLocaleString()}` : '';
+            
+          case 'pricePerSqFt':
+            const pricePerSqFt = data.pricePerSqFt || storedData.pricePerSqFt;
+            if (pricePerSqFt) {
+              return `$${pricePerSqFt}`;
+            }
+            // Calculate if not available
+            const priceForCalc = data.price || extractNumber(storedData.price);
+            const sqftForCalc = data.squareFeet || extractNumber(storedData.squareFeet);
+            return (priceForCalc && sqftForCalc) ? `$${Math.round(priceForCalc / sqftForCalc)}` : '';
+            
+          case 'capRate':
+            const capRate = data.capRate || storedData.capRate;
+            return capRate ? `${capRate}%` : '';
+            
+          case 'onePercentRule':
+            const onePercent = data.onePercentRule || storedData.onePercentRule;
+            return onePercent ? `${onePercent}%` : '';
+            
+          case 'grossRentMultiplier':
+            const grm = data.grossRentMultiplier || storedData.grossRentMultiplier;
+            return grm || '';
             
           case 'locationScore':
-            return data.locationScore || inferLocationScore(item.analysis?.fullAnalysis || '');
+            return data.locationScore || storedData.locationScore || '';
             
           case 'rentalGrowthPotential':
-            return `"${data.growthPotential || data.rentalGrowthPotential || inferRentalGrowthPotential(item.analysis?.fullAnalysis || '')}"`;
+            return `"${data.rentalGrowthPotential || data.growthPotential || storedData.rentalGrowthPotential || ''}"`;
+            
+          case 'pros':
+            return `"${data.pros || storedData.pros || ''}"`;
+            
+          case 'cons':
+            return `"${data.cons || storedData.cons || ''}"`;
+            
+          case 'redFlags':
+            return `"${data.redFlags || storedData.redFlags || ''}"`;
+            
+          case 'investmentPotential':
+            return `"${data.investmentPotential || storedData.investmentPotential || ''}"`;
+            
+          case 'marketAnalysis':
+            return `"${data.marketAnalysis || storedData.marketAnalysis || ''}"`;
             
           case 'address':
             return `"${item.url}"`;
@@ -1780,18 +2103,6 @@ async function exportPropertyHistory() {
             
           case 'analysisDate':
             return `"${item.date}"`;
-            
-          case 'pricePerSqFt':
-            const priceForCalc = data.price || extractNumber(storedData.price);
-            const sqftForCalc = data.squareFeet || extractNumber(storedData.squareFeet);
-            return (priceForCalc && sqftForCalc) ? `$${(priceForCalc / sqftForCalc).toFixed(2)}` : '';
-            
-          case 'propertyAge':
-            const yearBuilt = data.yearBuilt || extractNumber(storedData.yearBuilt);
-            return yearBuilt ? new Date().getFullYear() - yearBuilt : '';
-            
-          case 'neighborhood':
-            return `"${data.neighborhood || storedData.neighborhood || ''}"`;
             
           default:
             if (column.isCustom) {
