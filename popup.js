@@ -990,25 +990,82 @@ async function initializePopup() {
 }
 
 // Default prompt template
-const DEFAULT_PROMPT = `Please analyze this property listing and provide a comprehensive analysis including:
+const DEFAULT_PROMPT = `As a real estate investment expert, analyze this property listing for investment potential. Provide a detailed investment-focused analysis with the following sections:
 
-1. **Property Details**: Extract key information like price, size, bedrooms, bathrooms, year built, property type, and location.
+**PROPERTY FUNDAMENTALS**
+- Price: $XXX,XXX
+- Bedrooms/Bathrooms: X bed / X bath
+- Square Footage: XXXX sq ft (calculate price per sq ft)
+- Year Built: XXXX (calculate property age)
+- Property Type: Single Family/Condo/Townhouse/Multi-family
+- Lot Size: XXXX sq ft (if available)
+- HOA Fees: $XXX/month (if applicable)
 
-2. **Market Analysis**: Evaluate the pricing compared to market value, comparable properties, and current market conditions.
+**FINANCIAL ANALYSIS**
+- List Price vs Market Value assessment
+- Estimated Monthly Rental Income: $XXXX (research local rental rates)
+- Estimated Monthly Expenses: $XXXX (taxes, insurance, maintenance, vacancy allowance)
+- Estimated Net Cash Flow: $XXXX
+- Cap Rate Estimate: X.X%
+- Cash-on-Cash Return Estimate: X.X% (assuming 20% down)
+- 1% Rule Analysis: Does monthly rent ≥ 1% of purchase price?
+- Total Investment Required: Down payment + closing costs + initial repairs
 
-3. **Neighborhood Assessment**: Analyze the location, amenities, schools, transportation, and area developments.
+**MARKET CONDITIONS**
+- Current market trend (buyer's/seller's market)
+- Days on Market vs area average
+- Price History and adjustments
+- Comparable sales in the area (recent 3-6 months)
+- Area appreciation rates (historical)
+- Economic indicators affecting the area
 
-4. **Pros and Cons**: List the main advantages and disadvantages of this property.
+**LOCATION & NEIGHBORHOOD SCORING**
+- Neighborhood Quality: Rate 1-10 (safety, desirability)
+- Schools: Rate 1-10 (check school ratings)
+- Walkability & Transportation: Rate 1-10
+- Job Market & Employment Centers: Rate 1-10
+- Future Development Plans: Any major projects nearby?
+- Population Growth Trends: Growing/stable/declining
 
-5. **Investment Potential**: Assess the investment viability, potential appreciation, rental income possibilities, and ROI.
+**RENTAL MARKET ANALYSIS**
+- Rental Demand: High/Medium/Low
+- Average Rent for Similar Properties: $XXXX
+- Vacancy Rates in Area: X%
+- Tenant Demographics: Professionals/families/students
+- Rental Growth Potential: X% annually
+- Competition Analysis: Number of similar rentals available
 
-6. **Red Flags**: Identify any concerns, issues, or potential problems to be aware of.
+**INVESTMENT PROS**
+List 5-7 key advantages:
+- [Specific positive investment factors]
+
+**INVESTMENT CONS & RED FLAGS**
+List 5-7 concerns or risks:
+- [Specific concerns or potential issues]
+
+**CONDITION & MAINTENANCE**
+- Property Condition: Excellent/Good/Fair/Poor
+- Estimated Immediate Repair Costs: $XXXX
+- Major Systems Age: HVAC, roof, plumbing, electrical
+- Annual Maintenance Budget: $XXXX
+- Capital Expenditure Reserves Needed: $XXXX (10-year outlook)
+
+**INVESTMENT RECOMMENDATION**
+- Overall Investment Grade: A/B/C/D/F
+- Investment Strategy Fit: Buy & Hold/Fix & Flip/BRRRR/Avoid
+- Risk Level: Low/Medium/High
+- Expected Total Return (5-year): XX%
+- Key Decision Factors: [Top 3 factors for/against]
+
+**NEXT STEPS**
+- Due Diligence Priorities: [What to investigate further]
+- Negotiation Strategy: [Price/terms recommendations]
+- Timeline Considerations: [Urgency factors]
 
 Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
 
-Please visit the link and provide your analysis based on the property information. Structure your response with clear sections for easy extraction and comparison.
-
-Analysis Date: {DATE}`;
+Visit the property link and provide specific data where possible. Use local market research and current rental listings to support your analysis. Focus on actionable investment insights and concrete numbers.`;
 
 // Settings Functions
 async function loadCustomPrompt() {
