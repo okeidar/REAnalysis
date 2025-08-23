@@ -1,6 +1,32 @@
 // Content script for ChatGPT Helper Extension
 console.log('ChatGPT Helper Extension loaded on:', window.location.href);
 
+// Function to check if extension context is still valid
+function isExtensionContextValid() {
+  try {
+    return chrome.runtime && chrome.runtime.id;
+  } catch (err) {
+    return false;
+  }
+}
+
+// Safe wrapper for chrome API calls
+function safeChromeFall(apiCall, fallbackValue = null) {
+  try {
+    if (!isExtensionContextValid()) {
+      console.log('⚠️ Extension context invalidated, skipping chrome API call');
+      return Promise.resolve(fallbackValue);
+    }
+    return apiCall();
+  } catch (err) {
+    if (err.message && err.message.includes('Extension context invalidated')) {
+      console.log('⚠️ Extension context invalidated during API call');
+      return Promise.resolve(fallbackValue);
+    }
+    throw err;
+  }
+}
+
 // Global variable to track current property analysis
 let currentPropertyAnalysis = null;
 
@@ -511,15 +537,19 @@ function setupResponseMonitor() {
         });
         
         // Send the analysis data back to the background script
-        chrome.runtime.sendMessage({
-          action: 'savePropertyAnalysis',
-          propertyUrl: currentPropertyAnalysis.url,
-          sessionId: currentPropertyAnalysis.sessionId,
-          analysisData: analysisData
+        safeChromeFall(() => {
+          return chrome.runtime.sendMessage({
+            action: 'savePropertyAnalysis',
+            propertyUrl: currentPropertyAnalysis.url,
+            sessionId: currentPropertyAnalysis.sessionId,
+            analysisData: analysisData
+          });
         }).then(response => {
-          console.log('✅ Analysis data sent successfully:', response);
-          if (response && response.success) {
-            console.log('🎉 Property analysis saved and should now show as analyzed!');
+          if (response) {
+            console.log('✅ Analysis data sent successfully:', response);
+            if (response.success) {
+              console.log('🎉 Property analysis saved and should now show as analyzed!');
+            }
           }
         }).catch(err => {
           console.error('❌ Failed to send analysis data:', err);
@@ -752,9 +782,25 @@ function setupResponseMonitor() {
   
   console.log('🚀 Response monitor setup complete');
   
+  // Add periodic check for extension context validity
+  const contextCheckInterval = setInterval(() => {
+    if (!isExtensionContextValid()) {
+      console.log('⚠️ Extension context invalidated - cleaning up content script');
+      clearInterval(intervalId);
+      clearInterval(contextCheckInterval);
+      observer.disconnect();
+      // Clear any remaining timers
+      completionTimers.forEach(timer => clearTimeout(timer));
+      completionTimers.clear();
+      responseBuffer.clear();
+      currentPropertyAnalysis = null;
+    }
+  }, 5000); // Check every 5 seconds
+  
   // Cleanup function
   return () => {
     clearInterval(intervalId);
+    clearInterval(contextCheckInterval);
     observer.disconnect();
   };
 }
@@ -864,7 +910,10 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     const inputField = await waitForInputField(5000);
     
     // Get custom prompt from storage or use default
-    const result = await chrome.storage.local.get(['customPrompt']);
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['customPrompt']),
+      { customPrompt: null }
+    );
     const promptTemplate = result.customPrompt || `As a real estate investment expert, analyze this property for investment potential. Provide a detailed investment-focused analysis with the following sections:
 
 **PROPERTY FUNDAMENTALS**
