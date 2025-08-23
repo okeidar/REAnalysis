@@ -839,7 +839,9 @@ Please organize your response with clear sections:
 - Categorize rental growth potential clearly
 - Be concise but thorough in your analysis
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.`;
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
 
 // Settings Functions
 async function loadCustomPrompt() {
