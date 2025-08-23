@@ -394,9 +394,169 @@ function extractPropertyAnalysisData(responseText) {
   return analysis;
 }
 
-// Function to monitor for new ChatGPT messages with improved detection
+// Function to monitor for new ChatGPT messages with completion detection
 function setupResponseMonitor() {
   let lastMessageCount = 0;
+  let responseBuffer = new Map(); // Buffer to track response completion
+  let completionTimers = new Map(); // Timers for each property analysis
+  
+  // Function to detect if ChatGPT is still writing (streaming)
+  const isResponseStreaming = () => {
+    // Look for streaming indicators in the ChatGPT interface
+    const streamingIndicators = [
+      '.result-streaming',
+      '[class*="streaming"]',
+      '.animate-pulse',
+      '[data-testid*="streaming"]',
+      '.cursor-blink',
+      '.typing-indicator',
+      '[class*="loading"]',
+      '.text-2xl', // Sometimes ChatGPT shows a cursor
+      '[class*="animate"]'
+    ];
+    
+    for (const indicator of streamingIndicators) {
+      const element = document.querySelector(indicator);
+      if (element && element.offsetHeight > 0) { // Make sure element is visible
+        console.log('🔍 Found streaming indicator:', indicator);
+        return true;
+      }
+    }
+    
+    // Check for the stop generation button as an indicator of active streaming
+    const stopSelectors = [
+      '[data-testid*="stop"]',
+      'button[aria-label*="stop"]',
+      'button[title*="stop"]',
+      'button[aria-label*="Stop"]',
+      'button[title*="Stop"]',
+      'button:has(svg[data-icon="stop"])',
+      'button:contains("Stop")',
+      '[class*="stop"][class*="button"]'
+    ];
+    
+    for (const selector of stopSelectors) {
+      const stopButton = document.querySelector(selector);
+      if (stopButton && 
+          stopButton.offsetHeight > 0 && 
+          !stopButton.disabled && 
+          window.getComputedStyle(stopButton).display !== 'none') {
+        console.log('🔍 Found active stop button:', selector);
+        return true;
+      }
+    }
+    
+    // Additional check: look for the regenerate button being disabled (indicates streaming)
+    const regenerateButton = document.querySelector('button[aria-label*="regenerate"], button[title*="regenerate"], button:contains("Regenerate")');
+    if (regenerateButton && regenerateButton.disabled) {
+      console.log('🔍 Regenerate button is disabled, likely streaming');
+      return true;
+    }
+    
+    // Check for cursor or typing indicators in the message area
+    const lastMessage = document.querySelector('[data-message-author-role="assistant"]:last-of-type, .prose:last-of-type');
+    if (lastMessage) {
+      const text = lastMessage.textContent || '';
+      // Look for common streaming indicators like ending mid-sentence or incomplete formatting
+      if (text.endsWith('...') || text.match(/\*\*[^*]*$/) || text.match(/`[^`]*$/)) {
+        console.log('🔍 Message appears incomplete (streaming)');
+        return true;
+      }
+    }
+    
+    return false;
+  };
+  
+  // Function to process completed response
+  const processCompletedResponse = (messageText, currentUrl) => {
+    console.log('🎯 Processing completed response for:', currentUrl);
+    console.log('📝 Final response length:', messageText.length);
+    
+    // Clear any existing timer
+    if (completionTimers.has(currentUrl)) {
+      clearTimeout(completionTimers.get(currentUrl));
+      completionTimers.delete(currentUrl);
+    }
+    
+    // Process the analysis data
+    const propertyKeywords = [
+      'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
+      'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment',
+      'pros', 'cons', 'advantages', 'disadvantages', 'real estate',
+      'zillow', 'realtor', 'mls', 'home', 'house', 'condo', 'townhouse',
+      'apartment', 'duplex', 'villa', 'ranch', 'colonial', 'location',
+      'area', 'district', 'community', 'lot', 'land', 'acre', 'value',
+      'asking', 'listed', 'selling', 'sale', 'cost', 'mortgage',
+      'financing', 'schools', 'commute', 'walkable', 'amenities'
+    ];
+    
+    const keywordMatches = propertyKeywords.filter(keyword => 
+      messageText.toLowerCase().includes(keyword)
+    ).length;
+    
+    console.log(`Found ${keywordMatches} property keywords in completed response`);
+    
+    if (keywordMatches >= 2) {
+      console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
+      console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+      console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
+      const analysisData = extractPropertyAnalysisData(messageText);
+      
+      if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+        console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
+        console.log('📊 Extracted data summary:', {
+          propertyUrl: currentPropertyAnalysis.url,
+          sessionId: currentPropertyAnalysis.sessionId,
+          dataPoints: Object.keys(analysisData.extractedData).length,
+          hasPrice: !!analysisData.extractedData.price,
+          hasBedrooms: !!analysisData.extractedData.bedrooms,
+          hasBathrooms: !!analysisData.extractedData.bathrooms,
+          hasSquareFeet: !!analysisData.extractedData.squareFeet,
+          keys: Object.keys(analysisData.extractedData)
+        });
+        
+        // Send the analysis data back to the background script
+        chrome.runtime.sendMessage({
+          action: 'savePropertyAnalysis',
+          propertyUrl: currentPropertyAnalysis.url,
+          sessionId: currentPropertyAnalysis.sessionId,
+          analysisData: analysisData
+        }).then(response => {
+          console.log('✅ Analysis data sent successfully:', response);
+          if (response && response.success) {
+            console.log('🎉 Property analysis saved and should now show as analyzed!');
+          }
+        }).catch(err => {
+          console.error('❌ Failed to send analysis data:', err);
+        });
+        
+        // Track this message as processed for this property
+        if (currentUrl) {
+          if (!processedMessagesPerProperty.has(currentUrl)) {
+            processedMessagesPerProperty.set(currentUrl, []);
+          }
+          processedMessagesPerProperty.get(currentUrl).push(messageText);
+          
+          // Limit stored messages per property to prevent memory bloat
+          const messages = processedMessagesPerProperty.get(currentUrl);
+          if (messages.length > 5) {
+            messages.shift(); // Remove oldest message
+          }
+        }
+        
+        // Reset the current analysis tracking
+        currentPropertyAnalysis = null;
+      } else {
+        console.log('⚠️ No extractable data found in completed response');
+        console.log('📝 Response preview:', messageText.substring(0, 500) + '...');
+      }
+    } else {
+      console.log('⚠️ Insufficient property keywords in completed response');
+    }
+    
+    // Clean up buffer
+    responseBuffer.delete(currentUrl);
+  };
   
   const checkForNewMessages = () => {
     // Updated selectors for current ChatGPT interface (2024)
@@ -445,9 +605,10 @@ function setupResponseMonitor() {
         }
       }
       
-      // Check if this appears to be a property analysis response
+      // Only process if we have an active property analysis session
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
-        console.log('Checking message for property analysis content...');
+        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
+        console.log('📊 Current response length:', messageText.length);
         
         // Check if analysis session has timed out (10 minutes)
         const sessionAge = Date.now() - currentPropertyAnalysis.timestamp;
@@ -457,94 +618,63 @@ function setupResponseMonitor() {
           return;
         }
         
-        // Comprehensive property analysis detection with expanded keywords
-        const propertyKeywords = [
-          'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
-          'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment',
-          'pros', 'cons', 'advantages', 'disadvantages', 'real estate',
-          'zillow', 'realtor', 'mls', 'home', 'house', 'condo', 'townhouse',
-          'apartment', 'duplex', 'villa', 'ranch', 'colonial', 'location',
-          'area', 'district', 'community', 'lot', 'land', 'acre', 'value',
-          'asking', 'listed', 'selling', 'sale', 'cost', 'mortgage',
-          'financing', 'schools', 'commute', 'walkable', 'amenities'
-        ];
+        // Store/update the current response in buffer
+        responseBuffer.set(currentUrl, {
+          messageText: messageText,
+          lastUpdated: Date.now(),
+          length: messageText.length
+        });
         
-        const keywordMatches = propertyKeywords.filter(keyword => 
-          messageText.toLowerCase().includes(keyword)
-        ).length;
+        // Check if ChatGPT is still streaming
+        const isStreaming = isResponseStreaming();
+        console.log('🔄 Is ChatGPT still streaming?', isStreaming);
         
-        console.log(`Found ${keywordMatches} property keywords in response`);
-        
-        // More lenient keyword matching - require at least 2 property-related keywords
-        if (keywordMatches >= 2) {
-          console.log('✅ Detected property analysis response for:', currentPropertyAnalysis.url);
-          console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
-          console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
-          const analysisData = extractPropertyAnalysisData(messageText);
+        if (isStreaming) {
+          console.log('⏳ ChatGPT still writing, waiting for completion...');
           
-          if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
-            console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
-            console.log('📊 Extracted data summary:', {
-              propertyUrl: currentPropertyAnalysis.url,
-              sessionId: currentPropertyAnalysis.sessionId,
-              dataPoints: Object.keys(analysisData.extractedData).length,
-              hasPrice: !!analysisData.extractedData.price,
-              hasBedrooms: !!analysisData.extractedData.bedrooms,
-              hasBathrooms: !!analysisData.extractedData.bathrooms,
-              hasSquareFeet: !!analysisData.extractedData.squareFeet,
-              keys: Object.keys(analysisData.extractedData)
-            });
-            
-            // Send the analysis data back to the background script
-            chrome.runtime.sendMessage({
-              action: 'savePropertyAnalysis',
-              propertyUrl: currentPropertyAnalysis.url,
-              sessionId: currentPropertyAnalysis.sessionId,
-              analysisData: analysisData
-            }).then(response => {
-              console.log('✅ Analysis data sent successfully:', response);
-              if (response && response.success) {
-                console.log('🎉 Property analysis saved and should now show as analyzed!');
-              }
-            }).catch(err => {
-              console.error('❌ Failed to send analysis data:', err);
-            });
-            
-            // Track this message as processed for this property
-            if (currentUrl) {
-              if (!processedMessagesPerProperty.has(currentUrl)) {
-                processedMessagesPerProperty.set(currentUrl, []);
-              }
-              processedMessagesPerProperty.get(currentUrl).push(messageText);
-              
-              // Limit stored messages per property to prevent memory bloat
-              const messages = processedMessagesPerProperty.get(currentUrl);
-              if (messages.length > 5) {
-                messages.shift(); // Remove oldest message
-              }
+          // Clear any existing completion timer
+          if (completionTimers.has(currentUrl)) {
+            clearTimeout(completionTimers.get(currentUrl));
+          }
+          
+          // Set a new completion timer (wait 3 seconds after last change)
+          completionTimers.set(currentUrl, setTimeout(() => {
+            console.log('⏰ Completion timer triggered - assuming response is complete');
+            const bufferedResponse = responseBuffer.get(currentUrl);
+            if (bufferedResponse) {
+              processCompletedResponse(bufferedResponse.messageText, currentUrl);
             }
-            
-            // Reset the current analysis tracking
-            currentPropertyAnalysis = null;
-          } else {
-            console.log('⚠️ No extractable data found in response, response may be incomplete');
-            console.log('📝 Response preview:', messageText.substring(0, 300) + '...');
-            
-            // If response is long enough, it might be complete but just not matching our patterns
-            if (messageText.length > 500) {
-              console.log('🔄 Response is substantial, will retry extraction in a few seconds...');
-              // Don't reset currentPropertyAnalysis yet, allow for retry
+          }, 3000));
+          
+        } else {
+          console.log('✅ ChatGPT appears to have finished writing');
+          
+          // Check if we have a recent change to ensure we got the final content
+          const bufferedResponse = responseBuffer.get(currentUrl);
+          if (bufferedResponse) {
+            const timeSinceLastUpdate = Date.now() - bufferedResponse.lastUpdated;
+            if (timeSinceLastUpdate < 2000) {
+              // Recent change, wait a bit more to ensure completion
+              console.log('⏳ Recent change detected, waiting for final completion...');
+              
+              if (completionTimers.has(currentUrl)) {
+                clearTimeout(completionTimers.get(currentUrl));
+              }
+              
+              completionTimers.set(currentUrl, setTimeout(() => {
+                console.log('🎯 Final completion timer triggered');
+                const finalResponse = responseBuffer.get(currentUrl);
+                if (finalResponse) {
+                  processCompletedResponse(finalResponse.messageText, currentUrl);
+                }
+              }, 2000));
+              
+            } else {
+              // No recent changes and not streaming - process now
+              console.log('🚀 Processing completed response immediately');
+              processCompletedResponse(messageText, currentUrl);
             }
           }
-        } else if (messageText.length > 200) {
-          // If we have a substantial response but not enough keywords, log for debugging
-          console.log(`⚠️ Substantial response (${messageText.length} chars) but only ${keywordMatches} property keywords found`);
-          console.log('🔍 Keywords found:', propertyKeywords.filter(keyword => 
-            messageText.toLowerCase().includes(keyword)
-          ));
-          console.log('📝 Response preview:', messageText.substring(0, 200) + '...');
-        } else {
-          console.log('⚠️ Insufficient property keywords, waiting for more content...');
         }
       }
       
@@ -552,8 +682,8 @@ function setupResponseMonitor() {
     }
   };
   
-  // Check for new messages every 1 second (more frequent)
-  const intervalId = setInterval(checkForNewMessages, 1000);
+  // Check for new messages every 500ms for better completion detection
+  const intervalId = setInterval(checkForNewMessages, 500);
   
   // Also use MutationObserver for more immediate detection
   const observer = new MutationObserver((mutations) => {
