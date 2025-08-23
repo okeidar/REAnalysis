@@ -990,7 +990,7 @@ async function initializePopup() {
 }
 
 // Default prompt template
-const DEFAULT_PROMPT = `As a real estate investment expert, analyze this property listing for investment potential. Provide a detailed investment-focused analysis with the following sections:
+const DEFAULT_PROMPT = `As a real estate investment expert, analyze this property for investment potential. Provide a detailed investment-focused analysis with the following sections:
 
 **PROPERTY FUNDAMENTALS**
 - Price: $XXX,XXX
@@ -1065,7 +1065,7 @@ List 5-7 concerns or risks:
 Property Link: {PROPERTY_URL}
 Analysis Date: {DATE}
 
-Visit the property link and provide specific data where possible. Use local market research and current rental listings to support your analysis. Focus on actionable investment insights and concrete numbers.`;
+Visit the property link and provide specific data where possible. Use local market research and current rental data to support your analysis. Focus on actionable investment insights and concrete numbers.`;
 
 // Settings Functions
 async function loadCustomPrompt() {
