@@ -202,23 +202,82 @@ function extractPropertyAnalysisData(responseText) {
   function extractFromPropertyDetails(text, analysis) {
     // Extract specific data points with enhanced patterns
     const patterns = {
-      price: /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-      bedrooms: /(?:bedroom)[s]?[:\s]*(\d+)/gi,
-      bathrooms: /(?:bathroom)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
-      squareFeet: /(?:square\s+footage)[:\s]*([\d,]+)/gi,
-      yearBuilt: /(?:year\s+built)[:\s]*(\d{4})/gi,
-      propertyType: /(?:property\s+type)[:\s]*([^\n,]+)/gi
+      price: [
+        /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)/g
+      ],
+      bedrooms: [
+        /(?:bedroom)[s]?[:\s]*(\d+)/gi,
+        /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
+        /(\d+)\s*(?:bedroom|bed)/gi
+      ],
+      bathrooms: [
+        /(?:bathroom)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
+        /(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b)/gi,
+        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi
+      ],
+      squareFeet: [
+        /(?:square\s+footage)[:\s]*([\d,]+)/gi,
+        /([\d,]+)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi
+      ],
+      yearBuilt: [
+        /(?:year\s+built)[:\s]*(\d{4})/gi,
+        /(?:built)[:\s]*(\d{4})/gi,
+        /(\d{4})\s*(?:built)/gi
+      ],
+      propertyType: [
+        /(?:property\s+type)[:\s]*([^\n,]+)/gi,
+        /(?:type)[:\s]*(single\s+family|condo|townhouse|apartment|duplex|house|home)[^\n,]*/gi
+      ]
     };
     
-    for (const [key, pattern] of Object.entries(patterns)) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        const value = match[1].trim();
-        if (!analysis.extractedData[key]) { // Only set if not already extracted
-          analysis.extractedData[key] = value;
-          console.log(`✅ Extracted ${key} from Property Details:`, value);
+    for (const [key, patternArray] of Object.entries(patterns)) {
+      if (!analysis.extractedData[key]) { // Only set if not already extracted
+        let bestMatch = null;
+        
+        // Try each pattern until we find a match
+        for (const pattern of patternArray) {
+          pattern.lastIndex = 0; // Reset regex
+          const match = pattern.exec(text);
+          if (match && match[1]) {
+            const value = match[1].trim();
+            
+            // Validate the extracted value
+            if (validateExtractedValue(key, value)) {
+              bestMatch = value;
+              break; // Use the first valid match
+            }
+          }
+        }
+        
+        if (bestMatch) {
+          analysis.extractedData[key] = bestMatch;
+          console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
         }
       }
+    }
+  }
+  
+  // Helper function to validate extracted values
+  function validateExtractedValue(key, value) {
+    switch (key) {
+      case 'bedrooms':
+        const bedrooms = parseInt(value);
+        return bedrooms >= 0 && bedrooms <= 20;
+      case 'bathrooms':
+        const bathrooms = parseFloat(value);
+        return bathrooms >= 0 && bathrooms <= 20;
+      case 'squareFeet':
+        const sqft = parseInt(value.replace(/,/g, ''));
+        return sqft >= 100 && sqft <= 50000;
+      case 'yearBuilt':
+        const year = parseInt(value);
+        return year >= 1800 && year <= new Date().getFullYear();
+      case 'price':
+        const price = parseFloat(value.replace(/,/g, ''));
+        return price >= 10000 && price <= 50000000;
+      default:
+        return value && value.length > 0;
     }
   }
   
@@ -401,6 +460,14 @@ function extractPropertyAnalysisData(responseText) {
   console.log('📊 Final extraction summary:');
   console.log('Keys extracted:', Object.keys(analysis.extractedData));
   console.log('Total data points:', Object.keys(analysis.extractedData).length);
+  
+  // Enhanced debugging for bedroom and bathroom data
+  console.log('🔍 Bedroom/Bathroom extraction details:', {
+    bedrooms: analysis.extractedData.bedrooms,
+    bathrooms: analysis.extractedData.bathrooms,
+    bedroomsType: typeof analysis.extractedData.bedrooms,
+    bathroomsType: typeof analysis.extractedData.bathrooms
+  });
   
   // Log details of what was extracted
   for (const [key, value] of Object.entries(analysis.extractedData)) {
