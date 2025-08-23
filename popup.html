@@ -335,38 +335,24 @@
     </div>
   </div>
   
-  <div id="settingsSection" class="settings-section" style="display: none;">
+  <div id="settingsSection" class="settings-section" style="display: block;">
     <div class="section-title">
-      ⚙️ Analysis Prompt Settings
-      <button id="toggleSettingsBtn" class="btn-toggle">▼</button>
+      ⚙️ Export & Analysis Settings
+      <button id="toggleSettingsBtn" class="btn-toggle">▲</button>
     </div>
-    <div id="settingsContent" class="settings-content" style="display: none;">
-      <div class="setting-item">
-        <label for="customPrompt">Custom Analysis Prompt:</label>
-        <textarea id="customPrompt" class="prompt-textarea" rows="8" placeholder="Enter your custom prompt here..."></textarea>
-        <div class="prompt-help">
-          <p><strong>Available Variables:</strong></p>
-          <ul>
-            <li><code>{PROPERTY_URL}</code> - The property link</li>
-            <li><code>{DATE}</code> - Current date</li>
-          </ul>
-          <p><strong>Tip:</strong> Structure your prompt to get consistent analysis sections like pros, cons, market analysis, etc.</p>
+    <div id="settingsContent" class="settings-content" style="display: block;">
+      <div class="setting-item featured-setting">
+        <div class="setting-header">
+          <label>📊 Excel Export Column Configuration</label>
+          <div class="setting-badge">CUSTOMIZE YOUR EXPORT</div>
         </div>
-      </div>
-      <div class="setting-actions">
-        <button id="resetPromptBtn" class="btn btn-secondary btn-small">🔄 Reset to Default</button>
-        <button id="savePromptBtn" class="btn btn-primary btn-small">💾 Save Prompt</button>
-      </div>
-      <div class="default-prompt-section">
-        <button id="showDefaultBtn" class="btn btn-link btn-small">📄 View Default Prompt</button>
-        <div id="defaultPromptDisplay" class="default-prompt-display" style="display: none;"></div>
-      </div>
-      
-      <div class="setting-item">
         <label>Excel Export Column Configuration:</label>
+        <div class="intro-message">
+          <p><strong>Welcome!</strong> Before exporting your first property analysis, customize which data columns you want to include in your Excel spreadsheet. This will make your property comparisons more focused and efficient.</p>
+        </div>
         <div class="column-config-section">
           <div class="column-config-header">
-            <p>Customize which columns to include in Excel export and their order:</p>
+            <p>Select and reorder columns for your Excel export:</p>
             <div class="column-actions">
               <button id="selectAllColumnsBtn" class="btn btn-link btn-small">✅ Select All</button>
               <button id="deselectAllColumnsBtn" class="btn btn-link btn-small">❌ Deselect All</button>
@@ -389,13 +375,40 @@
           </div>
         </div>
         
-        <div class="setting-actions">
-          <button id="saveColumnsBtn" class="btn btn-primary btn-small">💾 Save Column Settings</button>
-          <button id="previewColumnsBtn" class="btn btn-secondary btn-small">👁️ Preview Export</button>
-        </div>
-      </div>
-    </div>
-  </div>
+                 <div class="setting-actions">
+           <button id="saveColumnsBtn" class="btn btn-primary btn-small">💾 Save Column Settings</button>
+           <button id="previewColumnsBtn" class="btn btn-secondary btn-small">👁️ Preview Export</button>
+         </div>
+       </div>
+       
+       <div class="setting-item collapsible-setting">
+         <div class="setting-header">
+           <label>🤖 Custom Analysis Prompt</label>
+           <button id="togglePromptBtn" class="btn-toggle">▼</button>
+         </div>
+         <div id="promptContent" class="collapsible-content" style="display: none;">
+           <label for="customPrompt">Custom Analysis Prompt:</label>
+           <textarea id="customPrompt" class="prompt-textarea" rows="8" placeholder="Enter your custom prompt here..."></textarea>
+           <div class="prompt-help">
+             <p><strong>Available Variables:</strong></p>
+             <ul>
+               <li><code>{PROPERTY_URL}</code> - The property link</li>
+               <li><code>{DATE}</code> - Current date</li>
+             </ul>
+             <p><strong>Tip:</strong> Structure your prompt to get consistent analysis sections like pros, cons, market analysis, etc.</p>
+           </div>
+           <div class="setting-actions">
+             <button id="resetPromptBtn" class="btn btn-secondary btn-small">🔄 Reset to Default</button>
+             <button id="savePromptBtn" class="btn btn-primary btn-small">💾 Save Prompt</button>
+           </div>
+           <div class="default-prompt-section">
+             <button id="showDefaultBtn" class="btn btn-link btn-small">📄 View Default Prompt</button>
+             <div id="defaultPromptDisplay" class="default-prompt-display" style="display: none;"></div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>
   
   <div class="footer">
     <div class="version">Version 1.0.2</div>

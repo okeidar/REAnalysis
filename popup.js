@@ -7,7 +7,7 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     propertyHistorySection, settingsSection, settingsToggle, toggleSettingsBtn, settingsContent,
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
     columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
-    saveColumnsBtn, previewColumnsBtn;
+    saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent;
 
 // Global variables
 let currentTab = null;
@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   resetColumnsBtn = document.getElementById('resetColumnsBtn');
   saveColumnsBtn = document.getElementById('saveColumnsBtn');
   previewColumnsBtn = document.getElementById('previewColumnsBtn');
+  togglePromptBtn = document.getElementById('togglePromptBtn');
+  promptContent = document.getElementById('promptContent');
 
   // Set up event listeners
   if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
@@ -78,6 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
   if (resetPromptBtn) resetPromptBtn.addEventListener('click', resetToDefaultPrompt);
   if (showDefaultBtn) showDefaultBtn.addEventListener('click', toggleDefaultPrompt);
+  if (togglePromptBtn) togglePromptBtn.addEventListener('click', togglePromptSection);
   
   // Column configuration event listeners
   if (selectAllColumnsBtn) selectAllColumnsBtn.addEventListener('click', selectAllColumns);
@@ -1001,8 +1004,9 @@ function toggleSettings() {
     settingsSection.style.display = isVisible ? 'none' : 'block';
     
     if (!isVisible) {
-      // Show settings section and load current prompt
+      // Show settings section and load current configurations
       loadCustomPrompt();
+      loadColumnConfiguration();
     }
   }
 }
@@ -1012,6 +1016,19 @@ function toggleSettingsContent() {
     const isVisible = settingsContent.style.display !== 'none';
     settingsContent.style.display = isVisible ? 'none' : 'block';
     toggleSettingsBtn.textContent = isVisible ? '▼' : '▲';
+  }
+}
+
+function togglePromptSection() {
+  if (promptContent && togglePromptBtn) {
+    const isVisible = promptContent.style.display !== 'none';
+    promptContent.style.display = isVisible ? 'none' : 'block';
+    togglePromptBtn.textContent = isVisible ? '▼' : '▲';
+    
+    if (!isVisible) {
+      // Load prompt when expanding
+      loadCustomPrompt();
+    }
   }
 }
 
