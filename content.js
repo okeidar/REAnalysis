@@ -914,95 +914,15 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       () => chrome.storage.local.get(['customPrompt']),
       { customPrompt: null }
     );
-    const promptTemplate = result.customPrompt || `As a real estate investment expert, analyze this property for investment potential. Provide a detailed investment-focused analysis with the following sections:
+    const promptTemplate = result.customPrompt || `Analyze this property for investment potential. Provide:
 
-**PROPERTY FUNDAMENTALS**
-- Price: $XXX,XXX
-- Bedrooms/Bathrooms: X bed / X bath
-- Square Footage: XXXX sq ft (calculate price per sq ft)
-- Year Built: XXXX (calculate property age)
-- Property Type: Single Family/Condo/Townhouse/Multi-family
-- Lot Size: XXXX sq ft (if available)
-- HOA Fees: $XXX/month (if applicable)
+• Price analysis & investment metrics
+• Neighborhood & market overview  
+• Rental income potential
+• Key pros & cons
+• Investment recommendation
 
-**FINANCIAL ANALYSIS**
-- List Price vs Market Value assessment
-- Estimated Monthly Rental Income: $XXXX (research local rental rates)
-- Estimated Monthly Expenses: $XXXX (taxes, insurance, maintenance, vacancy allowance)
-- Estimated Net Cash Flow: $XXXX
-- Cap Rate Estimate: X.X%
-- Cash-on-Cash Return Estimate: X.X% (assuming 20% down)
-- 1% Rule Analysis: Does monthly rent ≥ 1% of purchase price?
-- Total Investment Required: Down payment + closing costs + initial repairs
-
-**MARKET CONDITIONS**
-- Current market trend (buyer's/seller's market)
-- Days on Market vs area average
-- Price History and adjustments
-- Comparable sales in the area (recent 3-6 months)
-- Area appreciation rates (historical)
-- Economic indicators affecting the area
-
-**LOCATION & NEIGHBORHOOD SCORING**
-- Neighborhood Quality: Rate 1-10 (safety, desirability)
-- Schools: Rate 1-10 (check school ratings)
-- Walkability & Transportation: Rate 1-10
-- Job Market & Employment Centers: Rate 1-10
-- Future Development Plans: Any major projects nearby?
-- Population Growth Trends: Growing/stable/declining
-
-**RENTAL MARKET ANALYSIS**
-- Rental Demand: High/Medium/Low
-- Average Rent for Similar Properties: $XXXX
-- Vacancy Rates in Area: X%
-- Tenant Demographics: Professionals/families/students
-- Rental Growth Potential: X% annually
-- Competition Analysis: Number of similar rentals available
-
-**INVESTMENT PROS**
-List 5-7 key advantages:
-- [Specific positive investment factors]
-
-**INVESTMENT CONS & RED FLAGS**
-List 5-7 concerns or risks:
-- [Specific concerns or potential issues]
-
-**CONDITION & MAINTENANCE**
-- Property Condition: Excellent/Good/Fair/Poor
-- Estimated Immediate Repair Costs: $XXXX
-- Major Systems Age: HVAC, roof, plumbing, electrical
-- Annual Maintenance Budget: $XXXX
-- Capital Expenditure Reserves Needed: $XXXX (10-year outlook)
-
-**INVESTMENT RECOMMENDATION**
-- Overall Investment Grade: A/B/C/D/F
-- Investment Strategy Fit: Buy & Hold/Fix & Flip/BRRRR/Avoid
-- Risk Level: Low/Medium/High
-- Expected Total Return (5-year): XX%
-- Key Decision Factors: [Top 3 factors for/against]
-
-**NEXT STEPS**
-- Due Diligence Priorities: [What to investigate further]
-- Negotiation Strategy: [Price/terms recommendations]
-- Timeline Considerations: [Urgency factors]
-
-Property Link: {PROPERTY_URL}
-Analysis Date: {DATE}
-
-**IMPORTANT**: Please copy and paste the key property details from the above link into this chat, then I'll provide my analysis. I need the following information to complete the investment analysis:
-
-• Asking Price
-• Bedrooms/Bathrooms
-• Square Footage
-• Year Built
-• Property Type
-• Address/Location
-• Property Description
-• Any HOA fees
-• Days on Market
-• Any photos or condition details you can share
-
-Once you provide these details, I'll give you the comprehensive investment analysis using the framework above. Focus on actionable investment insights and concrete numbers based on the information you provide.`;
+Property Link: {PROPERTY_URL}`;
 
     // Replace variables in the prompt
     const prompt = promptTemplate
