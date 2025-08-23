@@ -248,10 +248,18 @@ function extractPropertyAnalysisData(responseText) {
       }
     }
     
-    // Extract rental growth potential
-    const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(high|strong|moderate|low|limited)/gi);
-    if (growthMatch && growthMatch[1]) {
-      analysis.extractedData.rentalGrowthPotential = growthMatch[1];
+    // Extract rental growth potential with Excel-friendly format
+    const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
+    if (growthMatch && growthMatch[0]) {
+      // Check if it already has "Growth:" prefix
+      if (growthMatch[0].toLowerCase().includes('growth:')) {
+        analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
+      } else {
+        const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+        if (match) {
+          analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+        }
+      }
       console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
     }
     
@@ -934,7 +942,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
 6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
 7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
 8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as High/Strong/Moderate/Low/Limited based on area development and market trends
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
 
 **ANALYSIS STRUCTURE:**
 Please organize your response with clear sections:
@@ -952,7 +960,7 @@ Please organize your response with clear sections:
 **RENTAL INCOME ANALYSIS:**
 - Provide your estimated monthly rental income with reasoning
 - Compare to local rental comps if possible
-- Assess rental growth potential (High/Strong/Moderate/Low/Limited) with specific factors:
+- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
   * Population growth trends
   * Economic development in the area
   * New construction and inventory levels

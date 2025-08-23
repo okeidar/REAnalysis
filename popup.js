@@ -799,7 +799,7 @@ const DEFAULT_PROMPT = `You are a professional real estate investment analyst. P
 6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
 7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
 8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as High/Strong/Moderate/Low/Limited based on area development and market trends
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
 
 **ANALYSIS STRUCTURE:**
 Please organize your response with clear sections:
@@ -817,7 +817,7 @@ Please organize your response with clear sections:
 **RENTAL INCOME ANALYSIS:**
 - Provide your estimated monthly rental income with reasoning
 - Compare to local rental comps if possible
-- Assess rental growth potential (High/Strong/Moderate/Low/Limited) with specific factors:
+- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
   * Population growth trends
   * Economic development in the area
   * New construction and inventory levels
@@ -962,7 +962,7 @@ const DEFAULT_COLUMNS = [
   
   // Location & Scoring
   { id: 'locationScore', name: 'Location & Neighborhood Scoring', description: 'Location quality score (e.g., 7/10, 2/10)', category: 'scoring', enabled: true, order: 8 },
-  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Assessment of rental income growth potential', category: 'analysis', enabled: true, order: 9 },
+  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Assessment of rental income growth potential (Growth: High/Strong/Moderate/Low/Limited)', category: 'analysis', enabled: true, order: 9 },
   
   // Additional Optional Columns (disabled by default)
   { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: false, order: 10 },
@@ -1709,25 +1709,25 @@ async function exportPropertyHistory() {
       return `${score}/10`;
     };
     
-    // Helper function to infer rental growth potential (fallback)
+    // Helper function to assess rental growth potential
     const inferRentalGrowthPotential = (analysis) => {
-      if (!analysis) return 'Moderate';
+      if (!analysis) return 'Growth: Moderate';
       
       const text = analysis.toLowerCase();
       
       if (text.includes('growing area') || text.includes('development') || 
-          text.includes('gentrification') || text.includes('upcoming')) return 'High';
+          text.includes('gentrification') || text.includes('upcoming')) return 'Growth: High';
       
       if (text.includes('strong rental market') || text.includes('high demand') ||
-          text.includes('good investment') || text.includes('appreciating')) return 'Strong';
+          text.includes('good investment') || text.includes('appreciating')) return 'Growth: Strong';
       
       if (text.includes('declining') || text.includes('saturated market') ||
-          text.includes('poor prospects') || text.includes('stagnant')) return 'Low';
+          text.includes('poor prospects') || text.includes('stagnant')) return 'Growth: Low';
       
       if (text.includes('limited') || text.includes('slow growth') ||
-          text.includes('mature market')) return 'Limited';
+          text.includes('mature market')) return 'Growth: Limited';
       
-      return 'Moderate';
+      return 'Growth: Moderate';
     };
     
     // Create CSV content
@@ -1770,7 +1770,7 @@ async function exportPropertyHistory() {
             return data.locationScore || inferLocationScore(item.analysis?.fullAnalysis || '');
             
           case 'rentalGrowthPotential':
-            return `"${data.growthPotential || inferRentalGrowthPotential(item.analysis?.fullAnalysis || '')}"`;
+            return `"${data.growthPotential || data.rentalGrowthPotential || inferRentalGrowthPotential(item.analysis?.fullAnalysis || '')}"`;
             
           case 'address':
             return `"${item.url}"`;
