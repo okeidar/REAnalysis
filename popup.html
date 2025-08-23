@@ -335,8 +335,38 @@
     </div>
   </div>
   
+  <div id="settingsSection" class="settings-section" style="display: none;">
+    <div class="section-title">
+      ⚙️ Analysis Prompt Settings
+      <button id="toggleSettingsBtn" class="btn-toggle">▼</button>
+    </div>
+    <div id="settingsContent" class="settings-content" style="display: none;">
+      <div class="setting-item">
+        <label for="customPrompt">Custom Analysis Prompt:</label>
+        <textarea id="customPrompt" class="prompt-textarea" rows="8" placeholder="Enter your custom prompt here..."></textarea>
+        <div class="prompt-help">
+          <p><strong>Available Variables:</strong></p>
+          <ul>
+            <li><code>{PROPERTY_URL}</code> - The property link</li>
+            <li><code>{DATE}</code> - Current date</li>
+          </ul>
+          <p><strong>Tip:</strong> Structure your prompt to get consistent analysis sections like pros, cons, market analysis, etc.</p>
+        </div>
+      </div>
+      <div class="setting-actions">
+        <button id="resetPromptBtn" class="btn btn-secondary btn-small">🔄 Reset to Default</button>
+        <button id="savePromptBtn" class="btn btn-primary btn-small">💾 Save Prompt</button>
+      </div>
+      <div class="default-prompt-section">
+        <button id="showDefaultBtn" class="btn btn-link btn-small">📄 View Default Prompt</button>
+        <div id="defaultPromptDisplay" class="default-prompt-display" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+  
   <div class="footer">
     <div class="version">Version 1.0.2</div>
+    <button id="settingsToggle" class="settings-toggle">⚙️</button>
   </div>
   
   <script src="popup.js"></script>

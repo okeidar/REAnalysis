@@ -4,7 +4,8 @@
 let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, analyzeBtn, 
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
     successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
-    propertyHistorySection;
+    propertyHistorySection, settingsSection, settingsToggle, toggleSettingsBtn, settingsContent,
+    customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay;
 
 // Global variables
 let currentTab = null;
@@ -29,6 +30,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   infoElement = document.getElementById('info');
   siteElement = document.getElementById('site');
   urlElement = document.getElementById('url');
+  
+  // Settings elements
+  settingsSection = document.getElementById('settingsSection');
+  settingsToggle = document.getElementById('settingsToggle');
+  toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+  settingsContent = document.getElementById('settingsContent');
+  customPromptTextarea = document.getElementById('customPrompt');
+  savePromptBtn = document.getElementById('savePromptBtn');
+  resetPromptBtn = document.getElementById('resetPromptBtn');
+  showDefaultBtn = document.getElementById('showDefaultBtn');
+  defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
 
   // Set up event listeners
   if (clearHistoryBtn) clearHistoryBtn.addEventListener('click', async function() {
@@ -50,6 +62,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Settings event listeners
+  if (settingsToggle) settingsToggle.addEventListener('click', toggleSettings);
+  if (toggleSettingsBtn) toggleSettingsBtn.addEventListener('click', toggleSettingsContent);
+  if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
+  if (resetPromptBtn) resetPromptBtn.addEventListener('click', resetToDefaultPrompt);
+  if (showDefaultBtn) showDefaultBtn.addEventListener('click', toggleDefaultPrompt);
+
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.propertyHistory) {
@@ -61,6 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load initial data and check site status
   await loadPropertyHistory();
+  await loadCustomPrompt();
   await initializePopup();
   
   // Set up periodic refresh for pending analyses
@@ -875,5 +895,113 @@ async function initializePopup() {
     console.error('Failed to initialize popup:', error);
     statusElement.className = 'status inactive';
     statusElement.textContent = '⚠️ Unable to check status';
+  }
+}
+
+// Default prompt template
+const DEFAULT_PROMPT = `Please analyze this property listing and provide a comprehensive analysis including:
+
+1. **Property Details**: Extract key information like price, size, bedrooms, bathrooms, year built, property type, and location.
+
+2. **Market Analysis**: Evaluate the pricing compared to market value, comparable properties, and current market conditions.
+
+3. **Neighborhood Assessment**: Analyze the location, amenities, schools, transportation, and area developments.
+
+4. **Pros and Cons**: List the main advantages and disadvantages of this property.
+
+5. **Investment Potential**: Assess the investment viability, potential appreciation, rental income possibilities, and ROI.
+
+6. **Red Flags**: Identify any concerns, issues, or potential problems to be aware of.
+
+Property Link: {PROPERTY_URL}
+
+Please visit the link and provide your analysis based on the property information. Structure your response with clear sections for easy extraction and comparison.
+
+Analysis Date: {DATE}`;
+
+// Settings Functions
+async function loadCustomPrompt() {
+  try {
+    const result = await chrome.storage.local.get(['customPrompt']);
+    const customPrompt = result.customPrompt || DEFAULT_PROMPT;
+    if (customPromptTextarea) {
+      customPromptTextarea.value = customPrompt;
+    }
+  } catch (error) {
+    console.error('Error loading custom prompt:', error);
+  }
+}
+
+async function saveCustomPrompt() {
+  try {
+    const customPrompt = customPromptTextarea.value.trim();
+    if (!customPrompt) {
+      showError('Prompt cannot be empty');
+      return;
+    }
+    
+    await chrome.storage.local.set({ customPrompt: customPrompt });
+    showSuccess('Custom prompt saved successfully!');
+  } catch (error) {
+    console.error('Error saving custom prompt:', error);
+    showError('Failed to save custom prompt');
+  }
+}
+
+async function resetToDefaultPrompt() {
+  if (confirm('Are you sure you want to reset to the default prompt? This will overwrite your current custom prompt.')) {
+    try {
+      await chrome.storage.local.set({ customPrompt: DEFAULT_PROMPT });
+      if (customPromptTextarea) {
+        customPromptTextarea.value = DEFAULT_PROMPT;
+      }
+      showSuccess('Prompt reset to default successfully!');
+    } catch (error) {
+      console.error('Error resetting prompt:', error);
+      showError('Failed to reset prompt');
+    }
+  }
+}
+
+function toggleSettings() {
+  if (settingsSection) {
+    const isVisible = settingsSection.style.display !== 'none';
+    settingsSection.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+      // Show settings section and load current prompt
+      loadCustomPrompt();
+    }
+  }
+}
+
+function toggleSettingsContent() {
+  if (settingsContent && toggleSettingsBtn) {
+    const isVisible = settingsContent.style.display !== 'none';
+    settingsContent.style.display = isVisible ? 'none' : 'block';
+    toggleSettingsBtn.textContent = isVisible ? '▼' : '▲';
+  }
+}
+
+function toggleDefaultPrompt() {
+  if (defaultPromptDisplay && showDefaultBtn) {
+    const isVisible = defaultPromptDisplay.style.display !== 'none';
+    defaultPromptDisplay.style.display = isVisible ? 'none' : 'block';
+    showDefaultBtn.textContent = isVisible ? '📄 View Default Prompt' : '📄 Hide Default Prompt';
+    
+    if (!isVisible) {
+      defaultPromptDisplay.textContent = DEFAULT_PROMPT;
+    }
+  }
+}
+
+// Function to get the current prompt (custom or default)
+async function getCurrentPrompt() {
+  try {
+    const result = await chrome.storage.local.get(['customPrompt']);
+    return result.customPrompt || DEFAULT_PROMPT;
+  } catch (error) {
+    console.error('Error getting current prompt:', error);
+    return DEFAULT_PROMPT;
   }
 }

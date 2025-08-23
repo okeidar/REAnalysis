@@ -863,18 +863,32 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Wait for input field to be available
     const inputField = await waitForInputField(5000);
     
-    const prompt = `Please analyze this property listing and provide a comprehensive analysis including:
+    // Get custom prompt from storage or use default
+    const result = await chrome.storage.local.get(['customPrompt']);
+    const promptTemplate = result.customPrompt || `Please analyze this property listing and provide a comprehensive analysis including:
 
-1. Property details (price, size, location, etc.)
-2. Market analysis and price evaluation
-3. Neighborhood information
-4. Pros and cons
-5. Investment potential (if applicable)
-6. Any red flags or concerns
+1. **Property Details**: Extract key information like price, size, bedrooms, bathrooms, year built, property type, and location.
 
-Property Link: ${propertyLink}
+2. **Market Analysis**: Evaluate the pricing compared to market value, comparable properties, and current market conditions.
 
-Please visit the link and provide your analysis based on the property information.`;
+3. **Neighborhood Assessment**: Analyze the location, amenities, schools, transportation, and area developments.
+
+4. **Pros and Cons**: List the main advantages and disadvantages of this property.
+
+5. **Investment Potential**: Assess the investment viability, potential appreciation, rental income possibilities, and ROI.
+
+6. **Red Flags**: Identify any concerns, issues, or potential problems to be aware of.
+
+Property Link: {PROPERTY_URL}
+
+Please visit the link and provide your analysis based on the property information. Structure your response with clear sections for easy extraction and comparison.
+
+Analysis Date: {DATE}`;
+
+    // Replace variables in the prompt
+    const prompt = promptTemplate
+      .replace('{PROPERTY_URL}', propertyLink)
+      .replace('{DATE}', new Date().toLocaleDateString());
     
     console.log('Inserting prompt into input field:', inputField);
     
