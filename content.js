@@ -1343,6 +1343,9 @@ Property Link: {PROPERTY_URL}`;
 // Function to insert text into ChatGPT input
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
+  console.log('🔗 Property link type:', typeof propertyLink);
+  console.log('🔗 Property link length:', propertyLink ? propertyLink.length : 0);
+  console.log('🔗 Property link valid URL:', propertyLink ? 'YES' : 'NO');
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
@@ -1370,6 +1373,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     
     // Get dynamic prompt based on column configuration
     let promptTemplate;
+    let promptSource = '';
     try {
       // Try to get custom prompt first, then generate dynamic prompt based on columns
       const result = await safeChromeFall(
@@ -1380,19 +1384,40 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       if (result.customPrompt) {
         // Use custom prompt if available
         promptTemplate = result.customPrompt;
+        promptSource = 'custom';
+        console.log('📋 Using custom prompt from storage');
       } else {
         // Generate dynamic prompt based on enabled columns
         promptTemplate = await generateDynamicPromptForContent(result.columnConfiguration);
+        promptSource = 'dynamic';
+        console.log('🔧 Generated dynamic prompt based on column configuration');
       }
     } catch (error) {
       console.error('Error getting prompt configuration:', error);
       promptTemplate = getDefaultPrompt();
+      promptSource = 'default';
+      console.log('⚠️ Falling back to default prompt due to error');
     }
 
     // Replace variables in the prompt
+    console.log('🔗 Property link to insert:', propertyLink);
+    console.log('📋 Prompt source:', promptSource);
+    console.log('🔍 Template contains {PROPERTY_URL}:', promptTemplate.includes('{PROPERTY_URL}') ? '✅ YES' : '❌ NO');
+    console.log('📝 Prompt template before replacement:', promptTemplate.substring(promptTemplate.length - 100));
+    
     const prompt = promptTemplate
       .replace('{PROPERTY_URL}', propertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
+    
+    // Safety check: ensure property URL is included even if placeholder was missing
+    let finalPrompt = prompt;
+    if (!finalPrompt.includes(propertyLink)) {
+      console.log('⚠️ Property URL not found in prompt, adding it manually');
+      finalPrompt = finalPrompt + '\n\nProperty Link: ' + propertyLink;
+    }
+    
+    console.log('📝 Final prompt with URL:', finalPrompt.substring(finalPrompt.length - 200));
+    console.log('🔍 Checking if URL was replaced:', finalPrompt.includes(propertyLink) ? '✅ YES' : '❌ NO');
     
     console.log('Inserting prompt into input field:', inputField);
     
@@ -1400,7 +1425,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     if (inputField.tagName === 'TEXTAREA') {
       inputField.value = '';
       inputField.focus();
-      inputField.value = prompt;
+      inputField.value = finalPrompt;
       
       // Trigger input events
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1409,7 +1434,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     } else if (inputField.contentEditable === 'true') {
       inputField.textContent = '';
       inputField.focus();
-      inputField.textContent = prompt;
+      inputField.textContent = finalPrompt;
       
       // Trigger input events for contenteditable
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
