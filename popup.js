@@ -1856,6 +1856,14 @@ async function exportPropertyHistory() {
   }
 }
 
+// Helper function to get custom column value from property data
+function getCustomColumnValue(propertyItem, column) {
+  if (propertyItem.customColumns && propertyItem.customColumns[column.id]) {
+    return propertyItem.customColumns[column.id];
+  }
+  return column.defaultValue || '';
+}
+
 // PROMPT SPLITTING FUNCTIONS
 
 // Function to load prompt splitting settings

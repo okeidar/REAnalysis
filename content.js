@@ -47,7 +47,8 @@ let promptSplittingState = {
     averageConfirmationTime: [],
     failureReasons: {},
     fallbackReasons: {},
-    confirmationTimes: []
+    confirmationTimes: [],
+    lastAttemptTime: 0
   }
 };
 
@@ -240,78 +241,75 @@ async function executeTwoPhasePromptSplit(promptData, propertyLink) {
   console.log(`📋 Phase 1: Sending instructions (${promptData.instructions.length} chars)`);
   console.log(`🔗 Phase 2 ready: Property link (${promptData.propertyLink.length} chars)`);
   
-  try {
+    try {
     // Retry loop for the entire splitting process
     for (let attempt = 1; attempt <= splittingSession.maxRetries; attempt++) {
-    splittingSession.retryCount = attempt - 1;
-    
-    try {
-      console.log(`🔄 Attempt ${attempt}/${splittingSession.maxRetries} for prompt splitting`);
+      splittingSession.retryCount = attempt - 1;
       
-      // Phase 1: Send instructions and wait for confirmation
-      const phase1Success = await sendInstructionsAndWaitForConfirmation(promptData.instructions);
-      
-      if (phase1Success) {
-        console.log('✅ Phase 1 completed successfully, proceeding to Phase 2');
-        splittingSession.phase = 'property';
+      try {
+        console.log(`🔄 Attempt ${attempt}/${splittingSession.maxRetries} for prompt splitting`);
         
-        // Small delay before sending property link
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Phase 1: Send instructions and wait for confirmation
+        const phase1Success = await sendInstructionsAndWaitForConfirmation(promptData.instructions);
         
-        // Phase 2: Send property link
-        const phase2Success = await sendPropertyLink(promptData.propertyLink);
-        
-        if (phase2Success) {
-          console.log('✅ Two-phase prompt splitting completed successfully');
-          splittingSession.completedAt = Date.now();
-          const duration = splittingSession.completedAt - splittingSession.startTime;
-          updateSplittingAnalytics('split_success', { duration: duration });
+        if (phase1Success) {
+          console.log('✅ Phase 1 completed successfully, proceeding to Phase 2');
+          splittingSession.phase = 'property';
           
-          // Keep only last 50 timing measurements
-          if (promptSplittingState.analytics.averageConfirmationTime.length > 50) {
-            promptSplittingState.analytics.averageConfirmationTime.shift();
+          // Small delay before sending property link
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Phase 2: Send property link
+          const phase2Success = await sendPropertyLink(promptData.propertyLink);
+          
+          if (phase2Success) {
+            console.log('✅ Two-phase prompt splitting completed successfully');
+            splittingSession.completedAt = Date.now();
+            const duration = splittingSession.completedAt - splittingSession.startTime;
+            updateSplittingAnalytics('split_success', { duration: duration });
+            
+            await savePromptSplittingAnalytics();
+            return true;
+          } else {
+            console.log(`⚠️ Phase 2 failed on attempt ${attempt}`);
+            if (attempt < splittingSession.maxRetries) {
+              console.log(`🔄 Retrying in 2 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              splittingSession.phase = 'instructions'; // Reset to instructions phase
+              continue;
+            }
           }
-          
-          await savePromptSplittingAnalytics();
-          return true;
         } else {
-          console.log(`⚠️ Phase 2 failed on attempt ${attempt}`);
+          console.log(`⚠️ Phase 1 failed on attempt ${attempt}`);
           if (attempt < splittingSession.maxRetries) {
-            console.log(`🔄 Retrying in 2 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            splittingSession.phase = 'instructions'; // Reset to instructions phase
+            console.log(`🔄 Retrying in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             continue;
           }
         }
-      } else {
-        console.log(`⚠️ Phase 1 failed on attempt ${attempt}`);
+        
+      } catch (error) {
+        console.error(`❌ Error during splitting attempt ${attempt}:`, error);
         if (attempt < splittingSession.maxRetries) {
-          console.log(`🔄 Retrying in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
+          console.log(`🔄 Retrying after error in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, 3000));
+          splittingSession.phase = 'instructions'; // Reset to instructions phase
           continue;
         }
       }
-      
-    } catch (error) {
-      console.error(`❌ Error during splitting attempt ${attempt}:`, error);
-      if (attempt < splittingSession.maxRetries) {
-        console.log(`🔄 Retrying after error in 3 seconds... (attempt ${attempt + 1}/${splittingSession.maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        splittingSession.phase = 'instructions'; // Reset to instructions phase
-        continue;
-             }
-     }
-     
-     console.log(`❌ All ${splittingSession.maxRetries} attempts failed, prompt splitting unsuccessful`);
-     updateSplittingAnalytics('split_failed', { reason: 'Max retries reached' });
-     return false;
-   } finally {
-  // Clean up session
-  if (splittingSession) {
-    console.log(`🧹 Cleaning up splitting session: ${splittingSession.id}`);
-    splittingSession = null;
+    }
+    
+    console.log(`❌ All ${splittingSession.maxRetries} attempts failed, prompt splitting unsuccessful`);
+    updateSplittingAnalytics('split_failed', { reason: 'Max retries reached' });
+    return false;
+    
+  } finally {
+    // Clean up session
+    if (splittingSession) {
+      console.log(`🧹 Cleaning up splitting session: ${splittingSession.id}`);
+      splittingSession = null;
+    }
   }
-}
 
 // Function to send instructions and wait for confirmation
 async function sendInstructionsAndWaitForConfirmation(instructionText) {
@@ -1764,15 +1762,28 @@ if (isChatGPTSite()) {
       
     } else if (request.action === 'getPromptSplittingAnalytics') {
       console.log('Retrieving prompt splitting analytics');
-      sendResponse({
-        success: true,
-        analytics: promptSplittingState.analytics,
-        currentSession: splittingSession ? {
-          id: splittingSession.id,
-          phase: splittingSession.phase,
-          duration: Date.now() - splittingSession.startTime
-        } : null
-      });
+      try {
+        sendResponse({
+          success: true,
+          analytics: promptSplittingState.analytics || {
+            splitAttempts: 0,
+            splitSuccesses: 0,
+            fallbackUses: 0,
+            averageConfirmationTime: [],
+            failureReasons: {},
+            fallbackReasons: {},
+            confirmationTimes: []
+          },
+          currentSession: splittingSession ? {
+            id: splittingSession.id,
+            phase: splittingSession.phase,
+            duration: Date.now() - splittingSession.startTime
+          } : null
+        });
+      } catch (error) {
+        console.error('Error getting analytics:', error);
+        sendResponse({ success: false, error: error.message });
+      }
     }
   });
   
