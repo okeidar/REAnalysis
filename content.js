@@ -45,6 +45,8 @@ function extractPropertyAnalysisData(responseText) {
   
   console.log('🔍 Starting comprehensive property data extraction...');
   console.log('📝 Response length:', responseText.length, 'characters');
+  console.log('📝 Response sample (first 300 chars):', responseText.substring(0, 300));
+  console.log('📝 Response sample (last 200 chars):', responseText.substring(responseText.length - 200));
   
   const analysis = {
     fullResponse: responseText,
@@ -89,7 +91,8 @@ function extractPropertyAnalysisData(responseText) {
       validator: (value) => {
         return value && value.length > 5 && value.length < 150 && 
                /\d/.test(value) && // Should contain at least one number
-               !/^(the|this|that|property|listing)$/i.test(value.trim());
+               !/^(the|this|that|property|listing)$/i.test(value.trim()) &&
+               !/\b(bed|bedroom|bath|bathroom|sqft|square|price|year|built|rent|rental)\b/i.test(value); // Reject property-related terms
       }
     },
     
@@ -329,6 +332,9 @@ function extractPropertyAnalysisData(responseText) {
         if (bestMatch) {
           analysis.extractedData[key] = bestMatch;
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+          console.log(`📍 Context for ${key}:`, match.input.substring(Math.max(0, match.index - 30), match.index + match[0].length + 30));
+        } else {
+          console.log(`❌ Failed to extract ${key}`);
         }
       }
     }
@@ -436,6 +442,7 @@ function extractPropertyAnalysisData(responseText) {
     if (!analysis.extractedData[fieldName]) { // Only extract if not already found in structured sections
       let bestMatch = null;
       let bestScore = 0;
+      let bestMatchContext = '';
       
       for (const pattern of extractor.patterns) {
         pattern.lastIndex = 0; // Reset regex
@@ -449,6 +456,7 @@ function extractPropertyAnalysisData(responseText) {
                 if (score > bestScore) {
                   bestMatch = value;
                   bestScore = score;
+                  bestMatchContext = match.input.substring(Math.max(0, match.index - 30), match.index + match[0].length + 30);
                 }
               }
             }
@@ -459,6 +467,7 @@ function extractPropertyAnalysisData(responseText) {
       if (bestMatch) {
         analysis.extractedData[fieldName] = bestMatch;
         console.log(`✅ Extracted ${fieldName}:`, bestMatch);
+        console.log(`📍 Context for ${fieldName}:`, bestMatchContext);
       } else {
         console.log(`❌ Failed to extract ${fieldName}`);
       }
@@ -1343,12 +1352,29 @@ Focus on data accuracy and practical investment considerations that would be val
 function getSimpleTestPrompt() {
   return `Analyze this property: {PROPERTY_URL}
 
-Please provide:
-1. Property price
-2. Number of bedrooms
-3. Property type
+I need you to extract specific property information and present it in this exact format:
 
-Keep your response concise.`;
+**PROPERTY DETAILS:**
+- Street Name: [property address]
+- Property Price: [exact asking price with $]
+- Number of Bedrooms: [number]
+- Bathrooms: [number, include .5 for half baths]
+- Square Footage: [number]
+- Year Built: [4-digit year]
+- Type of Property: [House/Apartment/Condo/etc]
+- Neighborhood: [area/neighborhood name]
+
+**RENTAL ANALYSIS:**
+- Estimated Monthly Rental Income: $[amount]
+- Location Score: [X/10]
+- Rental Growth Potential: Growth: [High/Strong/Moderate/Low/Limited]
+
+**INVESTMENT SUMMARY:**
+- Top 3 Pros: [list key advantages]
+- Top 3 Cons: [list main concerns]
+- Red Flags: [any warning signs]
+
+Please follow this format exactly so the data can be properly extracted.`;
 }
 
 function getComprehensiveDefaultPrompt() {
@@ -1458,16 +1484,16 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
         promptSource = 'dynamic';
         console.log('🔧 Generated dynamic prompt based on column configuration');
       } else {
-        // Use simple test prompt when no custom prompt and no column config (for testing)
-        promptTemplate = getSimpleTestPrompt();
-        promptSource = 'simple_test';
-        console.log('📋 Using simple test prompt (no custom settings)');
+        // Use comprehensive default prompt when no custom prompt and no column config
+        promptTemplate = getComprehensiveDefaultPrompt();
+        promptSource = 'comprehensive_default';
+        console.log('📋 Using comprehensive default prompt (no custom settings)');
       }
     } catch (error) {
       console.error('Error getting prompt configuration:', error);
-      promptTemplate = getSimpleTestPrompt(); // Temporarily use simple prompt for testing
-      promptSource = 'simple_test';
-      console.log('⚠️ Falling back to simple test prompt due to error');
+      promptTemplate = getComprehensiveDefaultPrompt();
+      promptSource = 'comprehensive_default';
+      console.log('⚠️ Falling back to comprehensive default prompt due to error');
     }
 
     // Replace variables in the prompt
