@@ -115,6 +115,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+
+
   // Load initial data and check site status
   await loadPropertyHistory();
   await loadCustomPrompt();
@@ -1426,6 +1428,11 @@ function clearCustomColumnForm() {
 
 async function addCustomColumn() {
   try {
+    if (!customColumnName || !customColumnType) {
+      showError('Form elements not found. Please refresh the extension.');
+      return;
+    }
+    
     const name = customColumnName.value.trim();
     const type = customColumnType.value;
     const description = customColumnDescription.value.trim();
