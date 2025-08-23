@@ -5,158 +5,243 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChatGPT Helper</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+    
     body {
-      width: 300px;
-      min-height: 200px;
+      width: 380px;
+      min-height: 500px;
       margin: 0;
-      padding: 16px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f8f9fa;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #2d3748;
+      line-height: 1.5;
+    }
+    
+    .container {
+      background: #ffffff;
+      border-radius: 0;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      overflow: hidden;
     }
     
     .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px 20px;
       text-align: center;
-      margin-bottom: 16px;
+      position: relative;
+    }
+    
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+    }
+    
+    .header-content {
+      position: relative;
+      z-index: 1;
     }
     
     .logo {
-      font-size: 24px;
+      font-size: 28px;
       margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
     
     .title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
-      color: #333;
       margin: 0;
+      opacity: 0.95;
+    }
+    
+    .subtitle {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-top: 4px;
+      font-weight: 400;
+    }
+    
+    .main-content {
+      padding: 24px 20px;
     }
     
     .status {
-      padding: 12px;
-      border-radius: 8px;
-      margin: 16px 0;
+      padding: 16px;
+      border-radius: 12px;
+      margin: 20px 0;
       text-align: center;
       font-size: 14px;
+      font-weight: 500;
+      border: none;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
     
     .status.active {
-      background: #d1f2eb;
-      color: #0d8a69;
-      border: 1px solid #10a37f;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
     }
     
     .status.inactive {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #dc3545;
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white;
+    }
+    
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+      border: none;
+      margin: 16px 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      transition: all 0.2s ease;
+    }
+    
+    .card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
     
     .info {
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #e1e5e9;
-      margin: 8px 0;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      margin: 12px 0;
     }
     
     .info-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #666;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
     }
     
     .info-value {
       font-size: 14px;
-      color: #333;
+      color: #334155;
       word-break: break-all;
+      font-weight: 500;
     }
 
     .property-link-section {
       background: white;
-      padding: 16px;
-      border-radius: 8px;
-      border: 1px solid #e1e5e9;
-      margin: 16px 0;
+      padding: 24px;
+      border-radius: 16px;
+      border: none;
+      margin: 20px 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
 
     .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+    }
+    
+    .section-title .emoji {
+      font-size: 18px;
     }
 
     .link-input {
       width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
       font-size: 14px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
       box-sizing: border-box;
       resize: vertical;
-      min-height: 36px;
+      min-height: 44px;
+      transition: all 0.2s ease;
+      background: #f8fafc;
     }
 
     .link-input:focus {
       outline: none;
-      border-color: #10a37f;
-      box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.1);
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      background: white;
     }
 
     .link-input::placeholder {
-      color: #9ca3af;
+      color: #94a3b8;
+      font-weight: 400;
     }
 
     .action-buttons {
       display: flex;
-      gap: 8px;
+      gap: 12px;
     }
 
     .btn {
       flex: 1;
-      padding: 8px 16px;
+      padding: 12px 20px;
       border: none;
-      border-radius: 6px;
+      border-radius: 12px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
     }
 
     .btn-primary {
-      background: #10a37f;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
     }
 
     .btn-primary:hover:not(:disabled) {
-      background: #0d8a69;
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
     }
 
     .btn-secondary {
-      background: #f3f4f6;
-      color: #374151;
-      border: 1px solid #d1d5db;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      color: #475569;
+      border: 2px solid #e2e8f0;
     }
 
     .btn-secondary:hover:not(:disabled) {
-      background: #e5e7eb;
+      background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+      color: #334155;
     }
 
     .btn:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       cursor: not-allowed;
+      transform: none !important;
     }
 
     .btn-small {
-      padding: 6px 12px;
+      padding: 8px 16px;
       font-size: 12px;
       flex: none;
+      font-weight: 600;
     }
 
     .success-message {
@@ -180,15 +265,38 @@
     }
     
     .footer {
-      text-align: center;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #e1e5e9;
+      background: #f8fafc;
+      margin-top: 0;
+      padding: 16px 20px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     
     .version {
-      font-size: 12px;
-      color: #666;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .settings-toggle {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .settings-toggle:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
     
     .loading {
@@ -289,10 +397,16 @@
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">🤖</div>
-    <h1 class="title">ChatGPT Helper</h1>
-  </div>
+  <div class="container">
+    <div class="header">
+      <div class="header-content">
+        <div class="logo">🏠</div>
+        <h1 class="title">Real Estate Investment Analyzer</h1>
+        <div class="subtitle">AI-Powered Property Analysis</div>
+      </div>
+    </div>
+    
+    <div class="main-content">
   
   <div id="status" class="status loading">
     Checking status...
@@ -312,7 +426,7 @@
   
   <div id="propertyLinkSection" class="property-link-section" style="display: none;">
     <div class="section-title">
-      🏠 Property Link Analyzer
+      <span class="emoji">🏡</span> Property Link Analyzer
     </div>
     <textarea 
       id="propertyLinkInput" 
@@ -330,7 +444,7 @@
   
   <div id="propertyHistorySection" class="property-link-section" style="display: none;">
     <div class="section-title">
-      📋 Analyzed Properties History
+      <span class="emoji">📊</span> Analyzed Properties History
       <button id="clearHistoryBtn" class="btn-clear">🗑️</button>
     </div>
     <div id="propertyHistoryList" class="property-history-list">
@@ -343,7 +457,7 @@
   
   <div id="settingsSection" class="settings-section" style="display: block;">
     <div class="section-title">
-      ⚙️ Export & Analysis Settings
+      <span class="emoji">⚙️</span> Export & Analysis Settings
       <button id="toggleSettingsBtn" class="btn-toggle">▲</button>
     </div>
     <div id="settingsContent" class="settings-content" style="display: block;">
@@ -457,10 +571,13 @@
      </div>
    </div>
   
-  <div class="footer">
-    <div class="version">Version 1.0.2</div>
-    <button id="settingsToggle" class="settings-toggle">⚙️</button>
-  </div>
+    </div> <!-- End main-content -->
+    
+    <div class="footer">
+      <div class="version">Version 1.0.2</div>
+      <button id="settingsToggle" class="settings-toggle">⚙️</button>
+    </div>
+  </div> <!-- End container -->
   
   <script src="popup.js"></script>
 </body>
