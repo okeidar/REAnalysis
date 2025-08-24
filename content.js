@@ -149,8 +149,12 @@ function removePromptSplittingIndicator() {
 
 // Handler for when confirmation is received
 async function handleConfirmationReceived() {
+  console.log('🔗 Checking pending property link:', promptSplittingState.pendingPropertyLink);
+  console.log('🔗 Prompt splitting state:', promptSplittingState);
+  
   if (!promptSplittingState.pendingPropertyLink) {
     console.error('❌ No pending property link to send');
+    console.error('❌ Current prompt splitting state:', promptSplittingState);
     return;
   }
   
@@ -172,7 +176,16 @@ async function handleConfirmationReceived() {
       throw new Error('Could not find input field for sending link');
     }
     
-    const linkMessage = `Please analyze this property listing: ${promptSplittingState.pendingPropertyLink}`;
+    const propertyLink = promptSplittingState.pendingPropertyLink;
+    console.log('🔗 About to create link message with:', propertyLink);
+    
+    if (!propertyLink || propertyLink === 'null' || propertyLink === 'undefined') {
+      console.error('❌ Invalid property link detected:', propertyLink);
+      await handleSplittingFallback();
+      return;
+    }
+    
+    const linkMessage = `Please analyze this property listing: ${propertyLink}`;
     
     // Insert the link message
     if (inputField.tagName === 'TEXTAREA') {
@@ -1373,6 +1386,8 @@ function waitForInputField(maxWait = 10000) {
 // Function to insert text into ChatGPT input
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
+  console.log('🔍 Property link type:', typeof propertyLink);
+  console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
@@ -1428,6 +1443,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       
       console.log('📤 Sending instructions first...');
       console.log('📝 Instructions length:', splitPrompt.instructions.length);
+      console.log('🔗 Pending property link:', promptSplittingState.pendingPropertyLink);
       
       // Insert instructions first
       if (inputField.tagName === 'TEXTAREA') {
@@ -1633,6 +1649,9 @@ if (isChatGPTSite()) {
       
     } else if (request.action === 'analyzeProperty') {
       console.log('Received property analysis request:', request.link);
+      console.log('🔍 Request object:', request);
+      console.log('🔍 Link type:', typeof request.link);
+      console.log('🔍 Link value:', request.link);
       
       // Handle async operation properly
       (async () => {
