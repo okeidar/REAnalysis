@@ -1856,12 +1856,16 @@ function setupResponseMonitor() {
     ).length;
     
     console.log(`Found ${keywordMatches} property keywords in completed response`);
+    console.log('🔍 Keywords found:', propertyKeywords.filter(keyword => 
+      messageText.toLowerCase().includes(keyword)
+    ));
     
     if (keywordMatches >= 2) {
       // Add null check for currentPropertyAnalysis
       if (!currentPropertyAnalysis) {
         console.log('⚠️ No active property analysis session, but detected property keywords');
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
+        console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
         // If we're in prompt splitting mode, this could be the analysis response
         if (promptSplittingState.currentPhase === 'complete' || 
@@ -2712,6 +2716,117 @@ window.testCurrentExtraction = function() {
     return window.testPropertyExtraction(messageText);
   } else {
     console.log('❌ No ChatGPT messages found on current page');
+    return null;
+  }
+};
+
+// Comprehensive diagnostic function
+window.diagnoseProblem = function() {
+  console.log('🔍=== COMPREHENSIVE EXTRACTION DIAGNOSIS ===');
+  
+  // 1. Check if extension is properly loaded
+  console.log('📋 1. Extension Status:');
+  console.log('   Extension active:', typeof extractPropertyAnalysisData === 'function');
+  console.log('   Current URL:', window.location.href);
+  console.log('   Is ChatGPT site:', window.location.hostname.includes('chatgpt.com') || window.location.hostname.includes('openai.com'));
+  
+  // 2. Check for ChatGPT messages
+  console.log('📋 2. ChatGPT Messages:');
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  console.log('   Total assistant messages found:', messages.length);
+  
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    console.log('   Last message length:', messageText.length);
+    console.log('   Last message preview:', messageText.substring(0, 200) + '...');
+    
+    // 3. Check keyword detection
+    console.log('📋 3. Keyword Detection:');
+    const propertyKeywords = [
+      'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
+      'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment'
+    ];
+    
+    const keywordMatches = propertyKeywords.filter(keyword => 
+      messageText.toLowerCase().includes(keyword)
+    );
+    
+    console.log('   Keywords found:', keywordMatches);
+    console.log('   Keyword count:', keywordMatches.length, '(needs >= 2)');
+    
+    // 4. Test extraction
+    console.log('📋 4. Extraction Test:');
+    const result = extractPropertyAnalysisData(messageText);
+    console.log('   Extraction result:', result);
+    console.log('   Data points extracted:', Object.keys(result?.extractedData || {}).length);
+    console.log('   Extracted data:', result?.extractedData);
+    
+    return result;
+  } else {
+    console.log('   ❌ No assistant messages found');
+  }
+  
+  // 5. Check current property analysis state
+  console.log('📋 5. Property Analysis State:');
+  console.log('   currentPropertyAnalysis:', typeof currentPropertyAnalysis !== 'undefined' ? currentPropertyAnalysis : 'undefined');
+  console.log('   promptSplittingState:', typeof promptSplittingState !== 'undefined' ? promptSplittingState : 'undefined');
+  
+  // 6. Check for any console errors
+  console.log('📋 6. Recent Console Activity:');
+  console.log('   Check above for any error messages or warnings');
+  console.log('   Look for extraction-related logs starting with 🔍, ✅, or ❌');
+  
+  console.log('🔍=== END DIAGNOSIS ===');
+  
+  return {
+    extensionActive: typeof extractPropertyAnalysisData === 'function',
+    messagesFound: messages.length,
+    keywordMatches: messages.length > 0 ? keywordMatches : [],
+    extractionResult: messages.length > 0 ? result : null
+  };
+};
+
+// Force extraction on current message (bypasses all session tracking)
+window.forceExtractCurrent = function() {
+  console.log('🚀 FORCING EXTRACTION ON CURRENT MESSAGE');
+  
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length === 0) {
+    console.log('❌ No assistant messages found');
+    return null;
+  }
+  
+  const lastMessage = messages[messages.length - 1];
+  const messageText = lastMessage.textContent || lastMessage.innerText || '';
+  
+  console.log('📝 Message length:', messageText.length);
+  console.log('📝 Message preview:', messageText.substring(0, 300) + '...');
+  
+  // Force extraction
+  const analysisData = extractPropertyAnalysisData(messageText);
+  
+  if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+    console.log('✅ Extraction successful!');
+    console.log('📊 Extracted data:', analysisData.extractedData);
+    
+    // Try to save it (using dummy URL if needed)
+    const propertyUrl = prompt('Enter property URL for this analysis:') || `manual_${Date.now()}`;
+    
+    chrome.runtime.sendMessage({
+      action: 'savePropertyAnalysis',
+      propertyUrl: propertyUrl,
+      sessionId: `manual_${Date.now()}`,
+      analysisData: analysisData
+    }).then(response => {
+      console.log('💾 Save response:', response);
+    }).catch(err => {
+      console.error('❌ Save failed:', err);
+    });
+    
+    return analysisData;
+  } else {
+    console.log('❌ No data extracted');
     return null;
   }
 };
