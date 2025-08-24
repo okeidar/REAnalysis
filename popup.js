@@ -1952,7 +1952,7 @@ async function initializePromptSplittingSettings() {
       chrome.storage.local.get(['promptSplittingSettings'], (result) => {
         resolve(result.promptSplittingSettings || {
           enabled: true,
-          lengthThreshold: 500,
+          lengthThreshold: 200, // lowered for dynamic prompts
           confirmationTimeout: 15000,
           stats: {
             totalAttempts: 0,
@@ -2020,7 +2020,7 @@ async function savePromptSplittingSettings() {
     
     const settings = {
       enabled: enableCheckbox ? enableCheckbox.checked : true,
-      lengthThreshold: thresholdSlider ? parseInt(thresholdSlider.value) : 500,
+      lengthThreshold: thresholdSlider ? parseInt(thresholdSlider.value) : 200, // lowered for dynamic prompts
       confirmationTimeout: timeoutSlider ? parseInt(timeoutSlider.value) * 1000 : 15000,
       stats: currentSettings.stats || { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };

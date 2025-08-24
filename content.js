@@ -39,7 +39,7 @@ let processedMessagesPerProperty = new Map();
 // Prompt splitting state management
 let promptSplittingState = {
   enabled: true,
-  lengthThreshold: 500, // characters
+  lengthThreshold: 200, // characters - lowered for dynamic prompts
   confirmationTimeout: 15000, // 15 seconds
   currentPhase: null, // 'instructions', 'waiting_confirmation', 'sending_link', 'complete'
   pendingPropertyLink: null,
@@ -75,7 +75,10 @@ function splitPromptContent(promptTemplate, propertyLink) {
 }
 
 function detectConfirmation(responseText) {
-  if (!responseText || typeof responseText !== 'string') return false;
+  if (!responseText || typeof responseText !== 'string') {
+    console.log('🔍 detectConfirmation: No response text provided');
+    return false;
+  }
   
   const confirmationPatterns = [
     /yes,?\s*i\s*understand/i,
@@ -87,7 +90,16 @@ function detectConfirmation(responseText) {
     /yes/i
   ];
   
-  return confirmationPatterns.some(pattern => pattern.test(responseText.trim()));
+  const result = confirmationPatterns.some(pattern => {
+    const matches = pattern.test(responseText.trim());
+    if (matches) {
+      console.log('🔍 detectConfirmation: Pattern matched:', pattern.source);
+    }
+    return matches;
+  });
+  
+  console.log('🔍 detectConfirmation result:', result);
+  return result;
 }
 
 function resetPromptSplittingState() {
@@ -564,7 +576,7 @@ async function updatePromptSplittingStats(type) {
     
     const settings = result.promptSplittingSettings || {
       enabled: true,
-      lengthThreshold: 500,
+      lengthThreshold: 200, // lowered for dynamic prompts
       confirmationTimeout: 15000,
       stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };
@@ -605,7 +617,7 @@ async function loadPromptSplittingSettings() {
     
     const settings = result.promptSplittingSettings || {
       enabled: true,
-      lengthThreshold: 500,
+      lengthThreshold: 200, // lowered for dynamic prompts  
       confirmationTimeout: 15000,
       stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };
@@ -1495,6 +1507,7 @@ function setupResponseMonitor() {
     // Check if we're waiting for confirmation in prompt splitting mode
     if (promptSplittingState.currentPhase === 'waiting_confirmation') {
       console.log('🔍 Checking for confirmation in response...');
+      console.log('📝 Response text preview:', messageText.substring(0, 200));
       if (detectConfirmation(messageText)) {
         console.log('✅ Confirmation detected! Proceeding to send property link...');
         handleConfirmationReceived();
@@ -1502,6 +1515,7 @@ function setupResponseMonitor() {
       } else {
         console.log('❌ No confirmation detected, checking timeout...');
         const timeElapsed = Date.now() - promptSplittingState.confirmationStartTime;
+        console.log('⏰ Time elapsed:', timeElapsed, 'ms, timeout:', promptSplittingState.confirmationTimeout, 'ms');
         if (timeElapsed > promptSplittingState.confirmationTimeout) {
           console.log('⏰ Confirmation timeout, falling back to single prompt...');
           handleConfirmationTimeout();
@@ -1935,6 +1949,10 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     const fullPrompt = promptTemplate
       .replace('{PROPERTY_URL}', propertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
+      
+    console.log('📏 Full prompt length:', fullPrompt.length, 'characters');
+    console.log('🔧 Prompt splitting threshold:', promptSplittingState.lengthThreshold);
+    console.log('⚙️ Prompt splitting enabled:', promptSplittingState.enabled);
       
     if (shouldSplitPrompt(fullPrompt)) {
       console.log('📝 Using prompt splitting approach for better link processing');
