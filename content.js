@@ -87,7 +87,11 @@ function detectConfirmation(responseText) {
     /understood/i,
     /ready\s*to\s*analyze/i,
     /ready/i,
-    /yes/i
+    /yes,?\s*i.{0,20}understand/i, // More flexible matching
+    /understand.{0,20}ready/i,
+    /ready.{0,20}analyze/i,
+    /yes.{0,50}ready/i,
+    /\byes\b/i // Word boundary to avoid matching "yesterday" etc.
   ];
   
   const result = confirmationPatterns.some(pattern => {
@@ -98,7 +102,15 @@ function detectConfirmation(responseText) {
     return matches;
   });
   
+  // Always log what we're testing for debugging
+  console.log('🔍 detectConfirmation: Testing response:', responseText.substring(0, 200));
   console.log('🔍 detectConfirmation result:', result);
+  
+  // If no pattern matched, show what patterns we tried
+  if (!result) {
+    console.log('🔍 detectConfirmation: No patterns matched. Tried:', confirmationPatterns.map(p => p.source));
+  }
+  
   return result;
 }
 
@@ -1646,6 +1658,14 @@ function setupResponseMonitor() {
       
       const messageText = newMessage.textContent || newMessage.innerText || '';
       
+      // Debug logging for all messages when waiting for confirmation
+      if (promptSplittingState.currentPhase === 'waiting_confirmation') {
+        console.log('📨 New message detected while waiting for confirmation:');
+        console.log('  - Message length:', messageText.length);
+        console.log('  - Current phase:', promptSplittingState.currentPhase);
+        console.log('  - Message preview:', messageText.substring(0, 150));
+      }
+      
       // Skip if we've already processed this exact message for this property
       const currentUrl = currentPropertyAnalysis?.url;
       if (currentUrl && processedMessagesPerProperty.has(currentUrl)) {
@@ -1653,6 +1673,13 @@ function setupResponseMonitor() {
         if (processedMessages.includes(messageText)) {
           return;
         }
+      }
+      
+      // Check for prompt splitting first, regardless of property analysis session
+      if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
+        console.log('🔍 Found message while waiting for confirmation:', messageText.substring(0, 100));
+        processCompletedResponse(messageText, currentUrl);
+        return; // Don't process as regular property analysis
       }
       
       // Only process if we have an active property analysis session
@@ -1996,9 +2023,12 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       promptSplittingState.confirmationStartTime = Date.now();
       
       console.log('⏰ Starting confirmation timer...');
+      console.log('🔗 Pending property link set to:', promptSplittingState.pendingPropertyLink);
+      console.log('📋 Prompt splitting state after setup:', promptSplittingState);
       showPromptSplittingIndicator('waiting_confirmation', 'Waiting for ChatGPT confirmation...');
       
       setTimeout(() => {
+        console.log('📤 Submitting instructions message...');
         submitMessage();
       }, 500);
       
@@ -2107,6 +2137,17 @@ window.addEventListener('error', function(event) {
 if (isChatGPTSite()) {
   try {
     console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
+    
+    // Add debug function for testing prompt splitting
+    window.debugPromptSplitting = function(testResponse) {
+      console.log('🧪 Testing prompt splitting with:', testResponse);
+      const result = detectConfirmation(testResponse || "Yes, I understand");
+      console.log('🧪 Test result:', result);
+      if (result && promptSplittingState.currentPhase === 'waiting_confirmation') {
+        console.log('🧪 Triggering handleConfirmationReceived');
+        handleConfirmationReceived();
+      }
+    };
     
     // Load prompt splitting settings asynchronously
     loadPromptSplittingSettings().catch(error => {
