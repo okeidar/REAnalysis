@@ -531,6 +531,451 @@
     .history-list::-webkit-scrollbar-thumb:hover {
       background: var(--text-secondary);
     }
+    
+    /* Properties Dashboard Enhancements */
+    .section-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    
+    /* View Mode Selector */
+    .view-mode-selector {
+      display: flex;
+      justify-content: center;
+    }
+    
+    .view-mode-btn {
+      border-radius: 0;
+      border-right: none;
+      background: var(--secondary-background);
+      color: var(--text-secondary);
+      transition: all 0.15s ease-in-out;
+    }
+    
+    .view-mode-btn:first-child {
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+    }
+    
+    .view-mode-btn:last-child {
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      border-right: 1px solid var(--border);
+    }
+    
+    .view-mode-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+    
+    .view-mode-btn:hover:not(.active) {
+      background: var(--background);
+      color: var(--text-primary);
+    }
+    
+    /* Property Filters */
+    .property-filters {
+      background: var(--secondary-background);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    
+    .filter-row {
+      display: flex;
+      align-items: end;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+    
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      min-width: 120px;
+    }
+    
+    .filter-label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+    
+    .filter-inputs {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    
+    .filter-input, .filter-select {
+      padding: var(--space-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      background: var(--background);
+      min-width: 80px;
+    }
+    
+    .filter-input:focus, .filter-select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    /* Property Views */
+    .property-view {
+      min-height: 200px;
+    }
+    
+    .property-view.hidden {
+      display: none;
+    }
+    
+    /* Property Cards Grid */
+    .property-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--space-md);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    /* Enhanced Property Cards */
+    .property-card {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      transition: all 0.15s ease-in-out;
+      position: relative;
+      cursor: pointer;
+    }
+    
+    .property-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary);
+    }
+    
+    .property-card.selected {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+    
+    .property-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: var(--space-sm);
+    }
+    
+    .property-card-select {
+      position: absolute;
+      top: var(--space-sm);
+      right: var(--space-sm);
+    }
+    
+    .property-card-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+    
+    .property-card-status.analyzed {
+      color: #16a34a;
+    }
+    
+    .property-card-status.pending {
+      color: #f59e0b;
+    }
+    
+    .property-card-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--primary);
+      text-decoration: none;
+      margin-bottom: var(--space-xs);
+      word-break: break-all;
+    }
+    
+    .property-card-title:hover {
+      text-decoration: underline;
+    }
+    
+    .property-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-sm);
+      margin: var(--space-md) 0;
+    }
+    
+    .property-metric {
+      background: var(--secondary-background);
+      padding: var(--space-sm);
+      border-radius: var(--radius-sm);
+    }
+    
+    .metric-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+    
+    .metric-value {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+    
+    .metric-value.price {
+      color: var(--primary);
+      font-size: var(--font-size-lg);
+    }
+    
+    .property-indicators {
+      display: flex;
+      gap: var(--space-xs);
+      margin: var(--space-sm) 0;
+      flex-wrap: wrap;
+    }
+    
+    .property-indicator {
+      background: var(--secondary-background);
+      color: var(--text-secondary);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: var(--font-size-sm);
+    }
+    
+    .property-indicator.good {
+      background: #dcfce7;
+      color: #166534;
+    }
+    
+    .property-indicator.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .property-indicator.error {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    
+    .property-card-actions {
+      display: flex;
+      gap: var(--space-xs);
+      margin-top: var(--space-sm);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--border);
+    }
+    
+    /* Data Quality Indicator */
+    .data-quality-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-size-sm);
+    }
+    
+    .quality-score {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: var(--font-weight-medium);
+    }
+    
+    .quality-score.excellent {
+      background: #dcfce7;
+      color: #166534;
+    }
+    
+    .quality-score.good {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .quality-score.fair {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    
+    /* Table View */
+    .table-container {
+      max-height: 400px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    
+    .property-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--font-size-sm);
+    }
+    
+    .property-table th {
+      background: var(--secondary-background);
+      padding: var(--space-sm);
+      text-align: left;
+      font-weight: var(--font-weight-semibold);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    
+    .property-table td {
+      padding: var(--space-sm);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    
+    .property-table tr:hover {
+      background: var(--secondary-background);
+    }
+    
+    .property-table tr.selected {
+      background: rgba(16, 163, 127, 0.05);
+    }
+    
+    /* Comparison View */
+    .comparison-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .comparison-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    
+    .comparison-container {
+      display: flex;
+      gap: var(--space-md);
+      overflow-x: auto;
+      min-height: 300px;
+    }
+    
+    .comparison-placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      padding: var(--space-xl);
+      text-align: center;
+      color: var(--text-secondary);
+    }
+    
+    .comparison-property {
+      flex: 0 0 280px;
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+    }
+    
+    .comparison-property-header {
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .comparison-metrics {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+    
+    .comparison-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-xs) 0;
+    }
+    
+    .comparison-metric-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    
+    .comparison-metric-value {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+    
+    /* Property Actions */
+    .property-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-md);
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 400px) {
+      .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .filter-group {
+        min-width: auto;
+      }
+      
+      .property-metrics {
+        grid-template-columns: 1fr;
+      }
+      
+      .property-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .property-actions .btn-group {
+        justify-content: center;
+      }
+    }
+    
+    /* Investment Potential Colors */
+    .investment-excellent {
+      color: #16a34a !important;
+      background: #dcfce7;
+    }
+    
+    .investment-good {
+      color: #65a30d !important;
+      background: #f7fee7;
+    }
+    
+    .investment-fair {
+      color: #ca8a04 !important;
+      background: #fefce8;
+    }
+    
+    .investment-poor {
+      color: #dc2626 !important;
+      background: #fef2f2;
+    }
+    
+    /* Loading States */
+    .loading-skeleton {
+      background: linear-gradient(90deg, var(--secondary-background) 25%, var(--border) 50%, var(--secondary-background) 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+    }
+    
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
   </style>
 </head>
 <body>
@@ -592,25 +1037,153 @@
         <div class="section-header">
           <h2 class="section-title">
             <span>📊</span>
-            Analysis History
+            Properties Dashboard
+            <span id="propertyCount" class="section-badge">0</span>
           </h2>
-          <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-            🗑️
-          </button>
+          <div class="section-controls">
+            <button id="viewModeBtn" class="btn btn-ghost btn-sm" title="Switch view mode">
+              📋
+            </button>
+            <button id="sortBtn" class="btn btn-ghost btn-sm" title="Sort properties">
+              🔄
+            </button>
+            <button id="filterBtn" class="btn btn-ghost btn-sm" title="Filter properties">
+              🔍
+            </button>
+            <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
+              🗑️
+            </button>
+          </div>
+        </div>
+        
+        <!-- View Mode Toggle -->
+        <div class="view-mode-selector" style="margin-bottom: var(--space-md);">
+          <div class="btn-group" role="group">
+            <button id="viewModeCards" class="btn btn-sm view-mode-btn active" data-view="cards">
+              📋 Cards
+            </button>
+            <button id="viewModeList" class="btn btn-sm view-mode-btn" data-view="list">
+              📄 List
+            </button>
+            <button id="viewModeTable" class="btn btn-sm view-mode-btn" data-view="table">
+              📊 Table
+            </button>
+            <button id="viewModeComparison" class="btn btn-sm view-mode-btn" data-view="comparison">
+              ⚖️ Compare
+            </button>
+          </div>
+        </div>
+        
+        <!-- Filters and Sort -->
+        <div id="propertyFilters" class="property-filters hidden" style="margin-bottom: var(--space-md);">
+          <div class="filter-row">
+            <div class="filter-group">
+              <label class="filter-label">Price Range</label>
+              <div class="filter-inputs">
+                <input id="minPrice" type="number" placeholder="Min" class="filter-input">
+                <span>-</span>
+                <input id="maxPrice" type="number" placeholder="Max" class="filter-input">
+              </div>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">Bedrooms</label>
+              <select id="bedroomsFilter" class="filter-select">
+                <option value="">Any</option>
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label class="filter-label">Property Type</label>
+              <select id="propertyTypeFilter" class="filter-select">
+                <option value="">All Types</option>
+                <option value="house">House</option>
+                <option value="apartment">Apartment</option>
+                <option value="condo">Condo</option>
+                <option value="townhouse">Townhouse</option>
+              </select>
+            </div>
+            <button id="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
+          </div>
         </div>
         
         <div class="card">
-          <div id="propertyHistoryList" class="history-list">
-            <div class="empty-state">
-              <div class="empty-state-icon">📄</div>
-              <p>No properties analyzed yet</p>
+          <!-- Property Display Container -->
+          <div id="propertyDisplayContainer">
+            
+            <!-- Cards View -->
+            <div id="propertyCardsView" class="property-view active">
+              <div id="propertyCardsList" class="property-cards-grid">
+                <div class="empty-state">
+                  <div class="empty-state-icon">📄</div>
+                  <p>No properties analyzed yet</p>
+                </div>
+              </div>
             </div>
+            
+            <!-- List View -->
+            <div id="propertyListView" class="property-view hidden">
+              <div id="propertyHistoryList" class="history-list">
+                <div class="empty-state">
+                  <div class="empty-state-icon">📄</div>
+                  <p>No properties analyzed yet</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Table View -->
+            <div id="propertyTableView" class="property-view hidden">
+              <div class="table-container">
+                <table id="propertyTable" class="property-table">
+                  <thead>
+                    <tr id="propertyTableHeaders">
+                      <!-- Headers will be generated dynamically -->
+                    </tr>
+                  </thead>
+                  <tbody id="propertyTableBody">
+                    <!-- Rows will be generated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- Comparison View -->
+            <div id="propertyComparisonView" class="property-view hidden">
+              <div class="comparison-header">
+                <h3>Property Comparison</h3>
+                <div class="comparison-controls">
+                  <span id="selectedCount">0 selected</span>
+                  <button id="clearSelection" class="btn btn-ghost btn-sm">Clear Selection</button>
+                </div>
+              </div>
+              <div id="comparisonContainer" class="comparison-container">
+                <div class="comparison-placeholder">
+                  <p>Select 2-4 properties to compare</p>
+                  <small>Use the checkboxes on property cards to select properties for comparison</small>
+                </div>
+              </div>
+            </div>
+            
           </div>
           
-          <div class="btn-group" style="margin-top: var(--space-md);">
-            <button id="exportHistoryBtn" class="btn btn-secondary btn-sm">
-              📤 Export to Excel
-            </button>
+          <!-- Action Buttons -->
+          <div class="property-actions" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border);">
+            <div class="btn-group">
+              <button id="selectAllProperties" class="btn btn-ghost btn-sm">
+                ✅ Select All
+              </button>
+              <button id="exportSelectedBtn" class="btn btn-secondary btn-sm">
+                📤 Export Selected
+              </button>
+              <button id="exportHistoryBtn" class="btn btn-secondary btn-sm">
+                📊 Export All
+              </button>
+              <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm" style="color: #dc2626;">
+                🗑️ Delete Selected
+              </button>
+            </div>
           </div>
         </div>
       </section>

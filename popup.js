@@ -9,11 +9,30 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     columnConfigList, selectAllColumnsBtn, deselectAllColumnsBtn, resetColumnsBtn,
     saveColumnsBtn, previewColumnsBtn, togglePromptBtn, promptContent,
     toggleCustomColumnBtn, customColumnForm, customColumnName, customColumnType,
-    customColumnDescription, customColumnDefault, addCustomColumnBtn, cancelCustomColumnBtn;
+    customColumnDescription, customColumnDefault, addCustomColumnBtn, cancelCustomColumnBtn,
+    // Enhanced UI elements
+    propertyCount, viewModeBtn, sortBtn, filterBtn, propertyFilters, propertyDisplayContainer,
+    propertyCardsView, propertyListView, propertyTableView, propertyComparisonView,
+    propertyCardsList, propertyTable, propertyTableHeaders, propertyTableBody,
+    comparisonContainer, selectedCount, clearSelection, selectAllProperties,
+    exportSelectedBtn, bulkDeleteBtn, viewModeCards, viewModeList, viewModeTable, viewModeComparison,
+    minPrice, maxPrice, bedroomsFilter, propertyTypeFilter, clearFilters;
 
 // Global variables
 let currentTab = null;
 let contentScriptReady = false;
+let currentViewMode = 'cards';
+let selectedProperties = new Set();
+let currentFilter = {
+  minPrice: null,
+  maxPrice: null,
+  bedrooms: null,
+  propertyType: null
+};
+let currentSort = {
+  field: 'timestamp',
+  direction: 'desc'
+};
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -34,6 +53,37 @@ document.addEventListener('DOMContentLoaded', async () => {
   infoElement = document.getElementById('info');
   siteElement = document.getElementById('site');
   urlElement = document.getElementById('url');
+  
+  // Enhanced UI elements
+  propertyCount = document.getElementById('propertyCount');
+  viewModeBtn = document.getElementById('viewModeBtn');
+  sortBtn = document.getElementById('sortBtn');
+  filterBtn = document.getElementById('filterBtn');
+  propertyFilters = document.getElementById('propertyFilters');
+  propertyDisplayContainer = document.getElementById('propertyDisplayContainer');
+  propertyCardsView = document.getElementById('propertyCardsView');
+  propertyListView = document.getElementById('propertyListView');
+  propertyTableView = document.getElementById('propertyTableView');
+  propertyComparisonView = document.getElementById('propertyComparisonView');
+  propertyCardsList = document.getElementById('propertyCardsList');
+  propertyTable = document.getElementById('propertyTable');
+  propertyTableHeaders = document.getElementById('propertyTableHeaders');
+  propertyTableBody = document.getElementById('propertyTableBody');
+  comparisonContainer = document.getElementById('comparisonContainer');
+  selectedCount = document.getElementById('selectedCount');
+  clearSelection = document.getElementById('clearSelection');
+  selectAllProperties = document.getElementById('selectAllProperties');
+  exportSelectedBtn = document.getElementById('exportSelectedBtn');
+  bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  viewModeCards = document.getElementById('viewModeCards');
+  viewModeList = document.getElementById('viewModeList');
+  viewModeTable = document.getElementById('viewModeTable');
+  viewModeComparison = document.getElementById('viewModeComparison');
+  minPrice = document.getElementById('minPrice');
+  maxPrice = document.getElementById('maxPrice');
+  bedroomsFilter = document.getElementById('bedroomsFilter');
+  propertyTypeFilter = document.getElementById('propertyTypeFilter');
+  clearFilters = document.getElementById('clearFilters');
   
   // Settings elements
   settingsSection = document.getElementById('settingsCollapsible');
@@ -103,6 +153,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Custom column event listeners
   if (addCustomColumnBtn) addCustomColumnBtn.addEventListener('click', addCustomColumn);
   if (cancelCustomColumnBtn) cancelCustomColumnBtn.addEventListener('click', clearCustomColumnForm);
+  
+  // Enhanced UI event listeners
+  setupEnhancedUIEventListeners();
 
   // Set up storage change listener for real-time updates
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -2256,4 +2309,743 @@ function addPromptSplittingEventListeners() {
       }
     });
   }
+}
+
+// Enhanced UI Functions
+function setupEnhancedUIEventListeners() {
+  // View mode buttons
+  if (viewModeCards) viewModeCards.addEventListener('click', () => switchViewMode('cards'));
+  if (viewModeList) viewModeList.addEventListener('click', () => switchViewMode('list'));
+  if (viewModeTable) viewModeTable.addEventListener('click', () => switchViewMode('table'));
+  if (viewModeComparison) viewModeComparison.addEventListener('click', () => switchViewMode('comparison'));
+  
+  // Filter controls
+  if (filterBtn) filterBtn.addEventListener('click', toggleFilters);
+  if (clearFilters) clearFilters.addEventListener('click', clearPropertyFilters);
+  
+  // Sort button
+  if (sortBtn) sortBtn.addEventListener('click', showSortMenu);
+  
+  // Property actions
+  if (selectAllProperties) selectAllProperties.addEventListener('click', toggleSelectAll);
+  if (clearSelection) clearSelection.addEventListener('click', clearPropertySelection);
+  if (exportSelectedBtn) exportSelectedBtn.addEventListener('click', exportSelectedProperties);
+  if (bulkDeleteBtn) bulkDeleteBtn.addEventListener('click', deleteSelectedProperties);
+  
+  // Filter inputs
+  if (minPrice) minPrice.addEventListener('input', debounce(applyFilters, 500));
+  if (maxPrice) maxPrice.addEventListener('input', debounce(applyFilters, 500));
+  if (bedroomsFilter) bedroomsFilter.addEventListener('change', applyFilters);
+  if (propertyTypeFilter) propertyTypeFilter.addEventListener('change', applyFilters);
+}
+
+function switchViewMode(mode) {
+  currentViewMode = mode;
+  
+  // Update button states
+  document.querySelectorAll('.view-mode-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  const activeBtn = document.querySelector(`[data-view="${mode}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+  
+  // Show/hide appropriate view
+  document.querySelectorAll('.property-view').forEach(view => {
+    view.classList.add('hidden');
+  });
+  
+  switch (mode) {
+    case 'cards':
+      if (propertyCardsView) propertyCardsView.classList.remove('hidden');
+      break;
+    case 'list':
+      if (propertyListView) propertyListView.classList.remove('hidden');
+      break;
+    case 'table':
+      if (propertyTableView) propertyTableView.classList.remove('hidden');
+      break;
+    case 'comparison':
+      if (propertyComparisonView) propertyComparisonView.classList.remove('hidden');
+      break;
+  }
+  
+  // Refresh display with current data
+  loadPropertyHistory();
+}
+
+function toggleFilters() {
+  if (propertyFilters) {
+    propertyFilters.classList.toggle('hidden');
+  }
+}
+
+function clearPropertyFilters() {
+  currentFilter = {
+    minPrice: null,
+    maxPrice: null,
+    bedrooms: null,
+    propertyType: null
+  };
+  
+  if (minPrice) minPrice.value = '';
+  if (maxPrice) maxPrice.value = '';
+  if (bedroomsFilter) bedroomsFilter.value = '';
+  if (propertyTypeFilter) propertyTypeFilter.value = '';
+  
+  applyFilters();
+}
+
+function applyFilters() {
+  // Update current filter state
+  currentFilter.minPrice = minPrice && minPrice.value ? parseFloat(minPrice.value) : null;
+  currentFilter.maxPrice = maxPrice && maxPrice.value ? parseFloat(maxPrice.value) : null;
+  currentFilter.bedrooms = bedroomsFilter && bedroomsFilter.value ? parseInt(bedroomsFilter.value) : null;
+  currentFilter.propertyType = propertyTypeFilter && propertyTypeFilter.value ? propertyTypeFilter.value.toLowerCase() : null;
+  
+  // Refresh display
+  loadPropertyHistory();
+}
+
+function filterProperties(properties) {
+  return properties.filter(property => {
+    const data = property.analysis?.extractedData || {};
+    
+    // Price filter
+    if (currentFilter.minPrice || currentFilter.maxPrice) {
+      const price = parseFloat((data.price || '').toString().replace(/[\$,]/g, ''));
+      if (currentFilter.minPrice && price < currentFilter.minPrice) return false;
+      if (currentFilter.maxPrice && price > currentFilter.maxPrice) return false;
+    }
+    
+    // Bedrooms filter
+    if (currentFilter.bedrooms) {
+      const bedrooms = parseInt(data.bedrooms || 0);
+      if (bedrooms < currentFilter.bedrooms) return false;
+    }
+    
+    // Property type filter
+    if (currentFilter.propertyType) {
+      const propertyType = (data.propertyType || '').toLowerCase();
+      if (!propertyType.includes(currentFilter.propertyType)) return false;
+    }
+    
+    return true;
+  });
+}
+
+function sortProperties(properties) {
+  return [...properties].sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (currentSort.field) {
+      case 'price':
+        aValue = parseFloat((a.analysis?.extractedData?.price || '0').toString().replace(/[\$,]/g, ''));
+        bValue = parseFloat((b.analysis?.extractedData?.price || '0').toString().replace(/[\$,]/g, ''));
+        break;
+      case 'bedrooms':
+        aValue = parseInt(a.analysis?.extractedData?.bedrooms || 0);
+        bValue = parseInt(b.analysis?.extractedData?.bedrooms || 0);
+        break;
+      case 'date':
+        aValue = new Date(a.date || a.timestamp);
+        bValue = new Date(b.date || b.timestamp);
+        break;
+      case 'quality':
+        aValue = a.analysis?.dataQuality?.score || 0;
+        bValue = b.analysis?.dataQuality?.score || 0;
+        break;
+      default:
+        aValue = a.timestamp || 0;
+        bValue = b.timestamp || 0;
+    }
+    
+    if (currentSort.direction === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
+  });
+}
+
+function showSortMenu() {
+  // Simple sort menu implementation
+  const sortOptions = [
+    { field: 'timestamp', label: 'Date Added', direction: 'desc' },
+    { field: 'price', label: 'Price (High to Low)', direction: 'desc' },
+    { field: 'price', label: 'Price (Low to High)', direction: 'asc' },
+    { field: 'bedrooms', label: 'Bedrooms (Most)', direction: 'desc' },
+    { field: 'quality', label: 'Data Quality', direction: 'desc' }
+  ];
+  
+  const selectedOption = prompt('Sort by:\n' + 
+    sortOptions.map((opt, i) => `${i + 1}. ${opt.label}`).join('\n') + 
+    '\n\nEnter number (1-' + sortOptions.length + '):');
+  
+  const optionIndex = parseInt(selectedOption) - 1;
+  if (optionIndex >= 0 && optionIndex < sortOptions.length) {
+    const option = sortOptions[optionIndex];
+    currentSort.field = option.field;
+    currentSort.direction = option.direction;
+    loadPropertyHistory();
+  }
+}
+
+function toggleSelectAll() {
+  const properties = document.querySelectorAll('.property-card, .property-table tr[data-property-index]');
+  const allSelected = selectedProperties.size === properties.length;
+  
+  if (allSelected) {
+    selectedProperties.clear();
+    properties.forEach(prop => {
+      prop.classList.remove('selected');
+      const checkbox = prop.querySelector('.property-select');
+      if (checkbox) checkbox.checked = false;
+    });
+  } else {
+    properties.forEach((prop, index) => {
+      selectedProperties.add(index);
+      prop.classList.add('selected');
+      const checkbox = prop.querySelector('.property-select');
+      if (checkbox) checkbox.checked = true;
+    });
+  }
+  
+  updateSelectionUI();
+}
+
+function clearPropertySelection() {
+  selectedProperties.clear();
+  document.querySelectorAll('.property-card, .property-table tr').forEach(prop => {
+    prop.classList.remove('selected');
+    const checkbox = prop.querySelector('.property-select');
+    if (checkbox) checkbox.checked = false;
+  });
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  const count = selectedProperties.size;
+  if (selectedCount) selectedCount.textContent = `${count} selected`;
+  
+  // Update button states
+  if (exportSelectedBtn) exportSelectedBtn.disabled = count === 0;
+  if (bulkDeleteBtn) bulkDeleteBtn.disabled = count === 0;
+  if (selectAllProperties) {
+    selectAllProperties.textContent = count > 0 ? '❌ Deselect All' : '✅ Select All';
+  }
+  
+  // Update comparison view
+  if (currentViewMode === 'comparison') {
+    updateComparisonView();
+  }
+}
+
+async function exportSelectedProperties() {
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const history = result.propertyHistory || [];
+    
+    if (selectedProperties.size === 0) {
+      showError('No properties selected for export');
+      return;
+    }
+    
+    const selectedHistory = Array.from(selectedProperties).map(index => history[index]).filter(Boolean);
+    
+    if (selectedHistory.length === 0) {
+      showError('Selected properties not found');
+      return;
+    }
+    
+    // Temporarily replace the full history with selected properties for export
+    const originalHistory = history;
+    await chrome.storage.local.set({ propertyHistory: selectedHistory });
+    
+    // Call the existing export function
+    await exportPropertyHistory();
+    
+    // Restore original history
+    await chrome.storage.local.set({ propertyHistory: originalHistory });
+    
+    showSuccess(`Exported ${selectedHistory.length} selected properties`);
+    
+  } catch (error) {
+    console.error('Error exporting selected properties:', error);
+    showError('Failed to export selected properties');
+  }
+}
+
+async function deleteSelectedProperties() {
+  if (selectedProperties.size === 0) {
+    showError('No properties selected for deletion');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to delete ${selectedProperties.size} selected properties?`)) {
+    return;
+  }
+  
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const history = result.propertyHistory || [];
+    
+    // Remove selected properties (sort indices in descending order to avoid index shifting)
+    const sortedIndices = Array.from(selectedProperties).sort((a, b) => b - a);
+    sortedIndices.forEach(index => {
+      history.splice(index, 1);
+    });
+    
+    await chrome.storage.local.set({ propertyHistory: history });
+    
+    selectedProperties.clear();
+    showSuccess(`Deleted ${sortedIndices.length} properties`);
+    
+  } catch (error) {
+    console.error('Error deleting selected properties:', error);
+    showError('Failed to delete selected properties');
+  }
+}
+
+// Enhanced property display function that replaces the original displayPropertyHistory
+function displayPropertyHistory(history) {
+  // Apply filters and sorting
+  let filteredHistory = filterProperties(history);
+  let sortedHistory = sortProperties(filteredHistory);
+  
+  // Update property count
+  if (propertyCount) {
+    propertyCount.textContent = `${filteredHistory.length}`;
+  }
+  
+  // Display based on current view mode
+  switch (currentViewMode) {
+    case 'cards':
+      displayPropertyCards(sortedHistory);
+      break;
+    case 'list':
+      displayPropertyList(sortedHistory);
+      break;
+    case 'table':
+      displayPropertyTable(sortedHistory);
+      break;
+    case 'comparison':
+      updateComparisonView();
+      break;
+  }
+}
+
+function displayPropertyCards(history) {
+  if (!propertyCardsList) return;
+  
+  if (history.length === 0) {
+    propertyCardsList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🏠</div>
+        <p>No properties match your criteria</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const cardsHTML = history.map((item, index) => {
+    const hasAnalysis = item.analysis && item.analysis.extractedData && 
+                       Object.keys(item.analysis.extractedData).length > 0;
+    const data = item.analysis?.extractedData || {};
+    const quality = item.analysis?.dataQuality || {};
+    
+    // Generate property indicators
+    const indicators = generatePropertyIndicators(data, quality);
+    
+    // Generate metrics display
+    const metrics = generatePropertyMetrics(data);
+    
+    return `
+      <div class="property-card" data-property-index="${index}">
+        <div class="property-card-select">
+          <input type="checkbox" class="property-select" data-index="${index}">
+        </div>
+        
+        <div class="property-card-header">
+          <div class="property-card-status ${hasAnalysis ? 'analyzed' : 'pending'}">
+            ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
+          </div>
+          ${quality.score ? getQualityIndicatorHTML(quality.score) : ''}
+        </div>
+        
+        <a href="${item.url}" target="_blank" class="property-card-title">
+          ${data.streetName || item.domain || 'Property'}
+        </a>
+        
+        <div class="property-metrics">
+          ${metrics}
+        </div>
+        
+        <div class="property-indicators">
+          ${indicators}
+        </div>
+        
+        <div class="property-card-actions">
+          ${hasAnalysis ? `<button class="btn btn-ghost btn-sm view-analysis-btn" data-index="${index}">👁️ View</button>` : ''}
+          <button class="btn btn-ghost btn-sm edit-custom-data-btn" data-index="${index}">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm property-item-remove" data-index="${index}">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  propertyCardsList.innerHTML = cardsHTML;
+  
+  // Add event listeners
+  addPropertyEventListeners(history);
+}
+
+function displayPropertyList(history) {
+  // Use the original list display logic
+  if (!propertyHistoryList) return;
+  
+  if (history.length === 0) {
+    propertyHistoryList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📄</div>
+        <p>No properties match your criteria</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const historyHTML = history.map((item, index) => {
+    const hasAnalysis = item.analysis && item.analysis.extractedData && 
+                       Object.keys(item.analysis.extractedData).length > 0;
+    const analysisPreview = hasAnalysis ? generateAnalysisPreview(item.analysis) : '';
+    const analysisStatus = hasAnalysis ? 'analyzed' : 'pending';
+    
+    return `
+      <div class="history-item ${analysisStatus}" data-property-index="${index}">
+        <input type="checkbox" class="property-select" data-index="${index}" style="float: right; margin: 4px;">
+        <div class="history-header">
+          <a href="${item.url}" target="_blank" class="history-url">${item.domain}</a>
+          <div class="history-status ${analysisStatus}">
+            ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
+          </div>
+        </div>
+        ${analysisPreview}
+        <div class="history-actions">
+          ${hasAnalysis ? `<button class="btn btn-ghost btn-sm view-analysis-btn" data-index="${index}">👁️ View</button>` : ''}
+          <button class="btn btn-ghost btn-sm edit-custom-data-btn" data-index="${index}">✏️ Edit</button>
+          <button class="btn btn-ghost btn-sm history-item-remove" data-index="${index}">🗑️ Remove</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  propertyHistoryList.innerHTML = historyHTML;
+  
+  // Add event listeners
+  addPropertyEventListeners(history);
+}
+
+function displayPropertyTable(history) {
+  if (!propertyTable || !propertyTableHeaders || !propertyTableBody) return;
+  
+  if (history.length === 0) {
+    propertyTableBody.innerHTML = `
+      <tr>
+        <td colspan="100%" style="text-align: center; padding: var(--space-xl);">
+          <div class="empty-state-icon">📊</div>
+          <p>No properties match your criteria</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+  
+  // Generate table headers based on available data
+  const headers = ['Select', 'Property', 'Price', 'Bed/Bath', 'Type', 'Status', 'Quality', 'Actions'];
+  propertyTableHeaders.innerHTML = headers.map(header => `<th>${header}</th>`).join('');
+  
+  // Generate table rows
+  const rowsHTML = history.map((item, index) => {
+    const hasAnalysis = item.analysis && item.analysis.extractedData && 
+                       Object.keys(item.analysis.extractedData).length > 0;
+    const data = item.analysis?.extractedData || {};
+    const quality = item.analysis?.dataQuality || {};
+    
+    const price = data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '—';
+    const bedBath = `${data.bedrooms || '—'}/${data.bathrooms || '—'}`;
+    const propertyType = data.propertyType || '—';
+    const status = hasAnalysis ? '✅ Analyzed' : '⏳ Pending';
+    const qualityDisplay = quality.score ? `${quality.score}%` : '—';
+    
+    return `
+      <tr data-property-index="${index}">
+        <td><input type="checkbox" class="property-select" data-index="${index}"></td>
+        <td><a href="${item.url}" target="_blank" style="color: var(--primary);">${data.streetName || item.domain}</a></td>
+        <td>${price}</td>
+        <td>${bedBath}</td>
+        <td>${propertyType}</td>
+        <td>${status}</td>
+        <td>${qualityDisplay}</td>
+        <td>
+          <div style="display: flex; gap: 4px;">
+            ${hasAnalysis ? `<button class="btn btn-ghost btn-sm view-analysis-btn" data-index="${index}">👁️</button>` : ''}
+            <button class="btn btn-ghost btn-sm edit-custom-data-btn" data-index="${index}">✏️</button>
+            <button class="btn btn-ghost btn-sm history-item-remove" data-index="${index}">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+  
+  propertyTableBody.innerHTML = rowsHTML;
+  
+  // Add event listeners
+  addPropertyEventListeners(history);
+}
+
+function updateComparisonView() {
+  if (!comparisonContainer) return;
+  
+  const selectedIndices = Array.from(selectedProperties);
+  
+  if (selectedIndices.length === 0) {
+    comparisonContainer.innerHTML = `
+      <div class="comparison-placeholder">
+        <p>Select 2-4 properties to compare</p>
+        <small>Use the checkboxes on property cards to select properties for comparison</small>
+      </div>
+    `;
+    return;
+  }
+  
+  if (selectedIndices.length === 1) {
+    comparisonContainer.innerHTML = `
+      <div class="comparison-placeholder">
+        <p>Select at least 2 properties to compare</p>
+        <small>Currently selected: 1 property</small>
+      </div>
+    `;
+    return;
+  }
+  
+  chrome.storage.local.get(['propertyHistory']).then(result => {
+    const history = result.propertyHistory || [];
+    const selectedProperties = selectedIndices.map(index => history[index]).filter(Boolean);
+    
+    const comparisonHTML = selectedProperties.map((property, index) => {
+      const data = property.analysis?.extractedData || {};
+      const quality = property.analysis?.dataQuality || {};
+      
+      return `
+        <div class="comparison-property">
+          <div class="comparison-property-header">
+            <h4>${data.streetName || property.domain}</h4>
+            ${quality.score ? getQualityIndicatorHTML(quality.score) : ''}
+          </div>
+          
+          <div class="comparison-metrics">
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Price</span>
+              <span class="comparison-metric-value">${data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Bedrooms</span>
+              <span class="comparison-metric-value">${data.bedrooms || '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Bathrooms</span>
+              <span class="comparison-metric-value">${data.bathrooms || '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Square Feet</span>
+              <span class="comparison-metric-value">${data.squareFeet ? parseInt(data.squareFeet).toLocaleString() : '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Property Type</span>
+              <span class="comparison-metric-value">${data.propertyType || '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Est. Rental</span>
+              <span class="comparison-metric-value">${data.estimatedRentalIncome ? `$${parseInt(data.estimatedRentalIncome).toLocaleString()}` : '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Location Score</span>
+              <span class="comparison-metric-value">${data.locationScore || '—'}</span>
+            </div>
+            <div class="comparison-metric">
+              <span class="comparison-metric-label">Cap Rate</span>
+              <span class="comparison-metric-value">${data.capRate ? `${data.capRate}%` : '—'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    comparisonContainer.innerHTML = comparisonHTML;
+  });
+}
+
+// Helper functions
+function generatePropertyIndicators(data, quality) {
+  const indicators = [];
+  
+  // Investment potential indicator
+  if (data.capRate) {
+    const capRate = parseFloat(data.capRate);
+    if (capRate >= 8) {
+      indicators.push('<span class="property-indicator good">🎯 High ROI</span>');
+    } else if (capRate >= 5) {
+      indicators.push('<span class="property-indicator">📈 Good ROI</span>');
+    } else {
+      indicators.push('<span class="property-indicator warning">📉 Low ROI</span>');
+    }
+  }
+  
+  // 1% rule indicator
+  if (data.onePercentRule) {
+    const onePercent = parseFloat(data.onePercentRule);
+    if (onePercent >= 1.0) {
+      indicators.push('<span class="property-indicator good">✅ 1% Rule</span>');
+    } else {
+      indicators.push('<span class="property-indicator warning">❌ 1% Rule</span>');
+    }
+  }
+  
+  // Location score indicator
+  if (data.locationScore) {
+    const score = parseInt(data.locationScore);
+    if (score >= 8) {
+      indicators.push('<span class="property-indicator good">🌟 Great Location</span>');
+    } else if (score >= 6) {
+      indicators.push('<span class="property-indicator">📍 Good Location</span>');
+    } else {
+      indicators.push('<span class="property-indicator warning">📍 Fair Location</span>');
+    }
+  }
+  
+  return indicators.join('');
+}
+
+function generatePropertyMetrics(data) {
+  const metrics = [];
+  
+  // Price (always show if available)
+  if (data.price) {
+    const price = parseFloat(data.price.toString().replace(/[\$,]/g, ''));
+    metrics.push(`
+      <div class="property-metric">
+        <div class="metric-label">Price</div>
+        <div class="metric-value price">$${price.toLocaleString()}</div>
+      </div>
+    `);
+  }
+  
+  // Bedrooms/Bathrooms
+  if (data.bedrooms || data.bathrooms) {
+    metrics.push(`
+      <div class="property-metric">
+        <div class="metric-label">Bed/Bath</div>
+        <div class="metric-value">${data.bedrooms || '—'}/${data.bathrooms || '—'}</div>
+      </div>
+    `);
+  }
+  
+  // Square feet
+  if (data.squareFeet) {
+    metrics.push(`
+      <div class="property-metric">
+        <div class="metric-label">Square Feet</div>
+        <div class="metric-value">${parseInt(data.squareFeet).toLocaleString()}</div>
+      </div>
+    `);
+  }
+  
+  // Estimated rental income
+  if (data.estimatedRentalIncome) {
+    metrics.push(`
+      <div class="property-metric">
+        <div class="metric-label">Est. Rent</div>
+        <div class="metric-value">$${parseInt(data.estimatedRentalIncome).toLocaleString()}</div>
+      </div>
+    `);
+  }
+  
+  return metrics.join('');
+}
+
+function getQualityIndicatorHTML(score) {
+  let className = 'fair';
+  let label = 'Fair';
+  
+  if (score >= 90) {
+    className = 'excellent';
+    label = 'Excellent';
+  } else if (score >= 75) {
+    className = 'good';
+    label = 'Good';
+  }
+  
+  return `
+    <div class="data-quality-indicator">
+      <span class="quality-score ${className}">${score}%</span>
+      <span style="font-size: var(--font-size-sm); color: var(--text-secondary);">${label}</span>
+    </div>
+  `;
+}
+
+function addPropertyEventListeners(history) {
+  // Property selection checkboxes
+  document.querySelectorAll('.property-select').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      const propertyElement = e.target.closest('.property-card, tr');
+      
+      if (e.target.checked) {
+        selectedProperties.add(index);
+        if (propertyElement) propertyElement.classList.add('selected');
+      } else {
+        selectedProperties.delete(index);
+        if (propertyElement) propertyElement.classList.remove('selected');
+      }
+      
+      updateSelectionUI();
+    });
+  });
+  
+  // View analysis buttons
+  document.querySelectorAll('.view-analysis-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      showFullAnalysis(history[index]);
+    });
+  });
+  
+  // Edit custom data buttons
+  document.querySelectorAll('.edit-custom-data-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      showCustomDataEditor(history[index], index);
+    });
+  });
+  
+  // Remove property buttons
+  document.querySelectorAll('.history-item-remove, .property-item-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      removePropertyFromHistory(index);
+    });
+  });
+}
+
+// Utility function for debouncing
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }

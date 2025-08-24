@@ -655,17 +655,41 @@ async function loadPromptSplittingSettings() {
 
 // Function to extract key information from ChatGPT response
 function extractPropertyAnalysisData(responseText) {
-  if (!responseText || typeof responseText !== 'string') return null;
+  if (!responseText || typeof responseText !== 'string') {
+    console.error('❌ Invalid input to extractPropertyAnalysisData:', typeof responseText);
+    return null;
+  }
   
+  // Check cache first for performance optimization
+  const cachedResult = getCachedExtraction(responseText);
+  if (cachedResult) {
+    console.log('🚀 Returning cached extraction result');
+    return cachedResult;
+  }
+  
+  // Performance monitoring
+  const startTime = performance.now();
   console.log('🔍 Starting comprehensive property data extraction...');
   console.log('📝 Response length:', responseText.length, 'characters');
+  
+  // Performance warning for very large responses
+  if (responseText.length > 50000) {
+    console.warn('⚠️ Large response detected:', responseText.length, 'characters - extraction may be slower');
+  }
+  
+  // Update analytics
+  extractionAnalytics.totalExtractions++;
   
   const analysis = {
     fullResponse: responseText,
     fullAnalysis: responseText, // Store full analysis for Excel export
     extractedData: {},
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    errors: [], // Track any errors during extraction
+    warnings: [] // Track any warnings during extraction
   };
+  
+  try {
   
   // First, try to extract from the structured format sections
   const structuredSections = extractStructuredSections(responseText);
@@ -690,61 +714,249 @@ function extractPropertyAnalysisData(responseText) {
   }
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
+  // Pattern performance optimization: Most specific patterns first, broad patterns last
   const extractors = {
     // Street name extraction with comprehensive patterns
     streetName: {
       patterns: [
-        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
-        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:address)[:\s]*([^\n,;]+)/gi
+        // Standard address patterns with street types (with source link support)
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Apartment/Unit address patterns
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir),?\s*(?:apt|apartment|unit|suite|ste|#)\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*apt\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*unit\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Directional addresses (N, S, E, W)
+        /(\d+\s+[NSEW]\.?\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+(?:north|south|east|west)\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Highway and route addresses
+        /(\d+\s+(?:highway|hwy|route|rt|state\s+route|sr|county\s+road|cr)\s+[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+\s+highway)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Rural and named property addresses
+        /((?:old|new|historic|heritage|vintage)\s+[A-Za-z0-9\s]+?(?:road|rd|lane|ln|trail|path|way))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([A-Za-z0-9\s]+?(?:estates|manor|ranch|farm|acres|hills|heights|view|ridge|creek|river|lake|pond|woods|forest|meadow|grove|gardens|park|square|commons|crossing|bend|valley))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // International format addresses
+        /(\d+\s+[A-Za-z0-9\s\-'\.]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|crescent|close|terrace|row|mews|square|gardens|park|green|walk|path|trail|hill|mount|vista|point))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Bullet point and structured formats (with source link support)
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        
+        // Full address patterns (number + street name) (with source link support)
+        /(?:^|\n|\.)\s*(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Address in quotes (avoiding conflict with source links in parentheses/brackets)
+        /["']([^"']+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))['"]/gi,
+        
+        // PO Box patterns
+        /(po\s+box\s+\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(p\.?o\.?\s+box\s+\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Building/Complex addresses
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*(?:building|bldg|tower|complex)\s*[A-Za-z0-9]*)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Simple address patterns without requiring street types (with source link support)
+        /(?:address|located)[:\s-]*([^\n,;\[\]]{10,80}?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Address with zip code - extract just the street part (with source link support)
+        /(\d+\s+[A-Za-z0-9\s]+?)(?:,\s*[A-Za-z\s]+,?\s*\d{5})(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Legacy patterns without source link support (fallback)
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;]+)/gi,
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gi,
+        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi
       ],
       validator: (value) => {
-        return value && value.length > 5 && value.length < 100 && 
-               !value.match(/^(the|this|that|property|analysis|listing)$/i);
+        // Clean up the value
+        const cleaned = value.trim().replace(/["""]/g, '');
+        return cleaned && 
+               cleaned.length >= 5 && 
+               cleaned.length <= 120 && 
+               !cleaned.match(/^(the|this|that|property|analysis|listing|located|address|street)$/i) &&
+               !cleaned.match(/^(asking|price|for|sale|rent)$/i) &&
+               cleaned.match(/\d/) && // Must contain at least one number
+               !cleaned.match(/^\d+$/) && // Not just a number
+               !cleaned.match(/^\$/) && // Not a price
+               !cleaned.match(/bedroom|bathroom|sqft|square|feet/i); // Not a property feature
       }
     },
     
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
-        /(?:price|cost|asking|listed|sale|selling|priced)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)/g,
-        /(?:for|at|around)\s*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi
+        // Standard price patterns with various labels (with source link support)
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Dollar sign patterns (with source link support)
+        /\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gm,
+        
+        // Context-based price patterns (with source link support)
+        /(?:for|at|around|approximately|about)\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Bullet point and structured formats (with source link support)
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        
+        // Colon and dash separated formats (with source link support)
+        /(?:price|asking|sale|cost|listed)[:\s-]+\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Number followed by currency indicators or context (with source link support)
+        /\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|sale|selling|property\s+price|price)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Price in quotes or parentheses (without conflicting with source links)
+        /["']\$?\s*([\d,]+(?:\.\d{2})?)['"]/gi,
+        
+        // Price with K/M suffixes (with source link support)
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK](?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        
+        // Price ranges (extract first value)
+        /\$?\s*([\d,]+(?:\.\d{2})?)\s*[-–—]\s*\$?\s*[\d,]+(?:\.\d{2})?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:between|from)\s*\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:to|and|\-)\s*\$?\s*[\d,]+(?:\.\d{2})?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Approximation patterns
+        /(?:around|approximately|about|roughly|near|close\s+to|estimated\s+at)\s*\$?\s*([\d,]+(?:\.\d{2})?)[kKmM]?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$?\s*([\d,]+(?:\.\d{2})?)[kKmM]?\s*(?:or\s+so|give\s+or\s+take|ish|thereabouts)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // International currencies (convert to approximate USD)
+        /£\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // British Pound
+        /€\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // Euro
+        /¥\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // Yen
+        /CAD?\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/gi, // Canadian Dollar
+        /AUD?\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/gi, // Australian Dollar
+        
+        // Written numbers (limited set for common property prices)
+        /((?:one|two|three|four|five|six|seven|eight|nine)\s+hundred\s+(?:thousand|million)?)(?:\s*dollars?)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /((?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+thousand)(?:\s*dollars?)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Scientific notation patterns
+        /([\d.]+)[eE][+-]?(\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Handle spacing variations (with source link support)
+        /(?:for|priced\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Numbers with explicit currency mentions (with source link support)
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollar|USD|usd|US\s+dollar)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Legacy patterns without source link support (fallback)
+        /\$\s*([\d,]+(?:\.\d{2})?)\b/g,
+        /(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)/gm,
+        /(?:for|at|around|approximately|about)\s*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)/gi
       ],
       validator: (value) => {
-        const num = parseFloat(value.replace(/,/g, ''));
-        return num >= 10000 && num <= 50000000; // Reasonable price range
+        let cleaned = value.replace(/[,$]/g, '');
+        
+        // Handle K and M suffixes
+        if (cleaned.match(/k$/i)) {
+          cleaned = (parseFloat(cleaned.replace(/k$/i, '')) * 1000).toString();
+        } else if (cleaned.match(/m$/i)) {
+          cleaned = (parseFloat(cleaned.replace(/m$/i, '')) * 1000000).toString();
+        }
+        
+        const num = parseFloat(cleaned);
+        return !isNaN(num) && num >= 10000 && num <= 50000000; // Reasonable price range
       }
     },
     
     // Bedroom extraction
     bedrooms: {
       patterns: [
+        // Basic bedroom patterns
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
         /(?:bedrooms)[:\s]*(\d+)/gi,
         /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
         /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
         /\b(\d+)\s*bed\b/gi,
-        /(\d+)\s*(?:bed)/gi
+        /(\d+)\s*(?:bed)/gi,
+        
+        // Range patterns (extract first number)
+        /(\d+)[-–—]\d+\s*(?:bed(?:room)?s?|br\b)/gi,
+        /(?:between\s+)?(\d+)\s*(?:to|and|\-)\s*\d+\s*(?:bed(?:room)?s?|br\b)/gi,
+        
+        // Complex descriptions
+        /(\d+)\s*(?:bed(?:room)?s?)?\s*\+\s*(?:den|office|study|flex)/gi,
+        /(\d+)\s*(?:bed(?:room)?s?)\s*(?:plus|with)\s*(?:den|office|study|flex)/gi,
+        
+        // Studio handling (0 bedrooms)
+        /studio(?:\s*apartment|\s*unit|\s*condo)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi, // Special case - returns "0"
+        
+        // Bullet points and structured formats
+        /[-•*]\s*(?:bedroom|bed)[s]?[:\s]*(\d+)/gi,
+        /(?:^|\n)\s*(?:bedroom|bed)[s]?[:\s]*(\d+)/gim,
+        
+        // Number spelled out (basic cases)
+        /(?:one|1)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "1"
+        /(?:two|2)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "2"
+        /(?:three|3)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "3"
+        /(?:four|4)\s*(?:bed(?:room)?s?|br\b)/gi // Returns "4"
       ],
       validator: (value) => {
+        // Handle special studio case
+        if (value.toLowerCase().includes('studio')) return 0;
+        
+        // Handle spelled out numbers
+        const spellMap = {'one': 1, 'two': 2, 'three': 3, 'four': 4};
+        const lower = value.toLowerCase();
+        for (const [word, num] of Object.entries(spellMap)) {
+          if (lower.includes(word)) return num;
+        }
+        
         const num = parseInt(value);
-        return num >= 0 && num <= 20;
+        return num >= 0 && num <= 50; // Expanded range
       }
     },
     
     // Bathroom extraction
     bathrooms: {
       patterns: [
+        // Basic bathroom patterns
         /(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b)/gi,
         /(?:bath(?:room)?s?|ba)[:\s]*(\d+(?:\.\d+)?)/gi,
-        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi
+        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi,
+        
+        // Half bath patterns
+        /(\d+)(?:\.\d+)?\s*(?:full|complete)?\s*(?:bath(?:room)?s?)\s*(?:and|plus|\+)\s*(\d+)\s*(?:half|partial)\s*(?:bath(?:room)?s?)/gi,
+        /(\d+)\s*full\s*(?:bath(?:room)?s?)\s*(?:and|plus|\+)\s*(\d+)\s*half/gi,
+        /(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?)\s*\((\d+)\s*full,?\s*(\d+)\s*half\)/gi,
+        
+        // Range patterns (extract first number)
+        /(\d+(?:\.\d+)?)[-–—]\d+(?:\.\d+)?\s*(?:bath(?:room)?s?|ba\b)/gi,
+        /(?:between\s+)?(\d+(?:\.\d+)?)\s*(?:to|and|\-)\s*\d+(?:\.\d+)?\s*(?:bath(?:room)?s?|ba\b)/gi,
+        
+        // Specific formats
+        /(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?)\s*(?:plus|with)\s*(?:powder|guest|half)/gi,
+        
+        // Bullet points and structured formats
+        /[-•*]\s*(?:bathroom|bath)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
+        /(?:^|\n)\s*(?:bathroom|bath)[s]?[:\s]*(\d+(?:\.\d+)?)/gim,
+        
+        // Number spelled out (basic cases)
+        /(?:one|1)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "1"
+        /(?:two|2)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "2"
+        /(?:three|3)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "3"
+        /(?:one\s+and\s+half|1\.5)\s*(?:bath(?:room)?s?|ba\b)/gi // Returns "1.5"
       ],
       validator: (value) => {
+        // Handle spelled out numbers
+        const spellMap = {'one': 1, 'two': 2, 'three': 3, 'one and half': 1.5};
+        const lower = value.toLowerCase();
+        for (const [word, num] of Object.entries(spellMap)) {
+          if (lower.includes(word)) return num;
+        }
+        
         const num = parseFloat(value);
-        return num >= 0 && num <= 20;
+        return num >= 0 && num <= 50; // Expanded range
       }
     },
     
@@ -778,11 +990,29 @@ function extractPropertyAnalysisData(responseText) {
     // Property type extraction
     propertyType: {
       patterns: [
-        /(?:property\s*type|type)[:\s]*([^.\n,]+)/gi,
-        /(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi,
-        /(?:this|the)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi
+        // Standard property type patterns
+        /(?:property\s*type|type\s*of\s*property|property\s*classification)[:\s-]*([^.\n,;]+)/gi,
+        /(?:type)[:\s-]*([^.\n,;]+)/gi,
+        // Specific property types with context
+        /(single\s*family\s*home?|single\s*family|detached\s*home|detached\s*house)/gi,
+        /(condominium|condo|apartment|flat|unit)/gi,
+        /(townhouse|townhome|row\s*house)/gi,
+        /(duplex|triplex|multi\s*family)/gi,
+        /(house|home|residence)/gi,
+        /(villa|ranch|colonial|tudor|contemporary|modern|bungalow)/gi,
+        // Bullet point and structured formats
+        /[-•*]\s*(?:property\s*type|type)[:\s-]*([^.\n,;]+)/gi,
+        /(?:^|\n)\s*(?:property\s*type|type)[:\s-]*([^.\n,;]+)/gim,
+        // Context-based extraction
+        /(?:this|the|a)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch)/gi,
+        /(?:is\s*a?|classified\s*as)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch)/gi,
+        // Common real estate terms
+        /(studio|loft|penthouse|cottage|cabin|mobile\s*home|manufactured\s*home)/gi
       ],
-      validator: (value) => value && value.length > 2 && value.length < 50
+      validator: (value) => {
+        return value && value.length > 2 && value.length < 100 && 
+               !value.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom)$/i);
+      }
     },
     
     // Lot size extraction
@@ -802,30 +1032,94 @@ function extractPropertyAnalysisData(responseText) {
   function extractStructuredSections(text) {
     const sections = {};
     
-    // Extract PROPERTY DETAILS section
-    const propertyDetailsMatch = text.match(/\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (propertyDetailsMatch) {
-      sections.propertyDetails = propertyDetailsMatch[1].trim();
+    // Enhanced section detection with multiple format patterns
+    
+    // Extract PROPERTY DETAILS section (multiple formats)
+    const propertyDetailPatterns = [
+      /\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=(?:LOCATION|RENTAL|INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*PROPERTY\s+INFORMATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*LISTING\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROPERTY\s+OVERVIEW:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROPERTY\s+SPECIFICATIONS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of propertyDetailPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.propertyDetails = match[1].trim();
+        console.log('✅ Found PROPERTY DETAILS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract LOCATION & NEIGHBORHOOD ANALYSIS section
-    const locationMatch = text.match(/\*\*LOCATION\s+&\s+NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (locationMatch) {
-      sections.locationAnalysis = locationMatch[1].trim();
+    // Extract LOCATION & NEIGHBORHOOD ANALYSIS section (multiple formats)
+    const locationPatterns = [
+      /\*\*LOCATION\s+&\s+NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*LOCATION\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*LOCATION\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*LOCATION\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /LOCATION\s+(?:&\s+NEIGHBORHOOD\s+)?ANALYSIS\s*:?\s*([\s\S]*?)(?=(?:RENTAL|INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*LOCATION\s+INFORMATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*AREA\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of locationPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.locationAnalysis = match[1].trim();
+        console.log('✅ Found LOCATION ANALYSIS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract RENTAL INCOME ANALYSIS section
-    const rentalMatch = text.match(/\*\*RENTAL\s+INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (rentalMatch) {
-      sections.rentalAnalysis = rentalMatch[1].trim();
+    // Extract RENTAL INCOME ANALYSIS section (multiple formats)
+    const rentalPatterns = [
+      /\*\*RENTAL\s+INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*RENTAL\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*RENTAL\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*RENTAL\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /RENTAL\s+(?:INCOME\s+)?ANALYSIS\s*:?\s*([\s\S]*?)(?=(?:INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*CASH\s+FLOW\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*FINANCIAL\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of rentalPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.rentalAnalysis = match[1].trim();
+        console.log('✅ Found RENTAL ANALYSIS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract INVESTMENT SUMMARY section
-    const investmentMatch = text.match(/\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (investmentMatch) {
-      sections.investmentSummary = investmentMatch[1].trim();
+    // Extract INVESTMENT SUMMARY section (multiple formats)
+    const investmentPatterns = [
+      /\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*CONCLUSION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=(?:[A-Z\s&]+:)|$)/i,
+      /\*\*RECOMMENDATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*FINAL\s+ASSESSMENT:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROS\s+AND\s+CONS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of investmentPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.investmentSummary = match[1].trim();
+        console.log('✅ Found INVESTMENT SUMMARY using pattern:', pattern.source);
+        break;
+      }
     }
     
+    console.log('📊 Structured sections found:', Object.keys(sections));
     return sections;
   }
   
@@ -834,14 +1128,22 @@ function extractPropertyAnalysisData(responseText) {
     // Extract specific data points with enhanced patterns
     const patterns = {
       streetName: [
-        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
-        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:address)[:\s]*([^\n,;]+)/gi
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        /(?:address|located)[:\s-]*([^\n,;\[\]]{10,80}?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi
       ],
       price: [
-        /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)/g
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|asking)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        /(?:for|at|around)\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK](?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g
       ],
       bedrooms: [
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
@@ -865,8 +1167,16 @@ function extractPropertyAnalysisData(responseText) {
         /(\d{4})\s*(?:built)/gi
       ],
       propertyType: [
-        /(?:property\s+type)[:\s]*([^\n,]+)/gi,
-        /(?:type)[:\s]*(single\s+family|condo|townhouse|apartment|duplex|house|home)[^\n,]*/gi
+        /(?:property\s+type|type\s+of\s+property)[:\s-]*([^\n,;]+)/gi,
+        /(?:type)[:\s-]*([^\n,;]+)/gi,
+        /[-•*]\s*(?:property\s+type|type)[:\s-]*([^\n,;]+)/gi,
+        /(?:^|\n)\s*(?:property\s+type|type)[:\s-]*([^\n,;]+)/gim,
+        /(single\s+family\s+home?|single\s+family|detached\s+home|detached\s+house)/gi,
+        /(condominium|condo|apartment|flat|unit)/gi,
+        /(townhouse|townhome|row\s+house)/gi,
+        /(duplex|triplex|multi\s+family)/gi,
+        /(house|home|residence)/gi,
+        /(villa|ranch|colonial|tudor|contemporary|modern|bungalow)/gi
       ]
     };
     
@@ -893,6 +1203,13 @@ function extractPropertyAnalysisData(responseText) {
         if (bestMatch) {
           analysis.extractedData[key] = bestMatch;
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+        } else {
+          console.log(`❌ Failed to extract ${key} from Property Details section`);
+          if (key === 'streetName' || key === 'price') {
+            console.log(`🔍 Property Details text for ${key}:`, text.substring(0, 800));
+            // Show what patterns were tried
+            console.log(`🔍 Patterns tested for ${key}:`, patterns[key].length);
+          }
         }
       }
     }
@@ -900,25 +1217,148 @@ function extractPropertyAnalysisData(responseText) {
   
   // Helper function to validate extracted values
   function validateExtractedValue(key, value) {
+    if (!value) {
+      console.log(`❌ Validation failed for ${key}: value is empty/null`);
+      return false;
+    }
+    
     switch (key) {
       case 'streetName':
-        return value && value.length > 5 && value.length < 100 && 
-               !value.match(/^(the|this|that|property|analysis|listing)$/i);
+        const streetCleaned = value.trim().replace(/["""]/g, '');
+        
+        // Basic length and content checks
+        const streetValidLength = streetCleaned.length >= 3 && streetCleaned.length <= 150; // Relaxed from 5-120
+        const streetNotJustKeywords = !streetCleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+        const streetNotFeature = !streetCleaned.match(/^(bedroom|bathroom|sqft|square|feet|bath|bed)$/i); // Only reject if ENTIRE string is a feature
+        const streetNotPrice = !streetCleaned.match(/^\$[\d,]+/); // Only reject if starts with price format
+        const streetNotJustNumber = !streetCleaned.match(/^\d+$/);
+        
+        // Street indicators - either has number OR contains street-related words
+        const streetHasNumber = streetCleaned.match(/\d/);
+        const streetHasStreetWords = streetCleaned.match(/(street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir|highway|route|trail|path|row|terrace|crescent|grove|close|view|heights|estates|manor|park|square|walk|green|commons|crossing|bend|ridge|hill|valley|creek|river|lake|pond|wood|forest|meadow|field|garden|villa|residence|manor|estate|ranch|farm|cabin|cottage|house|home|mill|bridge|station|center|plaza|market|town|city|village|north|south|east|west|old|new|main|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(\s|$)/i);
+        const streetHasIndicators = streetHasNumber || streetHasStreetWords;
+        
+        // More lenient validation - warn instead of reject for some cases
+        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
+        
+        if (streetIsLikelyValid && !streetHasIndicators) {
+          console.log(`⚠️ Street name "${streetCleaned}" passed basic validation but lacks typical street indicators (numbers or street words) - accepting anyway`);
+        }
+        
+        if (!streetIsLikelyValid) {
+          console.log(`❌ Street name validation failed for "${value}":`, {
+            cleaned: streetCleaned,
+            validLength: streetValidLength,
+            hasNumber: !!streetHasNumber,
+            hasStreetWords: !!streetHasStreetWords,
+            hasIndicators: streetHasIndicators,
+            isNotJustKeywords: streetNotKeywords,
+            isNotPropertyFeature: streetNotFeature,
+            isNotPrice: streetNotPrice,
+            isNotJustNumber: streetNotJustNumber
+          });
+        } else {
+          console.log(`✅ Street name validation passed for "${streetCleaned}"`);
+        }
+        
+        return streetIsLikelyValid;
+               
       case 'bedrooms':
         const bedrooms = parseInt(value);
-        return bedrooms >= 0 && bedrooms <= 20;
+        // Expanded from 0-20 to 0-50 for large commercial/multi-family properties
+        const bedroomValid = bedrooms >= 0 && bedrooms <= 50;
+        if (!bedroomValid) {
+          console.log(`❌ Bedrooms validation failed for "${value}": parsed=${bedrooms}, range=0-50`);
+        }
+        return bedroomValid;
+        
       case 'bathrooms':
         const bathrooms = parseFloat(value);
-        return bathrooms >= 0 && bathrooms <= 20;
+        // Expanded from 0-20 to 0-50 for large commercial/multi-family properties
+        const bathroomValid = bathrooms >= 0 && bathrooms <= 50;
+        if (!bathroomValid) {
+          console.log(`❌ Bathrooms validation failed for "${value}": parsed=${bathrooms}, range=0-50`);
+        }
+        return bathroomValid;
+        
       case 'squareFeet':
         const sqft = parseInt(value.replace(/,/g, ''));
-        return sqft >= 100 && sqft <= 50000;
+        // Expanded from 100-50K to 50-500K to support tiny homes and large commercial
+        const sqftValid = sqft >= 50 && sqft <= 500000;
+        if (!sqftValid) {
+          console.log(`❌ Square feet validation failed for "${value}": parsed=${sqft}, range=50-500,000`);
+        }
+        return sqftValid;
+        
       case 'yearBuilt':
         const year = parseInt(value);
-        return year >= 1800 && year <= new Date().getFullYear();
+        // Expanded from 1800 to 1600 for historic properties
+        const yearValid = year >= 1600 && year <= new Date().getFullYear();
+        if (!yearValid) {
+          console.log(`❌ Year built validation failed for "${value}": parsed=${year}, range=1600-${new Date().getFullYear()}`);
+        }
+        return yearValid;
+        
       case 'price':
-        const price = parseFloat(value.replace(/,/g, ''));
-        return price >= 10000 && price <= 50000000;
+        let priceStr = value.replace(/[,$£€¥]/g, ''); // Support more currencies
+        
+        // Handle K and M suffixes
+        if (priceStr.match(/k$/i)) {
+          priceStr = (parseFloat(priceStr.replace(/k$/i, '')) * 1000).toString();
+        } else if (priceStr.match(/m$/i)) {
+          priceStr = (parseFloat(priceStr.replace(/m$/i, '')) * 1000000).toString();
+        }
+        
+        const price = parseFloat(priceStr);
+        // Relaxed price range: $1,000 to $100,000,000 (was $10K-$50M)
+        const priceValid = !isNaN(price) && price >= 1000 && price <= 100000000;
+        
+        if (!priceValid) {
+          console.log(`❌ Price validation failed for "${value}":`, {
+            original: value,
+            cleaned: priceStr,
+            parsed: price,
+            isNumber: !isNaN(price),
+            inRange: price >= 1000 && price <= 100000000,
+            note: 'Expanded range: $1K - $100M to support more property types'
+          });
+        } else {
+          console.log(`✅ Price validation passed for "${value}" → ${price}`);
+        }
+        
+        return priceValid;
+        
+      case 'propertyType':
+        const typeClean = value.trim();
+        const typeValidLength = typeClean.length > 2 && typeClean.length < 150; // Increased from 100
+        const typeNotJustKeywords = !typeClean.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom|price|asking)$/i);
+        
+        // Expanded property type keywords to be more inclusive
+        const typeHasPropertyKeywords = typeClean.match(/(single|family|house|home|condo|condominium|apartment|townhouse|duplex|villa|ranch|colonial|tudor|contemporary|modern|bungalow|studio|loft|penthouse|cottage|cabin|mobile|manufactured|detached|residence|flat|unit|triplex|multi|dwelling|building|estate|property|tiny|micro|prefab|modular|residential|commercial|mixed|use|office|retail|warehouse|industrial|land|lot|parcel|farm|agricultural|historic|heritage|luxury|executive|starter|investment|rental|vacation|second|primary|main|guest|accessory|adu|carriage|coach|granny|suite|basement|garage|conversion|new|construction|custom|spec|model|development|subdivision|community|gated|waterfront|beachfront|lakefront|oceanfront|mountain|view|golf|course|acre|acres|stories|story|level|split|bi|traditional|craftsman|victorian|mediterranean|spanish|french|greek|revival|cape|cod|farmhouse|log|timber|frame|brick|stone|stucco|siding|shingle|metal|concrete|block|adobe|rammed|earth|green|sustainable|eco|friendly|energy|efficient|solar|smart|tech|luxury|premium|high|end|mid|century|antique|historic|restored|renovated|updated|remodeled|original|character|charm|unique|custom|designed|architect|built|quality|construction|solid|well|maintained|move|ready|turnkey|fixer|upper|handyman|special|as|is|sold|where|stands)/i);
+        
+        // Accept if it has basic property indicators OR common real estate terms
+        const typeIsValid = typeValidLength && typeNotJustKeywords && (typeHasPropertyKeywords || 
+          // Additional acceptance for common terms that might not match above
+          typeClean.match(/(house|home|apartment|condo|unit|building|property|residence|dwelling)/i) ||
+          // Accept single words that are clearly property types
+          typeClean.match(/^(house|home|apartment|condo|townhouse|duplex|villa|ranch|bungalow|studio|loft|cottage|cabin|flat|unit)$/i)
+        );
+        
+        if (!typeIsValid) {
+          console.log(`❌ Property type validation failed for "${value}":`, {
+            original: value,
+            cleaned: typeClean,
+            validLength: typeValidLength,
+            notJustKeywords: typeNotJustKeywords,
+            hasPropertyKeywords: !!typeHasPropertyKeywords,
+            note: 'Expanded property type recognition'
+          });
+        } else {
+          console.log(`✅ Property type validation passed for "${typeClean}"`);
+        }
+        
+        return typeIsValid;
+               
       default:
         return value && value.length > 0;
     }
@@ -1033,9 +1473,30 @@ function extractPropertyAnalysisData(responseText) {
       
       if (bestMatch) {
         analysis.extractedData[fieldName] = bestMatch;
-        console.log(`✅ Extracted ${fieldName}:`, bestMatch);
+        console.log(`✅ Extracted ${fieldName} (fallback):`, bestMatch);
       } else {
-        console.log(`❌ Failed to extract ${fieldName}`);
+        console.log(`❌ Failed to extract ${fieldName} from full response`);
+        // Show sample text around potential matches for debugging
+        if (fieldName === 'price') {
+          const priceContext = responseText.match(/.{0,50}(?:price|asking|\$[\d,]+).{0,50}/gi);
+          if (priceContext) {
+            console.log(`🔍 Price context found:`, priceContext.slice(0, 3));
+          }
+        }
+        if (fieldName === 'streetName') {
+          const addressContext = responseText.match(/.{0,50}(?:address|street|located|\d+\s+[A-Za-z]+).{0,50}/gi);
+          if (addressContext && addressContext.length > 0) {
+            console.log(`🔍 Address context found:`, addressContext.slice(0, 3));
+          } else {
+            console.log(`🔍 No address context found in response`);
+          }
+        }
+        if (fieldName === 'propertyType') {
+          const typeContext = responseText.match(/.{0,50}(?:type|house|home|condo|apartment|family).{0,50}/gi);
+          if (typeContext) {
+            console.log(`🔍 Property type context found:`, typeContext.slice(0, 3));
+          }
+        }
       }
     }
   }
@@ -1145,6 +1606,37 @@ function extractPropertyAnalysisData(responseText) {
   // Validate and clean extracted data
   analysis.extractedData = validateAndCleanData(analysis.extractedData);
   
+  // Normalize international formats and currencies
+  analysis.extractedData = normalizeInternationalData(analysis.extractedData);
+  
+  // Add data consistency validation
+  const consistencyIssues = validateDataConsistency(analysis.extractedData);
+  if (consistencyIssues.length > 0) {
+    analysis.warnings.push(...consistencyIssues);
+    console.warn('⚠️ Data consistency issues detected:', consistencyIssues);
+  }
+  
+  // AI-assisted fallback extraction for missing critical fields
+  const criticalFields = ['streetName', 'price', 'propertyType', 'bedrooms'];
+  const missingFields = criticalFields.filter(field => !analysis.extractedData[field]);
+  
+  if (missingFields.length > 0) {
+    console.log('🤖 Attempting AI-assisted fallback extraction for missing fields:', missingFields);
+    const fallbackData = performAIAssistedExtraction(responseText, missingFields);
+    
+    // Merge fallback data with existing data
+    Object.assign(analysis.extractedData, fallbackData);
+    
+    if (Object.keys(fallbackData).length > 0) {
+      console.log('✅ AI-assisted extraction recovered:', Object.keys(fallbackData));
+      analysis.warnings.push({
+        type: 'ai_fallback_used',
+        message: `AI fallback extraction used for: ${Object.keys(fallbackData).join(', ')}`,
+        severity: 'info'
+      });
+    }
+  }
+  
   // Calculate data confidence score
   analysis.dataQuality = calculateDataQuality(analysis.extractedData);
   
@@ -1155,9 +1647,67 @@ function extractPropertyAnalysisData(responseText) {
     console.log('✅ Calculated investment metrics:', Object.keys(metrics));
   }
   
+  // Performance monitoring completion
+  const endTime = performance.now();
+  const extractionTime = endTime - startTime;
+  console.log(`⏱️ Extraction completed in ${extractionTime.toFixed(2)}ms`);
+  
+  // Performance metrics
+  const extractedFieldsCount = Object.keys(analysis.extractedData).length;
+  const responseLength = responseText.length;
+  const efficiency = extractedFieldsCount / (responseLength / 1000); // fields per KB
+  
+  console.log('📊 Extraction Performance:', {
+    extractionTime: `${extractionTime.toFixed(2)}ms`,
+    responseLength: `${responseLength} characters`,
+    extractedFields: extractedFieldsCount,
+    efficiency: `${efficiency.toFixed(2)} fields/KB`,
+    dataQuality: analysis.dataQuality?.score || 'N/A'
+  });
+  
+  // Performance warnings
+  if (extractionTime > 1000) {
+    console.warn('⚠️ Slow extraction detected:', extractionTime.toFixed(2), 'ms');
+  }
+  if (efficiency < 0.1) {
+    console.warn('⚠️ Low extraction efficiency:', efficiency.toFixed(2), 'fields/KB');
+  }
+  
   console.log('✅ Successfully extracted meaningful property analysis data');
   console.log('✅ Meaningful property data found, analysis ready for save');
+  
+  // Update analytics for successful extraction
+  extractionAnalytics.successfulExtractions++;
+  extractionAnalytics.averageExtractionTime = (extractionAnalytics.averageExtractionTime + extractionTime) / 2;
+  
+  // Cache the successful result
+  setCachedExtraction(responseText, analysis);
+  
   return analysis;
+  
+  } catch (error) {
+    console.error('❌ Critical error during property data extraction:', error);
+    analysis.errors.push({
+      type: 'extraction_error',
+      message: error.message,
+      stack: error.stack,
+      timestamp: Date.now()
+    });
+    
+    // Return partial analysis even if there was an error
+    const endTime = performance.now();
+    console.log(`⏱️ Extraction failed after ${(endTime - startTime).toFixed(2)}ms`);
+    
+    // Try to salvage any data that was extracted before the error
+    const extractedFieldsCount = Object.keys(analysis.extractedData).length;
+    if (extractedFieldsCount > 0) {
+      console.log(`🔄 Returning partial analysis with ${extractedFieldsCount} fields despite error`);
+      return analysis;
+    } else {
+      console.log('💥 Complete extraction failure - no data could be extracted');
+      return null;
+    }
+  }
 }
 
 // Investment metrics calculation function
@@ -1219,11 +1769,20 @@ function validateAndCleanData(data) {
   try {
     // Clean and validate price
     if (cleanedData.price) {
-      const priceNum = parseFloat(cleanedData.price.toString().replace(/[\$,]/g, ''));
-      if (priceNum >= 10000 && priceNum <= 50000000) {
+      let priceStr = cleanedData.price.toString().replace(/[\$,]/g, '');
+      
+      // Handle K and M suffixes
+      if (priceStr.match(/k$/i)) {
+        priceStr = (parseFloat(priceStr.replace(/k$/i, '')) * 1000).toString();
+      } else if (priceStr.match(/m$/i)) {
+        priceStr = (parseFloat(priceStr.replace(/m$/i, '')) * 1000000).toString();
+      }
+      
+      const priceNum = parseFloat(priceStr);
+      if (!isNaN(priceNum) && priceNum >= 10000 && priceNum <= 50000000) {
         cleanedData.price = priceNum.toString();
       } else {
-        console.warn('❌ Invalid price detected:', cleanedData.price);
+        console.warn('❌ Invalid price detected:', cleanedData.price, '→', priceNum);
         delete cleanedData.price;
       }
     }
@@ -1286,17 +1845,87 @@ function validateAndCleanData(data) {
     
     // Clean property type
     if (cleanedData.propertyType) {
-      cleanedData.propertyType = cleanedData.propertyType.trim().replace(/["""]/g, '');
+      let propType = cleanedData.propertyType.trim().replace(/["""]/g, '');
+      
+      // Standardize common property types
+      propType = propType.toLowerCase();
+      if (propType.match(/single\s*family/i)) {
+        propType = 'Single Family Home';
+      } else if (propType.match(/condo|condominium/i)) {
+        propType = 'Condominium';
+      } else if (propType.match(/townhouse|townhome|row\s*house/i)) {
+        propType = 'Townhouse';
+      } else if (propType.match(/apartment|flat|unit/i)) {
+        propType = 'Apartment';
+      } else if (propType.match(/duplex/i)) {
+        propType = 'Duplex';
+      } else if (propType.match(/triplex/i)) {
+        propType = 'Triplex';
+      } else if (propType.match(/house|home|residence/i) && !propType.match(/single/i)) {
+        propType = 'House';
+      } else if (propType.match(/villa/i)) {
+        propType = 'Villa';
+      } else if (propType.match(/ranch/i)) {
+        propType = 'Ranch';
+      } else if (propType.match(/colonial/i)) {
+        propType = 'Colonial';
+      } else if (propType.match(/tudor/i)) {
+        propType = 'Tudor';
+      } else if (propType.match(/contemporary|modern/i)) {
+        propType = 'Contemporary';
+      } else if (propType.match(/bungalow/i)) {
+        propType = 'Bungalow';
+      } else if (propType.match(/studio/i)) {
+        propType = 'Studio';
+      } else if (propType.match(/loft/i)) {
+        propType = 'Loft';
+      } else if (propType.match(/penthouse/i)) {
+        propType = 'Penthouse';
+      } else if (propType.match(/cottage/i)) {
+        propType = 'Cottage';
+      } else if (propType.match(/cabin/i)) {
+        propType = 'Cabin';
+      } else if (propType.match(/mobile|manufactured/i)) {
+        propType = 'Mobile Home';
+      } else {
+        // Capitalize first letter of each word
+        propType = propType.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+      }
+      
+      cleanedData.propertyType = propType;
     }
     
     // Clean street name
     if (cleanedData.streetName) {
-      cleanedData.streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
-      if (cleanedData.streetName.length < 5 || cleanedData.streetName.length > 100) {
-        console.warn('❌ Invalid street name length:', cleanedData.streetName);
+      let streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
+      
+      // Additional validation checks
+      const hasNumber = streetName.match(/\d/);
+      const isNotJustKeywords = !streetName.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+      const isNotPropertyFeature = !streetName.match(/bedroom|bathroom|sqft|square|feet/i);
+      const isNotPrice = !streetName.match(/^\$/);
+      
+      if (streetName.length >= 5 && 
+          streetName.length <= 120 && 
+          hasNumber && 
+          isNotJustKeywords && 
+          isNotPropertyFeature && 
+          isNotPrice) {
+        cleanedData.streetName = streetName;
+      } else {
+        console.warn('❌ Invalid street name - failed validation:', {
+          streetName: streetName,
+          length: streetName.length,
+          hasNumber: !!hasNumber,
+          isNotJustKeywords: isNotJustKeywords,
+          isNotPropertyFeature: isNotPropertyFeature,
+          isNotPrice: isNotPrice
+        });
         delete cleanedData.streetName;
       }
-    }
+    } // Fixed: Added missing closing brace
     
     console.log('✅ Data validation completed');
     
@@ -1305,6 +1934,694 @@ function validateAndCleanData(data) {
   }
   
   return cleanedData;
+}
+
+// Data relationship validation and consistency checks
+function validateDataConsistency(data) {
+  const issues = [];
+  
+  try {
+    // Price vs Property Type consistency
+    if (data.price && data.propertyType) {
+      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
+      const propertyType = data.propertyType.toLowerCase();
+      
+      // Luxury property type with low price
+      if ((propertyType.includes('luxury') || propertyType.includes('premium') || 
+           propertyType.includes('executive') || propertyType.includes('penthouse')) && 
+          price < 200000) {
+        issues.push({
+          type: 'price_property_mismatch',
+          message: `Luxury property type "${data.propertyType}" but low price $${price.toLocaleString()}`,
+          severity: 'warning'
+        });
+      }
+      
+      // Tiny home with high price
+      if ((propertyType.includes('tiny') || propertyType.includes('micro')) && price > 200000) {
+        issues.push({
+          type: 'price_property_mismatch',
+          message: `Tiny/micro property but high price $${price.toLocaleString()}`,
+          severity: 'warning'
+        });
+      }
+    }
+    
+    // Bedrooms vs Square Footage consistency
+    if (data.bedrooms && data.squareFeet) {
+      const bedrooms = parseInt(data.bedrooms);
+      const sqft = parseInt(data.squareFeet.toString().replace(/,/g, ''));
+      
+      // Very small space with many bedrooms
+      if (sqft < 500 && bedrooms > 2) {
+        issues.push({
+          type: 'bedroom_size_mismatch',
+          message: `${bedrooms} bedrooms in only ${sqft} sq ft seems inconsistent`,
+          severity: 'warning'
+        });
+      }
+      
+      // Very large space with few bedrooms
+      if (sqft > 5000 && bedrooms < 3) {
+        issues.push({
+          type: 'bedroom_size_mismatch',
+          message: `Only ${bedrooms} bedrooms in ${sqft} sq ft seems low`,
+          severity: 'info'
+        });
+      }
+    }
+    
+    // Price vs Square Footage consistency (price per sqft analysis)
+    if (data.price && data.squareFeet) {
+      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
+      const sqft = parseInt(data.squareFeet.toString().replace(/,/g, ''));
+      const pricePerSqft = price / sqft;
+      
+      // Extremely high price per sqft
+      if (pricePerSqft > 1000) {
+        issues.push({
+          type: 'high_price_per_sqft',
+          message: `Very high price per sq ft: $${pricePerSqft.toFixed(2)}/sq ft`,
+          severity: 'warning'
+        });
+      }
+      
+      // Extremely low price per sqft
+      if (pricePerSqft < 20) {
+        issues.push({
+          type: 'low_price_per_sqft',
+          message: `Very low price per sq ft: $${pricePerSqft.toFixed(2)}/sq ft`,
+          severity: 'warning'
+        });
+      }
+    }
+    
+    // Rental Income vs Price consistency (1% rule check)
+    if (data.price && data.estimatedRentalIncome) {
+      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
+      const monthlyRent = parseFloat(data.estimatedRentalIncome.toString().replace(/[,$]/g, ''));
+      const rentToPrice = (monthlyRent * 12) / price;
+      
+      // Very low rental yield
+      if (rentToPrice < 0.03) {
+        issues.push({
+          type: 'low_rental_yield',
+          message: `Low rental yield: ${(rentToPrice * 100).toFixed(1)}% annually`,
+          severity: 'info'
+        });
+      }
+      
+      // Unrealistically high rental yield
+      if (rentToPrice > 0.20) {
+        issues.push({
+          type: 'high_rental_yield',
+          message: `Unusually high rental yield: ${(rentToPrice * 100).toFixed(1)}% annually`,
+          severity: 'warning'
+        });
+      }
+    }
+    
+    // Year Built vs Property Type consistency
+    if (data.yearBuilt && data.propertyType) {
+      const year = parseInt(data.yearBuilt);
+      const propertyType = data.propertyType.toLowerCase();
+      
+      // Modern property type with old year
+      if ((propertyType.includes('contemporary') || propertyType.includes('modern')) && 
+          year < 1980) {
+        issues.push({
+          type: 'style_year_mismatch',
+          message: `"${data.propertyType}" style but built in ${year}`,
+          severity: 'info'
+        });
+      }
+      
+      // Historic property type with recent year
+      if ((propertyType.includes('victorian') || propertyType.includes('colonial') || 
+           propertyType.includes('historic')) && year > 1950) {
+        issues.push({
+          type: 'style_year_mismatch',
+          message: `"${data.propertyType}" style but built in ${year}`,
+          severity: 'info'
+        });
+      }
+    }
+    
+    // Bathroom vs Bedroom ratio
+    if (data.bathrooms && data.bedrooms) {
+      const bathrooms = parseFloat(data.bathrooms);
+      const bedrooms = parseInt(data.bedrooms);
+      
+      // More bathrooms than bedrooms + 2
+      if (bathrooms > bedrooms + 2) {
+        issues.push({
+          type: 'bathroom_bedroom_ratio',
+          message: `${bathrooms} bathrooms for ${bedrooms} bedrooms seems high`,
+          severity: 'info'
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Error during data consistency validation:', error);
+    issues.push({
+      type: 'validation_error',
+      message: `Error validating data consistency: ${error.message}`,
+      severity: 'error'
+    });
+  }
+  
+  return issues;
+}
+
+// International format support and currency conversion
+function normalizeInternationalData(data) {
+  const normalized = { ...data };
+  
+  try {
+    // Currency conversion (approximate rates - in production, use real API)
+    if (normalized.price && typeof normalized.price === 'string') {
+      let price = normalized.price;
+      let convertedPrice = null;
+      
+      // British Pound to USD (approximate)
+      if (price.includes('£')) {
+        const amount = parseFloat(price.replace(/[£,]/g, ''));
+        convertedPrice = Math.round(amount * 1.27); // Approximate GBP to USD
+        console.log(`💱 Converted £${amount.toLocaleString()} to $${convertedPrice.toLocaleString()} USD`);
+      }
+      
+      // Euro to USD (approximate)
+      else if (price.includes('€')) {
+        const amount = parseFloat(price.replace(/[€,]/g, ''));
+        convertedPrice = Math.round(amount * 1.09); // Approximate EUR to USD
+        console.log(`💱 Converted €${amount.toLocaleString()} to $${convertedPrice.toLocaleString()} USD`);
+      }
+      
+      // Japanese Yen to USD (approximate)
+      else if (price.includes('¥')) {
+        const amount = parseFloat(price.replace(/[¥,]/g, ''));
+        convertedPrice = Math.round(amount * 0.0067); // Approximate JPY to USD
+        console.log(`💱 Converted ¥${amount.toLocaleString()} to $${convertedPrice.toLocaleString()} USD`);
+      }
+      
+      // Canadian Dollar to USD (approximate)
+      else if (price.match(/CAD|C\$/)) {
+        const amount = parseFloat(price.replace(/[CAD$C,]/g, ''));
+        convertedPrice = Math.round(amount * 0.74); // Approximate CAD to USD
+        console.log(`💱 Converted CAD$${amount.toLocaleString()} to $${convertedPrice.toLocaleString()} USD`);
+      }
+      
+      // Australian Dollar to USD (approximate)
+      else if (price.match(/AUD|A\$/)) {
+        const amount = parseFloat(price.replace(/[AUD$A,]/g, ''));
+        convertedPrice = Math.round(amount * 0.66); // Approximate AUD to USD
+        console.log(`💱 Converted AUD$${amount.toLocaleString()} to $${convertedPrice.toLocaleString()} USD`);
+      }
+      
+      if (convertedPrice) {
+        normalized.price = convertedPrice.toString();
+        normalized.originalPrice = price;
+        normalized.currencyConversion = true;
+      }
+    }
+    
+    // Square meter to square feet conversion
+    if (normalized.squareFeet && typeof normalized.squareFeet === 'string') {
+      const sqftText = normalized.squareFeet.toLowerCase();
+      if (sqftText.includes('m²') || sqftText.includes('sq m') || sqftText.includes('square meter')) {
+        const sqm = parseFloat(sqftText.replace(/[^0-9.]/g, ''));
+        const sqft = Math.round(sqm * 10.764); // Square meters to square feet
+        normalized.squareFeet = sqft.toString();
+        normalized.originalSquareFeet = normalized.squareFeet;
+        normalized.metricConversion = true;
+        console.log(`📏 Converted ${sqm} m² to ${sqft} sq ft`);
+      }
+    }
+    
+    // Normalize address formats for international addresses
+    if (normalized.streetName) {
+      let address = normalized.streetName;
+      
+      // Common international street type conversions
+      const streetTypeMap = {
+        'rue': 'street',
+        'avenue': 'avenue', 
+        'boulevard': 'boulevard',
+        'place': 'place',
+        'strada': 'street',
+        'via': 'street',
+        'calle': 'street',
+        'strasse': 'street',
+        'gasse': 'lane',
+        'platz': 'square',
+        'weg': 'way',
+        'laan': 'lane',
+        'straat': 'street'
+      };
+      
+      // Add note for international addresses but keep original
+      for (const [foreign, english] of Object.entries(streetTypeMap)) {
+        if (address.toLowerCase().includes(foreign)) {
+          console.log(`🌍 International address detected: ${address}`);
+          normalized.internationalAddress = true;
+          break;
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Error during international data normalization:', error);
+  }
+  
+  return normalized;
+}
+
+// Pattern performance tracking and optimization
+let patternPerformanceStats = new Map();
+let extractionAnalytics = {
+  totalExtractions: 0,
+  successfulExtractions: 0,
+  fieldSuccessRates: {},
+  averageExtractionTime: 0,
+  patternEfficiency: {}
+};
+
+function trackPatternSuccess(fieldName, patternIndex, executionTime = 0) {
+  try {
+    const key = `${fieldName}_${patternIndex}`;
+    
+    if (!patternPerformanceStats.has(key)) {
+      patternPerformanceStats.set(key, {
+        fieldName,
+        patternIndex,
+        successCount: 0,
+        totalAttempts: 0,
+        averageTime: 0,
+        successRate: 0
+      });
+    }
+    
+    const stats = patternPerformanceStats.get(key);
+    stats.successCount++;
+    stats.totalAttempts++;
+    stats.averageTime = (stats.averageTime + executionTime) / 2;
+    stats.successRate = stats.successCount / stats.totalAttempts;
+    
+    // Update field-level analytics
+    if (!extractionAnalytics.fieldSuccessRates[fieldName]) {
+      extractionAnalytics.fieldSuccessRates[fieldName] = { successes: 0, attempts: 0 };
+    }
+    extractionAnalytics.fieldSuccessRates[fieldName].successes++;
+    extractionAnalytics.fieldSuccessRates[fieldName].attempts++;
+    
+    console.log(`📊 Pattern success: ${fieldName}[${patternIndex}] - ${stats.successRate.toFixed(2)} success rate`);
+  } catch (error) {
+    console.warn('Error tracking pattern success:', error);
+  }
+}
+
+function trackExtractionFailure(fieldName, responseText) {
+  try {
+    // Update field-level analytics
+    if (!extractionAnalytics.fieldSuccessRates[fieldName]) {
+      extractionAnalytics.fieldSuccessRates[fieldName] = { successes: 0, attempts: 0 };
+    }
+    extractionAnalytics.fieldSuccessRates[fieldName].attempts++;
+    
+    // Store failure context for analysis
+    const failureKey = `${fieldName}_failures`;
+    if (!window.extractionFailures) {
+      window.extractionFailures = new Map();
+    }
+    
+    if (!window.extractionFailures.has(failureKey)) {
+      window.extractionFailures.set(failureKey, []);
+    }
+    
+    window.extractionFailures.get(failureKey).push({
+      timestamp: Date.now(),
+      responseLength: responseText.length,
+      sampleText: responseText.substring(0, 500),
+      fieldName
+    });
+    
+    // Keep only last 10 failures per field
+    const failures = window.extractionFailures.get(failureKey);
+    if (failures.length > 10) {
+      failures.splice(0, failures.length - 10);
+    }
+    
+  } catch (error) {
+    console.warn('Error tracking extraction failure:', error);
+  }
+}
+
+function getExtractionAnalytics() {
+  const analytics = {
+    ...extractionAnalytics,
+    topPatterns: [],
+    fieldPerformance: {}
+  };
+  
+  // Calculate field performance
+  for (const [fieldName, stats] of Object.entries(extractionAnalytics.fieldSuccessRates)) {
+    analytics.fieldPerformance[fieldName] = {
+      successRate: stats.attempts > 0 ? (stats.successes / stats.attempts * 100).toFixed(1) + '%' : '0%',
+      attempts: stats.attempts,
+      successes: stats.successes
+    };
+  }
+  
+  // Get top performing patterns
+  const patternArray = Array.from(patternPerformanceStats.values());
+  analytics.topPatterns = patternArray
+    .filter(p => p.totalAttempts >= 3) // Only patterns with enough attempts
+    .sort((a, b) => b.successRate - a.successRate)
+    .slice(0, 10)
+    .map(p => ({
+      pattern: `${p.fieldName}[${p.patternIndex}]`,
+      successRate: (p.successRate * 100).toFixed(1) + '%',
+      attempts: p.totalAttempts,
+      avgTime: p.averageTime.toFixed(2) + 'ms'
+    }));
+  
+  return analytics;
+}
+
+// Intelligent caching system for repeated extractions
+let extractionCache = new Map();
+const CACHE_MAX_SIZE = 100;
+const CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
+
+function getCacheKey(responseText) {
+  // Create a hash-like key from response text
+  let hash = 0;
+  for (let i = 0; i < responseText.length; i++) {
+    const char = responseText.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+function getCachedExtraction(responseText) {
+  try {
+    const cacheKey = getCacheKey(responseText);
+    const cached = extractionCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp) < CACHE_EXPIRY_TIME) {
+      console.log('🚀 Using cached extraction result');
+      return cached.data;
+    }
+    
+    // Clean expired entries
+    if (cached && (Date.now() - cached.timestamp) >= CACHE_EXPIRY_TIME) {
+      extractionCache.delete(cacheKey);
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error accessing extraction cache:', error);
+    return null;
+  }
+}
+
+function setCachedExtraction(responseText, extractionResult) {
+  try {
+    const cacheKey = getCacheKey(responseText);
+    
+    // Implement LRU cache
+    if (extractionCache.size >= CACHE_MAX_SIZE) {
+      const firstKey = extractionCache.keys().next().value;
+      extractionCache.delete(firstKey);
+    }
+    
+    extractionCache.set(cacheKey, {
+      data: extractionResult,
+      timestamp: Date.now()
+    });
+    
+    console.log('💾 Cached extraction result');
+  } catch (error) {
+    console.warn('Error caching extraction result:', error);
+  }
+}
+
+// AI-assisted fallback extraction using semantic analysis
+function performAIAssistedExtraction(responseText, missingFields) {
+  const extractedData = {};
+  
+  try {
+    console.log('🤖 Performing AI-assisted extraction for:', missingFields);
+    
+    for (const field of missingFields) {
+      let value = null;
+      
+      switch (field) {
+        case 'streetName':
+          value = extractAddressWithAI(responseText);
+          break;
+        case 'price':
+          value = extractPriceWithAI(responseText);
+          break;
+        case 'propertyType':
+          value = extractPropertyTypeWithAI(responseText);
+          break;
+        case 'bedrooms':
+          value = extractBedroomsWithAI(responseText);
+          break;
+        case 'bathrooms':
+          value = extractBathroomsWithAI(responseText);
+          break;
+        case 'squareFeet':
+          value = extractSquareFeetWithAI(responseText);
+          break;
+      }
+      
+      if (value) {
+        extractedData[field] = value;
+        console.log(`🤖 AI extracted ${field}:`, value);
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Error in AI-assisted extraction:', error);
+  }
+  
+  return extractedData;
+}
+
+// AI-assisted address extraction using context analysis
+function extractAddressWithAI(text) {
+  try {
+    // Look for any numeric + text combinations that could be addresses
+    const addressCandidates = text.match(/\b\d+\s+[A-Za-z][A-Za-z0-9\s]{3,30}\b/g);
+    
+    if (addressCandidates) {
+      // Score candidates based on context clues
+      let bestCandidate = null;
+      let bestScore = 0;
+      
+      for (const candidate of addressCandidates) {
+        let score = 0;
+        const context = text.substring(
+          Math.max(0, text.indexOf(candidate) - 100),
+          text.indexOf(candidate) + candidate.length + 100
+        ).toLowerCase();
+        
+        // Context scoring
+        if (context.includes('property') || context.includes('address') || 
+            context.includes('located') || context.includes('street')) score += 3;
+        if (context.includes('house') || context.includes('home')) score += 2;
+        if (candidate.match(/\b(street|avenue|road|drive|lane|way|st|ave|rd|dr|ln)\b/i)) score += 4;
+        if (candidate.length >= 8 && candidate.length <= 40) score += 2;
+        
+        // Avoid obvious non-addresses
+        if (candidate.match(/\$|price|bedroom|bathroom|sqft|year/i)) score -= 5;
+        
+        if (score > bestScore && score > 3) {
+          bestScore = score;
+          bestCandidate = candidate.trim();
+        }
+      }
+      
+      return bestCandidate;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI address extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted price extraction using context analysis
+function extractPriceWithAI(text) {
+  try {
+    // Look for any price-like patterns
+    const priceCandidates = text.match(/\$[\d,]+(?:\.\d{2})?|\b[\d,]+(?:\.\d+)?\s*[kKmM]\b|\b[\d,]{3,}\b/g);
+    
+    if (priceCandidates) {
+      let bestCandidate = null;
+      let bestScore = 0;
+      
+      for (const candidate of priceCandidates) {
+        let score = 0;
+        const context = text.substring(
+          Math.max(0, text.indexOf(candidate) - 50),
+          text.indexOf(candidate) + candidate.length + 50
+        ).toLowerCase();
+        
+        // Context scoring for price
+        if (context.includes('price') || context.includes('asking') || 
+            context.includes('cost') || context.includes('listed')) score += 4;
+        if (context.includes('property') || context.includes('home')) score += 2;
+        if (candidate.includes('$')) score += 3;
+        if (candidate.match(/[kKmM]$/)) score += 2;
+        
+        // Price range validation
+        let numericValue = parseFloat(candidate.replace(/[,$kKmM]/g, ''));
+        if (candidate.match(/[kK]$/)) numericValue *= 1000;
+        if (candidate.match(/[mM]$/)) numericValue *= 1000000;
+        
+        if (numericValue >= 10000 && numericValue <= 10000000) score += 3;
+        else if (numericValue < 1000 || numericValue > 50000000) score -= 3;
+        
+        // Avoid rental prices
+        if (context.includes('monthly') || context.includes('rent')) score -= 2;
+        
+        if (score > bestScore && score > 4) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      }
+      
+      return bestCandidate;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI price extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted property type extraction
+function extractPropertyTypeWithAI(text) {
+  try {
+    const propertyKeywords = [
+      'single family', 'townhouse', 'condo', 'condominium', 'apartment',
+      'duplex', 'triplex', 'house', 'home', 'villa', 'ranch', 'colonial',
+      'contemporary', 'modern', 'bungalow', 'cottage', 'cabin', 'loft',
+      'penthouse', 'studio', 'mobile home', 'manufactured home', 'tiny home'
+    ];
+    
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const keyword of propertyKeywords) {
+      const regex = new RegExp(keyword.replace(/\s+/g, '\\s+'), 'gi');
+      const matches = text.match(regex);
+      
+      if (matches) {
+        let score = matches.length;
+        
+        // Context scoring
+        for (const match of matches) {
+          const context = text.substring(
+            Math.max(0, text.indexOf(match) - 30),
+            text.indexOf(match) + match.length + 30
+          ).toLowerCase();
+          
+          if (context.includes('type') || context.includes('property')) score += 2;
+          if (context.includes('style') || context.includes('building')) score += 1;
+        }
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = keyword;
+        }
+      }
+    }
+    
+    return bestMatch ? bestMatch.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ') : null;
+    
+  } catch (error) {
+    console.warn('Error in AI property type extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted bedroom extraction
+function extractBedroomsWithAI(text) {
+  try {
+    // Look for numeric patterns that could be bedrooms
+    const candidates = text.match(/\b[0-9]\s*(?:bed|bedroom)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const bedroom = candidates[0].match(/\d+/)[0];
+      const num = parseInt(bedroom);
+      
+      if (num >= 0 && num <= 10) {
+        return bedroom;
+      }
+    }
+    
+    // Fallback: look for studio mentions
+    if (text.toLowerCase().includes('studio')) {
+      return '0';
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI bedroom extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted bathroom extraction
+function extractBathroomsWithAI(text) {
+  try {
+    const candidates = text.match(/\b[0-9](?:\.[0-9])?\s*(?:bath|bathroom)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const bathroom = candidates[0].match(/[\d.]+/)[0];
+      const num = parseFloat(bathroom);
+      
+      if (num >= 0 && num <= 10) {
+        return bathroom;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI bathroom extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted square feet extraction
+function extractSquareFeetWithAI(text) {
+  try {
+    const candidates = text.match(/\b[\d,]+\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const sqft = candidates[0].match(/[\d,]+/)[0];
+      const num = parseInt(sqft.replace(/,/g, ''));
+      
+      if (num >= 100 && num <= 20000) {
+        return sqft;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI square feet extraction:', error);
+    return null;
+  }
 }
 
 // Data quality assessment function
@@ -1443,38 +2760,55 @@ function setupResponseMonitor() {
   let responseBuffer = new Map(); // Buffer to track response completion
   let completionTimers = new Map(); // Timers for each property analysis
   
-  // Function to detect if ChatGPT is still writing (streaming)
+  // Enhanced function to detect if ChatGPT is still writing (streaming)
   const isResponseStreaming = () => {
     console.log('🔍 Checking if ChatGPT is still streaming...');
     
-    // Primary check: Look for the stop generation button
+    // Primary check: Look for the stop generation button (most reliable)
     const stopSelectors = [
       'button[data-testid*="stop"]',
       'button[aria-label*="stop" i]',
       'button[title*="stop" i]',
       'button:has([data-icon="stop"])',
-      '[role="button"][aria-label*="stop" i]'
+      '[role="button"][aria-label*="stop" i]',
+      'button[class*="stop"]',
+      '[data-state="stop"]',
+      'button:has(svg[class*="stop"])',
+      '[aria-label*="Stop generating"]',
+      '[title*="Stop generating"]'
     ];
     
     for (const selector of stopSelectors) {
-      const stopButton = document.querySelector(selector);
-      if (stopButton && 
-          stopButton.offsetHeight > 0 && 
-          !stopButton.disabled && 
-          window.getComputedStyle(stopButton).visibility !== 'hidden' &&
-          window.getComputedStyle(stopButton).display !== 'none') {
-        console.log('🔍 Found active stop button:', selector, stopButton);
-        return true;
+      try {
+        const stopButton = document.querySelector(selector);
+        if (stopButton && 
+            stopButton.offsetHeight > 0 && 
+            !stopButton.disabled && 
+            window.getComputedStyle(stopButton).visibility !== 'hidden' &&
+            window.getComputedStyle(stopButton).display !== 'none') {
+          console.log('🔍 Found active stop button:', selector, stopButton);
+          return true;
+        }
+      } catch (e) {
+        // Skip selector if it causes errors
+        continue;
       }
     }
     
-    // Secondary check: Look for streaming indicators
+    // Secondary check: Look for streaming indicators and visual cues
     const streamingIndicators = [
       '.result-streaming',
       '[class*="streaming"]',
       '[class*="loading"]',
       '.animate-pulse',
-      '[data-testid*="streaming"]'
+      '[data-testid*="streaming"]',
+      '[data-state="streaming"]',
+      '.thinking',
+      '.generating',
+      '.typing',
+      '[class*="dots"]',
+      '[class*="ellipsis"]',
+      '.cursor-blink'
     ];
     
     for (const indicator of streamingIndicators) {
@@ -1587,12 +2921,16 @@ function setupResponseMonitor() {
     ).length;
     
     console.log(`Found ${keywordMatches} property keywords in completed response`);
+    console.log('🔍 Keywords found:', propertyKeywords.filter(keyword => 
+      messageText.toLowerCase().includes(keyword)
+    ));
     
     if (keywordMatches >= 2) {
       // Add null check for currentPropertyAnalysis
       if (!currentPropertyAnalysis) {
         console.log('⚠️ No active property analysis session, but detected property keywords');
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
+        console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
         // If we're in prompt splitting mode, this could be the analysis response
         if (promptSplittingState.currentPhase === 'complete' || 
@@ -1697,19 +3035,61 @@ function setupResponseMonitor() {
   };
   
   const checkForNewMessages = () => {
-    // Updated selectors for current ChatGPT interface (2024)
+    // Comprehensive selectors for ChatGPT interface with fallbacks for interface changes
     const messageSelectors = [
+      // Current primary selectors (December 2024)
       '[data-message-author-role="assistant"]',
       '[data-message-id] [data-message-author-role="assistant"]',
+      
+      // Alternative data attributes
+      '[data-author="assistant"]',
+      '[data-role="assistant"]',
+      '[role="assistant"]',
+      
+      // Class-based selectors (current)
       '.group.w-full.text-token-text-primary',
       '.group.final-completion',
       '.prose.result-streaming',
       '.prose',
       '[class*="markdown"]',
+      
+      // Message container patterns
       '[class*="message"][class*="assistant"]',
       '.message.assistant',
       '.group.assistant',
-      '[class*="assistant"]'
+      '[class*="assistant"]',
+      '.assistant-message',
+      '.bot-message',
+      '.ai-message',
+      '.response-message',
+      
+      // Generic conversation patterns
+      '.conversation-turn[data-author="assistant"]',
+      '.conversation-item[data-role="assistant"]',
+      '.chat-message.assistant',
+      '.message[data-sender="assistant"]',
+      '.turn.assistant',
+      
+      // Fallback content-based selectors
+      '[class*="response"]',
+      '[class*="reply"]',
+      '[class*="bot"]',
+      '[class*="ai"]',
+      
+      // Structure-based fallbacks (look for even-numbered message groups)
+      '.group:nth-child(even)',
+      '.message:nth-child(even)',
+      '.conversation-turn:nth-child(even)',
+      
+      // Last resort: any element with substantial text that's not user input
+      'div[class*="prose"]:not([class*="user"]):not([class*="human"]):not(textarea):not(input)',
+      'div[class*="text"]:not([class*="user"]):not([class*="human"]):not(textarea):not(input)',
+      
+      // OpenAI specific patterns (alternative domains)
+      '.result-thinking',
+      '.result-content',
+      '.completion-content',
+      '.generated-text'
     ];
     
     let messages = [];
@@ -1782,7 +3162,8 @@ function setupResponseMonitor() {
             // Length hasn't changed, use the previous length change time
             lastLengthChangeTime = previousBuffer.lastLengthChange || previousBuffer.lastUpdated;
             const stableTime = currentTime - lastLengthChangeTime;
-            if (stableTime > 2000) { // Length hasn't changed for 2 seconds
+            // More aggressive completion detection for faster processing
+            if (stableTime > 1500) { // Reduced from 2000ms to 1500ms for faster detection
               lengthStable = true;
               console.log('📏 Response length stable for', Math.round(stableTime/1000), 'seconds, likely complete');
             }
@@ -1838,14 +3219,14 @@ function setupResponseMonitor() {
             clearTimeout(completionTimers.get(currentUrl));
           }
           
-          // Set a shorter completion timer (2 seconds after last change)
+          // Set a shorter completion timer (1.5 seconds after last change for faster processing)
           completionTimers.set(currentUrl, setTimeout(() => {
             console.log('⏰ Completion timer triggered - assuming response is complete');
             const bufferedResponse = responseBuffer.get(currentUrl);
             if (bufferedResponse) {
               processCompletedResponse(bufferedResponse.messageText, currentUrl);
             }
-          }, 2000));
+          }, 1500)); // Reduced from 2000ms to 1500ms
         }
       }
       
@@ -2371,7 +3752,353 @@ window.debugPromptSplitting = function(testResponse) {
   }
 };
 
+// Advanced debugging and testing utilities
+window.getExtractionAnalytics = function() {
+  const analytics = getExtractionAnalytics();
+  console.log('📊 Extraction Analytics:', analytics);
+  return analytics;
+};
+
+window.clearExtractionCache = function() {
+  extractionCache.clear();
+  console.log('🗑️ Extraction cache cleared');
+};
+
+window.getPatternPerformance = function() {
+  const patterns = Array.from(patternPerformanceStats.entries()).map(([key, stats]) => ({
+    pattern: key,
+    ...stats,
+    successRate: (stats.successRate * 100).toFixed(1) + '%'
+  }));
+  console.log('📊 Pattern Performance:', patterns);
+  return patterns;
+};
+
+window.analyzeExtractionFailures = function(fieldName = null) {
+  if (!window.extractionFailures) {
+    console.log('No extraction failures recorded');
+    return {};
+  }
+  
+  const analysis = {};
+  
+  for (const [key, failures] of window.extractionFailures.entries()) {
+    if (fieldName && !key.includes(fieldName)) continue;
+    
+    analysis[key] = {
+      totalFailures: failures.length,
+      recentFailures: failures.slice(-5),
+      commonCharacteristics: {
+        averageLength: failures.reduce((sum, f) => sum + f.responseLength, 0) / failures.length,
+        timePattern: failures.map(f => new Date(f.timestamp).toLocaleTimeString())
+      }
+    };
+  }
+  
+  console.log('🔍 Extraction Failure Analysis:', analysis);
+  return analysis;
+};
+
+window.testExtractionPerformance = function(iterations = 10) {
+  const testResponse = `**PROPERTY DETAILS:**
+- Address: 123 Main Street
+- Property Price: $450,000
+- Bedrooms: 3
+- Bathrooms: 2
+- Property Type: Single Family Home
+- Square Footage: 1,500
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Location Score: 8/10
+- Great neighborhood with excellent schools
+
+**RENTAL INCOME ANALYSIS:**
+- Estimated Monthly Rental Income: $2,200
+
+**INVESTMENT SUMMARY:**
+- Strong investment potential
+- Good location and pricing`;
+
+  console.log(`🧪 Running performance test with ${iterations} iterations...`);
+  
+  const startTime = performance.now();
+  const results = [];
+  
+  for (let i = 0; i < iterations; i++) {
+    const iterationStart = performance.now();
+    const result = extractPropertyAnalysisData(testResponse);
+    const iterationTime = performance.now() - iterationStart;
+    
+    results.push({
+      iteration: i + 1,
+      extractionTime: iterationTime,
+      fieldsExtracted: Object.keys(result.extractedData).length,
+      success: Object.keys(result.extractedData).length > 0
+    });
+  }
+  
+  const totalTime = performance.now() - startTime;
+  const avgTime = totalTime / iterations;
+  const successRate = results.filter(r => r.success).length / iterations * 100;
+  
+  const performanceReport = {
+    totalTime: totalTime.toFixed(2) + 'ms',
+    averageTime: avgTime.toFixed(2) + 'ms',
+    successRate: successRate.toFixed(1) + '%',
+    iterations,
+    results: results.slice(0, 5) // Show first 5 results
+  };
+  
+  console.log('⚡ Performance Test Results:', performanceReport);
+  return performanceReport;
+};
+
+window.validateExtractionAccuracy = function(expectedData, actualResponse) {
+  console.log('🎯 Validating extraction accuracy...');
+  
+  const extracted = extractPropertyAnalysisData(actualResponse);
+  if (!extracted) {
+    console.log('❌ Extraction failed completely');
+    return { accuracy: 0, details: 'Complete extraction failure' };
+  }
+  
+  const accuracy = {};
+  let totalFields = 0;
+  let correctFields = 0;
+  
+  for (const [field, expectedValue] of Object.entries(expectedData)) {
+    totalFields++;
+    const extractedValue = extracted.extractedData[field];
+    
+    if (extractedValue && extractedValue.toString().toLowerCase().includes(expectedValue.toString().toLowerCase())) {
+      correctFields++;
+      accuracy[field] = { expected: expectedValue, extracted: extractedValue, correct: true };
+    } else {
+      accuracy[field] = { expected: expectedValue, extracted: extractedValue || 'NOT_FOUND', correct: false };
+    }
+  }
+  
+  const accuracyPercentage = (correctFields / totalFields * 100).toFixed(1);
+  
+  const report = {
+    accuracyPercentage: accuracyPercentage + '%',
+    correctFields,
+    totalFields,
+    fieldAccuracy: accuracy
+  };
+  
+  console.log('🎯 Accuracy Report:', report);
+  return report;
+};
+
 // Add comprehensive debugging function
+window.testPropertyExtraction = function(sampleResponse) {
+  console.log('🧪=== TESTING PROPERTY EXTRACTION ===');
+  console.log('📝 Input text length:', sampleResponse ? sampleResponse.length : 0);
+  
+  if (!sampleResponse) {
+    sampleResponse = `**PROPERTY DETAILS:**
+- Address: 123 Main Street
+- Property Price: $450,000
+- Bedrooms: 3
+- Bathrooms: 2
+- Property Type: Single Family Home
+- Square Footage: 1,500
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Location Score: 8/10
+- Great neighborhood with excellent schools
+
+**RENTAL INCOME ANALYSIS:**
+- Estimated Monthly Rental Income: $2,200
+
+**INVESTMENT SUMMARY:**
+- Strong investment potential
+- Good location and pricing`;
+  }
+  
+  console.log('📝 Sample text (first 400 chars):', sampleResponse.substring(0, 400) + '...');
+  
+  // Test extraction
+  console.log('🔍=== RUNNING FULL EXTRACTION ===');
+  const result = extractPropertyAnalysisData(sampleResponse);
+  
+  console.log('📊 EXTRACTION RESULTS:');
+  console.log('   Total data points extracted:', Object.keys(result.extractedData).length);
+  console.log('   Extracted data:', result.extractedData);
+  console.log('   Has streetName:', !!result.extractedData.streetName);
+  console.log('   Has price:', !!result.extractedData.price);
+  console.log('   Has propertyType:', !!result.extractedData.propertyType);
+  
+  return result;
+};
+
+// Quick test with common patterns
+window.quickTestPatterns = function() {
+  const testCases = [
+    'Address: 123 Main Street',
+    'Property Price: $450,000',
+    '• Address: 456 Oak Avenue',
+    '• Price: 350K',
+    'This property at 789 Pine Road is priced at $400,000',
+    'Located at 321 Elm Street for approximately $425,000'
+  ];
+  
+  console.log('🧪=== QUICK PATTERN TESTS ===');
+  
+  testCases.forEach((testCase, index) => {
+    console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
+    const result = extractPropertyAnalysisData(testCase);
+    console.log('   Result:', result.extractedData);
+  });
+};
+
+// Test patterns with source links
+window.testSourceLinks = function() {
+  const testCases = [
+    'Address: 123 Main Street [Source: Zillow.com]',
+    'Property Price: $450,000 [Source: Realtor.com]',
+    '• Address: 456 Oak Avenue (Source: MLS)',
+    '• Price: 350K [Source: Zillow]',
+    'This property at 789 Pine Road is priced at $400,000 [Source: Trulia]',
+    'Located at 321 Elm Street for approximately $425,000 (From: Realtor.com)',
+    'Price: $299,000 [Src: RedFin]',
+    'Address: 555 Elm Drive (Source: Property Records)'
+  ];
+  
+  console.log('🧪=== SOURCE LINK PATTERN TESTS ===');
+  
+  testCases.forEach((testCase, index) => {
+    console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
+    const result = extractPropertyAnalysisData(testCase);
+    console.log('   Result:', result.extractedData);
+  });
+};
+
+// Test function for current webpage
+window.testCurrentExtraction = function() {
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    console.log('🧪 Testing extraction on current ChatGPT response');
+    return window.testPropertyExtraction(messageText);
+  } else {
+    console.log('❌ No ChatGPT messages found on current page');
+    return null;
+  }
+};
+
+// Comprehensive diagnostic function
+window.diagnoseProblem = function() {
+  console.log('🔍=== COMPREHENSIVE EXTRACTION DIAGNOSIS ===');
+  
+  // 1. Check if extension is properly loaded
+  console.log('📋 1. Extension Status:');
+  console.log('   Extension active:', typeof extractPropertyAnalysisData === 'function');
+  console.log('   Current URL:', window.location.href);
+  console.log('   Is ChatGPT site:', window.location.hostname.includes('chatgpt.com') || window.location.hostname.includes('openai.com'));
+  
+  // 2. Check for ChatGPT messages
+  console.log('📋 2. ChatGPT Messages:');
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  console.log('   Total assistant messages found:', messages.length);
+  
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    console.log('   Last message length:', messageText.length);
+    console.log('   Last message preview:', messageText.substring(0, 200) + '...');
+    
+    // 3. Check keyword detection
+    console.log('📋 3. Keyword Detection:');
+    const propertyKeywords = [
+      'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
+      'sqft', 'square feet', 'built', 'neighborhood', 'market', 'investment'
+    ];
+    
+    const keywordMatches = propertyKeywords.filter(keyword => 
+      messageText.toLowerCase().includes(keyword)
+    );
+    
+    console.log('   Keywords found:', keywordMatches);
+    console.log('   Keyword count:', keywordMatches.length, '(needs >= 2)');
+    
+    // 4. Test extraction
+    console.log('📋 4. Extraction Test:');
+    const result = extractPropertyAnalysisData(messageText);
+    console.log('   Extraction result:', result);
+    console.log('   Data points extracted:', Object.keys(result?.extractedData || {}).length);
+    console.log('   Extracted data:', result?.extractedData);
+    
+    return result;
+  } else {
+    console.log('   ❌ No assistant messages found');
+  }
+  
+  // 5. Check current property analysis state
+  console.log('📋 5. Property Analysis State:');
+  console.log('   currentPropertyAnalysis:', typeof currentPropertyAnalysis !== 'undefined' ? currentPropertyAnalysis : 'undefined');
+  console.log('   promptSplittingState:', typeof promptSplittingState !== 'undefined' ? promptSplittingState : 'undefined');
+  
+  // 6. Check for any console errors
+  console.log('📋 6. Recent Console Activity:');
+  console.log('   Check above for any error messages or warnings');
+  console.log('   Look for extraction-related logs starting with 🔍, ✅, or ❌');
+  
+  console.log('🔍=== END DIAGNOSIS ===');
+  
+  return {
+    extensionActive: typeof extractPropertyAnalysisData === 'function',
+    messagesFound: messages.length,
+    keywordMatches: messages.length > 0 ? keywordMatches : [],
+    extractionResult: messages.length > 0 ? result : null
+  };
+};
+
+// Force extraction on current message (bypasses all session tracking)
+window.forceExtractCurrent = function() {
+  console.log('🚀 FORCING EXTRACTION ON CURRENT MESSAGE');
+  
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length === 0) {
+    console.log('❌ No assistant messages found');
+    return null;
+  }
+  
+  const lastMessage = messages[messages.length - 1];
+  const messageText = lastMessage.textContent || lastMessage.innerText || '';
+  
+  console.log('📝 Message length:', messageText.length);
+  console.log('📝 Message preview:', messageText.substring(0, 300) + '...');
+  
+  // Force extraction
+  const analysisData = extractPropertyAnalysisData(messageText);
+  
+  if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+    console.log('✅ Extraction successful!');
+    console.log('📊 Extracted data:', analysisData.extractedData);
+    
+    // Try to save it (using dummy URL if needed)
+    const propertyUrl = prompt('Enter property URL for this analysis:') || `manual_${Date.now()}`;
+    
+    chrome.runtime.sendMessage({
+      action: 'savePropertyAnalysis',
+      propertyUrl: propertyUrl,
+      sessionId: `manual_${Date.now()}`,
+      analysisData: analysisData
+    }).then(response => {
+      console.log('💾 Save response:', response);
+    }).catch(err => {
+      console.error('❌ Save failed:', err);
+    });
+    
+    return analysisData;
+  } else {
+    console.log('❌ No data extracted');
+    return null;
+  }
+};
 window.debugPromptSplittingState = function() {
   console.log('=== PROMPT SPLITTING DEBUG INFO ===');
   console.log('🔧 Current state:', promptSplittingState);
