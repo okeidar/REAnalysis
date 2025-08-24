@@ -4,8 +4,9 @@ console.log('ChatGPT Helper Extension loaded on:', window.location.href);
 // Function to check if extension context is still valid
 function isExtensionContextValid() {
   try {
-    return chrome.runtime && chrome.runtime.id;
+    return !!(chrome && chrome.runtime && chrome.runtime.id);
   } catch (err) {
+    console.warn('Extension context validation failed:', err);
     return false;
   }
 }
@@ -14,15 +15,17 @@ function isExtensionContextValid() {
 function safeChromeFall(apiCall, fallbackValue = null) {
   try {
     if (!isExtensionContextValid()) {
-      console.log('⚠️ Extension context invalidated, skipping chrome API call');
+      console.warn('⚠️ Extension context invalidated, skipping chrome API call');
       return Promise.resolve(fallbackValue);
     }
     return apiCall();
   } catch (err) {
-    if (err.message && err.message.includes('Extension context invalidated')) {
-      console.log('⚠️ Extension context invalidated during API call');
+    if (err && (err.message && err.message.includes('Extension context invalidated') || 
+               err.message && err.message.includes('Unexpected token'))) {
+      console.warn('⚠️ Extension context invalidated during API call:', err.message);
       return Promise.resolve(fallbackValue);
     }
+    console.error('Chrome API call failed:', err);
     throw err;
   }
 }
@@ -303,34 +306,42 @@ function extractPropertyAnalysisData(responseText) {
   
   // Function to extract data from RENTAL INCOME ANALYSIS section
   function extractFromRentalAnalysis(text, analysis) {
-    // Extract estimated monthly rental income
-    const rentalIncomeMatch = text.match(/\$?([\d,]+)\s*(?:per\s+month|monthly|\/month)/gi);
-    if (rentalIncomeMatch && rentalIncomeMatch[0]) {
-      const match = rentalIncomeMatch[0].match(/\$?([\d,]+)/);
-      if (match) {
-        analysis.extractedData.estimatedRentalIncome = match[1].replace(/,/g, '');
-        console.log(`✅ Extracted estimated rental income:`, analysis.extractedData.estimatedRentalIncome);
-      }
-    }
-    
-    // Extract rental growth potential with Excel-friendly format
-    const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
-    if (growthMatch && growthMatch[0]) {
-      // Check if it already has "Growth:" prefix
-      if (growthMatch[0].toLowerCase().includes('growth:')) {
-        analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
-      } else {
-        const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+    try {
+      // Extract estimated monthly rental income
+      const rentalIncomeMatch = text.match(/\$?([\d,]+)\s*(?:per\s+month|monthly|\/month)/gi);
+      if (rentalIncomeMatch && rentalIncomeMatch[0]) {
+        const match = rentalIncomeMatch[0].match(/\$?([\d,]+)/);
         if (match) {
-          analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+          analysis.extractedData.estimatedRentalIncome = match[1].replace(/,/g, '');
+          console.log(`✅ Extracted estimated rental income:`, analysis.extractedData.estimatedRentalIncome);
         }
       }
-      console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
+    } catch (error) {
+      console.warn('Error in rental income extraction:', error.message);
     }
     
-    // Store the full rental analysis
-    analysis.extractedData.rentalAnalysis = text.substring(0, 1000);
-    console.log(`✅ Stored rental analysis (${text.length} chars)`);
+    try {
+      // Extract rental growth potential with Excel-friendly format
+      const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
+      if (growthMatch && growthMatch[0]) {
+        // Check if it already has "Growth:" prefix
+        if (growthMatch[0].toLowerCase().includes('growth:')) {
+          analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
+        } else {
+          const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+          if (match) {
+            analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+          }
+        }
+        console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
+      }
+      
+      // Store the full rental analysis
+      analysis.extractedData.rentalAnalysis = text.substring(0, 1000);
+      console.log(`✅ Stored rental analysis (${text.length} chars)`);
+    } catch (error) {
+      console.warn('Error in rental growth potential extraction:', error.message);
+    }
   }
   
   // Function to extract data from INVESTMENT SUMMARY section
@@ -1140,12 +1151,22 @@ function submitMessage() {
   }, 1000);
 }
 
+// Global error handler for uncaught syntax errors
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message && event.error.message.includes('Unexpected token')) {
+    console.warn('ChatGPT Helper: Caught syntax error (likely extension context invalidation):', event.error.message);
+    event.preventDefault(); // Prevent the error from propagating
+    return true;
+  }
+});
+
 // Initialize extension only on ChatGPT
 if (isChatGPTSite()) {
-  console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
-  
-  // Add a visual indicator that the extension is active
-  function addExtensionIndicator() {
+  try {
+    console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
+    
+    // Add a visual indicator that the extension is active
+    function addExtensionIndicator() {
     // Check if indicator already exists
     if (document.getElementById('chatgpt-helper-indicator')) {
       return;
@@ -1243,6 +1264,12 @@ if (isChatGPTSite()) {
     }
   });
   
+  } catch (initError) {
+    console.error('ChatGPT Helper Extension initialization failed:', initError);
+    if (initError.message && initError.message.includes('Unexpected token')) {
+      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
+    }
+  }
 } else {
   console.log('❌ ChatGPT Helper Extension is not active on this site');
 }
