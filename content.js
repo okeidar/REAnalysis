@@ -39,7 +39,7 @@ let processedMessagesPerProperty = new Map();
 // Prompt splitting state management
 let promptSplittingState = {
   enabled: true,
-  lengthThreshold: 500, // characters
+  lengthThreshold: 200, // characters - lowered for dynamic prompts
   confirmationTimeout: 15000, // 15 seconds
   currentPhase: null, // 'instructions', 'waiting_confirmation', 'sending_link', 'complete'
   pendingPropertyLink: null,
@@ -70,12 +70,15 @@ function splitPromptContent(promptTemplate, propertyLink) {
   
   return {
     instructions: instructionsPart + confirmationRequest,
-    linkMessage: `Please analyze this property listing: ${propertyLink}`
+    linkMessage: propertyLink  // Send only the raw link, no additional text
   };
 }
 
 function detectConfirmation(responseText) {
-  if (!responseText || typeof responseText !== 'string') return false;
+  if (!responseText || typeof responseText !== 'string') {
+    console.log('🔍 detectConfirmation: No response text provided');
+    return false;
+  }
   
   const confirmationPatterns = [
     /yes,?\s*i\s*understand/i,
@@ -84,10 +87,31 @@ function detectConfirmation(responseText) {
     /understood/i,
     /ready\s*to\s*analyze/i,
     /ready/i,
-    /yes/i
+    /yes,?\s*i.{0,20}understand/i, // More flexible matching
+    /understand.{0,20}ready/i,
+    /ready.{0,20}analyze/i,
+    /yes.{0,50}ready/i,
+    /\byes\b/i // Word boundary to avoid matching "yesterday" etc.
   ];
   
-  return confirmationPatterns.some(pattern => pattern.test(responseText.trim()));
+  const result = confirmationPatterns.some(pattern => {
+    const matches = pattern.test(responseText.trim());
+    if (matches) {
+      console.log('🔍 detectConfirmation: Pattern matched:', pattern.source);
+    }
+    return matches;
+  });
+  
+  // Always log what we're testing for debugging
+  console.log('🔍 detectConfirmation: Testing response:', responseText.substring(0, 200));
+  console.log('🔍 detectConfirmation result:', result);
+  
+  // If no pattern matched, show what patterns we tried
+  if (!result) {
+    console.log('🔍 detectConfirmation: No patterns matched. Tried:', confirmationPatterns.map(p => p.source));
+  }
+  
+  return result;
 }
 
 function resetPromptSplittingState() {
@@ -185,7 +209,7 @@ async function handleConfirmationReceived() {
       return;
     }
     
-    const linkMessage = `Please analyze this property listing: ${propertyLink}`;
+    const linkMessage = propertyLink;  // Send only the raw link
     
     // Insert the link message
     if (inputField.tagName === 'TEXTAREA') {
@@ -258,12 +282,12 @@ async function handleSplittingFallback() {
       throw new Error('Could not find input field for fallback');
     }
     
-    // Get the original prompt template
+    // Get the original prompt template  
     const result = await safeChromeFall(
       () => chrome.storage.local.get(['customPrompt']),
       { customPrompt: null }
     );
-    const promptTemplate = result.customPrompt || getDefaultPromptTemplate();
+    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
     
     // Create the full prompt with link
     const fullPrompt = promptTemplate
@@ -305,15 +329,10 @@ function getDefaultPromptTemplate() {
   return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
 
 **REQUIRED DATA EXTRACTION:**
-1. **Price**: Exact asking price (include currency symbol)
-2. **Bedrooms**: Number of bedrooms (numeric)
-3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
-4. **Square Footage**: Total square footage (numeric)
-5. **Year Built**: Construction year (4-digit year)
-6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
-7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
-8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
+1. **Street Name**: Property street address (e.g., "123 Main Street")
+2. **Property Price**: Exact asking price (include currency symbol)
+3. **Number of Bedrooms**: Number of bedrooms (numeric)
+4. **Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)
 
 **ANALYSIS STRUCTURE:**
 Please organize your response with clear sections:
@@ -358,6 +377,207 @@ Focus on data accuracy and practical investment considerations that would be val
 Property Link: {PROPERTY_URL}`;
 }
 
+// Dynamic prompt generation based on user's column selection
+async function generateDynamicPrompt() {
+  try {
+    // Get user's column configuration
+    const columnResult = await safeChromeFall(
+      () => chrome.storage.local.get(['columnConfiguration']),
+      { columnConfiguration: null }
+    );
+    const columnConfig = columnResult.columnConfiguration || getDefaultColumns();
+    
+    // Filter to enabled columns
+    const enabledColumns = columnConfig.filter(col => col.enabled);
+    
+    // Generate prompt sections based on enabled columns
+    const promptSections = [];
+    
+    // Core property details
+    const coreColumns = enabledColumns.filter(col => col.category === 'core');
+    if (coreColumns.length > 0) {
+      promptSections.push(generateCorePropertySection(coreColumns));
+    }
+    
+    // Financial metrics
+    const financialColumns = enabledColumns.filter(col => col.category === 'financial');
+    if (financialColumns.length > 0) {
+      promptSections.push(generateFinancialSection(financialColumns));
+    }
+    
+    // Location and scoring
+    const scoringColumns = enabledColumns.filter(col => col.category === 'scoring');
+    if (scoringColumns.length > 0) {
+      promptSections.push(generateLocationSection(scoringColumns));
+    }
+    
+    // Analysis data
+    const analysisColumns = enabledColumns.filter(col => col.category === 'analysis');
+    if (analysisColumns.length > 0) {
+      promptSections.push(generateAnalysisSection(analysisColumns));
+    }
+    
+    // Custom columns
+    const customColumns = enabledColumns.filter(col => col.isCustom);
+    if (customColumns.length > 0) {
+      promptSections.push(generateCustomColumnsSection(customColumns));
+    }
+    
+    // Combine sections into final prompt
+    const dynamicPrompt = combinePromptSections(promptSections);
+    
+    return dynamicPrompt;
+  } catch (error) {
+    console.error('Error generating dynamic prompt:', error);
+    return getDefaultPromptTemplate();
+  }
+}
+
+function getDefaultColumns() {
+  // Default columns matching popup.js specification
+  return [
+    { id: 'streetName', name: 'Street Name', category: 'core', enabled: true },
+    { id: 'price', name: 'Property Price', category: 'core', enabled: true },
+    { id: 'bedrooms', name: 'Number of Bedrooms', category: 'core', enabled: true },
+    { id: 'propertyType', name: 'Type of Property', category: 'core', enabled: true }
+  ];
+}
+
+function generateCorePropertySection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'streetName':
+        dataPoints.push('**Street Name**: Property street address (e.g., "123 Main Street")');
+        break;
+      case 'price':
+        dataPoints.push('**Property Price**: Exact asking price (include currency symbol)');
+        break;
+      case 'bedrooms':
+        dataPoints.push('**Number of Bedrooms**: Number of bedrooms (numeric)');
+        break;
+      case 'bathrooms':
+        dataPoints.push('**Bathrooms**: Number of bathrooms (numeric, include half baths as .5)');
+        break;
+      case 'squareFeet':
+        dataPoints.push('**Square Footage**: Total square footage (numeric)');
+        break;
+      case 'yearBuilt':
+        dataPoints.push('**Year Built**: Construction year (4-digit year)');
+        break;
+      case 'propertyType':
+        dataPoints.push('**Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)');
+        break;
+      case 'neighborhood':
+        dataPoints.push('**Neighborhood**: Property location/neighborhood name');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**REQUIRED DATA EXTRACTION:**\n${dataPoints.map((point, index) => `${index + 1}. ${point}`).join('\n')}` : '';
+}
+
+function generateFinancialSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'estimatedRentalIncome':
+        dataPoints.push('**Estimated Monthly Rental Income**: Your professional estimate based on local market rates');
+        break;
+      case 'pricePerSqFt':
+        dataPoints.push('**Price per Square Foot**: Calculated value for investment analysis');
+        break;
+      case 'capRate':
+        dataPoints.push('**Cap Rate**: Annual return percentage based on rental income');
+        break;
+      case 'onePercentRule':
+        dataPoints.push('**1% Rule Assessment**: Monthly rent to price ratio for quick investment evaluation');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**FINANCIAL ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateLocationSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'locationScore':
+        dataPoints.push('**Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation');
+        break;
+      case 'rentalGrowthPotential':
+        dataPoints.push('**Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**LOCATION & MARKET ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateAnalysisSection(columns) {
+  const dataPoints = [];
+  
+  columns.forEach(col => {
+    switch (col.id) {
+      case 'pros':
+        dataPoints.push('**Top 3 Advantages**: Key property advantages for investment');
+        break;
+      case 'cons':
+        dataPoints.push('**Top 3 Concerns**: Main property limitations or concerns');
+        break;
+      case 'redFlags':
+        dataPoints.push('**Red Flags**: Any warning signs or risk indicators');
+        break;
+      case 'investmentPotential':
+        dataPoints.push('**Investment Potential**: Overall investment grade and reasoning');
+        break;
+      case 'marketAnalysis':
+        dataPoints.push('**Market Analysis**: Detailed market assessment and trends');
+        break;
+    }
+  });
+  
+  return dataPoints.length > 0 ? `**INVESTMENT ANALYSIS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function generateCustomColumnsSection(customColumns) {
+  const dataPoints = customColumns.map(col => 
+    `**${col.name}**: ${col.description || 'Custom data point'}`
+  );
+  
+  return dataPoints.length > 0 ? `**CUSTOM DATA POINTS:**\n${dataPoints.join('\n')}` : '';
+}
+
+function combinePromptSections(sections) {
+  const validSections = sections.filter(section => section.length > 0);
+  
+  if (validSections.length === 0) {
+    return getDefaultPromptTemplate();
+  }
+  
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+${validSections.join('\n\n')}
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections based on the data points requested above.
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format if requested
+- Categorize rental growth potential clearly if requested
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
+
 // Performance tracking functions for prompt splitting
 async function updatePromptSplittingStats(type) {
   try {
@@ -368,7 +588,7 @@ async function updatePromptSplittingStats(type) {
     
     const settings = result.promptSplittingSettings || {
       enabled: true,
-      lengthThreshold: 500,
+      lengthThreshold: 200, // lowered for dynamic prompts
       confirmationTimeout: 15000,
       stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };
@@ -409,7 +629,7 @@ async function loadPromptSplittingSettings() {
     
     const settings = result.promptSplittingSettings || {
       enabled: true,
-      lengthThreshold: 500,
+      lengthThreshold: 200, // lowered for dynamic prompts  
       confirmationTimeout: 15000,
       stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };
@@ -471,6 +691,20 @@ function extractPropertyAnalysisData(responseText) {
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
   const extractors = {
+    // Street name extraction with comprehensive patterns
+    streetName: {
+      patterns: [
+        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:address)[:\s]*([^\n,;]+)/gi
+      ],
+      validator: (value) => {
+        return value && value.length > 5 && value.length < 100 && 
+               !value.match(/^(the|this|that|property|analysis|listing)$/i);
+      }
+    },
+    
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
@@ -599,6 +833,12 @@ function extractPropertyAnalysisData(responseText) {
   function extractFromPropertyDetails(text, analysis) {
     // Extract specific data points with enhanced patterns
     const patterns = {
+      streetName: [
+        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:address)[:\s]*([^\n,;]+)/gi
+      ],
       price: [
         /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
         /\$\s*([\d,]+(?:\.\d{2})?)/g
@@ -661,6 +901,9 @@ function extractPropertyAnalysisData(responseText) {
   // Helper function to validate extracted values
   function validateExtractedValue(key, value) {
     switch (key) {
+      case 'streetName':
+        return value && value.length > 5 && value.length < 100 && 
+               !value.match(/^(the|this|that|property|analysis|listing)$/i);
       case 'bedrooms':
         const bedrooms = parseInt(value);
         return bedrooms >= 0 && bedrooms <= 20;
@@ -899,9 +1142,299 @@ function extractPropertyAnalysisData(responseText) {
     return analysis;
   }
   
+  // Validate and clean extracted data
+  analysis.extractedData = validateAndCleanData(analysis.extractedData);
+  
+  // Calculate data confidence score
+  analysis.dataQuality = calculateDataQuality(analysis.extractedData);
+  
+  // Calculate investment metrics if we have the necessary data
+  if (analysis.extractedData.price && analysis.extractedData.estimatedRentalIncome) {
+    const metrics = calculateInvestmentMetrics(analysis.extractedData);
+    Object.assign(analysis.extractedData, metrics);
+    console.log('✅ Calculated investment metrics:', Object.keys(metrics));
+  }
+  
   console.log('✅ Successfully extracted meaningful property analysis data');
   console.log('✅ Meaningful property data found, analysis ready for save');
   return analysis;
+}
+
+// Investment metrics calculation function
+function calculateInvestmentMetrics(data) {
+  const metrics = {};
+  
+  try {
+    const price = parseFloat((data.price || '').toString().replace(/[\$,]/g, ''));
+    const sqft = parseFloat((data.squareFeet || '').toString().replace(/[\$,]/g, ''));
+    const monthlyRent = parseFloat((data.estimatedRentalIncome || '').toString().replace(/[\$,]/g, ''));
+    const yearBuilt = parseInt(data.yearBuilt || 0);
+    
+    // Price per square foot
+    if (price > 0 && sqft > 0) {
+      metrics.pricePerSqFt = (price / sqft).toFixed(2);
+    }
+    
+    // Cap Rate (Annual return percentage)
+    if (price > 0 && monthlyRent > 0) {
+      metrics.capRate = (((monthlyRent * 12) / price) * 100).toFixed(2);
+    }
+    
+    // 1% Rule (Monthly rent to price ratio)
+    if (price > 0 && monthlyRent > 0) {
+      metrics.onePercentRule = ((monthlyRent / price) * 100).toFixed(2);
+    }
+    
+    // Gross Rent Multiplier
+    if (price > 0 && monthlyRent > 0) {
+      metrics.grossRentMultiplier = (price / (monthlyRent * 12)).toFixed(2);
+    }
+    
+    // Property Age
+    if (yearBuilt > 0) {
+      metrics.propertyAge = new Date().getFullYear() - yearBuilt;
+    }
+    
+    // Cash-on-Cash Return (assuming 20% down payment)
+    if (price > 0 && monthlyRent > 0) {
+      const downPayment = price * 0.20;
+      const annualCashFlow = monthlyRent * 12;
+      // Simplified calculation - actual would include mortgage payments, taxes, insurance, etc.
+      metrics.estimatedCashOnCashReturn = ((annualCashFlow / downPayment) * 100).toFixed(2);
+    }
+    
+    console.log('📊 Calculated investment metrics:', metrics);
+    
+  } catch (error) {
+    console.warn('Error calculating investment metrics:', error);
+  }
+  
+  return metrics;
+}
+
+// Data validation and cleaning function
+function validateAndCleanData(data) {
+  const cleanedData = { ...data };
+  
+  try {
+    // Clean and validate price
+    if (cleanedData.price) {
+      const priceNum = parseFloat(cleanedData.price.toString().replace(/[\$,]/g, ''));
+      if (priceNum >= 10000 && priceNum <= 50000000) {
+        cleanedData.price = priceNum.toString();
+      } else {
+        console.warn('❌ Invalid price detected:', cleanedData.price);
+        delete cleanedData.price;
+      }
+    }
+    
+    // Clean and validate bedrooms
+    if (cleanedData.bedrooms) {
+      const beds = parseInt(cleanedData.bedrooms);
+      if (beds >= 0 && beds <= 20) {
+        cleanedData.bedrooms = beds.toString();
+      } else {
+        console.warn('❌ Invalid bedrooms count:', cleanedData.bedrooms);
+        delete cleanedData.bedrooms;
+      }
+    }
+    
+    // Clean and validate bathrooms
+    if (cleanedData.bathrooms) {
+      const baths = parseFloat(cleanedData.bathrooms);
+      if (baths >= 0 && baths <= 20) {
+        cleanedData.bathrooms = baths.toString();
+      } else {
+        console.warn('❌ Invalid bathrooms count:', cleanedData.bathrooms);
+        delete cleanedData.bathrooms;
+      }
+    }
+    
+    // Clean and validate square feet
+    if (cleanedData.squareFeet) {
+      const sqft = parseInt(cleanedData.squareFeet.toString().replace(/[,]/g, ''));
+      if (sqft >= 100 && sqft <= 50000) {
+        cleanedData.squareFeet = sqft.toString();
+      } else {
+        console.warn('❌ Invalid square footage:', cleanedData.squareFeet);
+        delete cleanedData.squareFeet;
+      }
+    }
+    
+    // Clean and validate year built
+    if (cleanedData.yearBuilt) {
+      const year = parseInt(cleanedData.yearBuilt);
+      const currentYear = new Date().getFullYear();
+      if (year >= 1800 && year <= currentYear) {
+        cleanedData.yearBuilt = year.toString();
+      } else {
+        console.warn('❌ Invalid year built:', cleanedData.yearBuilt);
+        delete cleanedData.yearBuilt;
+      }
+    }
+    
+    // Clean and validate estimated rental income
+    if (cleanedData.estimatedRentalIncome) {
+      const rental = parseFloat(cleanedData.estimatedRentalIncome.toString().replace(/[\$,]/g, ''));
+      if (rental >= 100 && rental <= 50000) {
+        cleanedData.estimatedRentalIncome = rental.toString();
+      } else {
+        console.warn('❌ Invalid rental income:', cleanedData.estimatedRentalIncome);
+        delete cleanedData.estimatedRentalIncome;
+      }
+    }
+    
+    // Clean property type
+    if (cleanedData.propertyType) {
+      cleanedData.propertyType = cleanedData.propertyType.trim().replace(/["""]/g, '');
+    }
+    
+    // Clean street name
+    if (cleanedData.streetName) {
+      cleanedData.streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
+      if (cleanedData.streetName.length < 5 || cleanedData.streetName.length > 100) {
+        console.warn('❌ Invalid street name length:', cleanedData.streetName);
+        delete cleanedData.streetName;
+      }
+    }
+    
+    console.log('✅ Data validation completed');
+    
+  } catch (error) {
+    console.warn('Error during data validation:', error);
+  }
+  
+  return cleanedData;
+}
+
+// Data quality assessment function
+function calculateDataQuality(data) {
+  const quality = {
+    score: 0,
+    completeness: 0,
+    accuracy: 0,
+    reliability: 0,
+    missingFields: [],
+    issues: []
+  };
+  
+  try {
+    // Core fields for completeness assessment
+    const coreFields = ['streetName', 'price', 'bedrooms', 'propertyType'];
+    const financialFields = ['estimatedRentalIncome', 'pricePerSqFt', 'capRate'];
+    const detailFields = ['bathrooms', 'squareFeet', 'yearBuilt', 'neighborhood'];
+    const analysisFields = ['locationScore', 'pros', 'cons', 'investmentPotential'];
+    
+    // Calculate completeness score
+    let foundCoreFields = 0;
+    let foundFinancialFields = 0;
+    let foundDetailFields = 0;
+    let foundAnalysisFields = 0;
+    
+    coreFields.forEach(field => {
+      if (data[field] && data[field].toString().trim()) {
+        foundCoreFields++;
+      } else {
+        quality.missingFields.push(field);
+      }
+    });
+    
+    financialFields.forEach(field => {
+      if (data[field] && data[field].toString().trim()) {
+        foundFinancialFields++;
+      }
+    });
+    
+    detailFields.forEach(field => {
+      if (data[field] && data[field].toString().trim()) {
+        foundDetailFields++;
+      }
+    });
+    
+    analysisFields.forEach(field => {
+      if (data[field] && data[field].toString().trim()) {
+        foundAnalysisFields++;
+      }
+    });
+    
+    // Weighted completeness calculation
+    quality.completeness = Math.round(
+      (foundCoreFields / coreFields.length * 0.4) +
+      (foundFinancialFields / financialFields.length * 0.3) +
+      (foundDetailFields / detailFields.length * 0.2) +
+      (foundAnalysisFields / analysisFields.length * 0.1)
+    * 100);
+    
+    // Calculate accuracy score based on data consistency
+    quality.accuracy = 100; // Start with perfect score
+    
+    // Check for logical inconsistencies
+    if (data.price && data.estimatedRentalIncome) {
+      const price = parseFloat(data.price.toString().replace(/[\$,]/g, ''));
+      const rent = parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, ''));
+      const priceToRentRatio = price / (rent * 12);
+      
+      if (priceToRentRatio < 5 || priceToRentRatio > 50) {
+        quality.accuracy -= 20;
+        quality.issues.push('Unusual price-to-rent ratio');
+      }
+    }
+    
+    if (data.bedrooms && data.bathrooms) {
+      const beds = parseInt(data.bedrooms);
+      const baths = parseFloat(data.bathrooms);
+      
+      if (baths > beds + 1) {
+        quality.accuracy -= 10;
+        quality.issues.push('More bathrooms than expected for bedroom count');
+      }
+    }
+    
+    if (data.yearBuilt && data.price && data.squareFeet) {
+      const year = parseInt(data.yearBuilt);
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - year;
+      const price = parseFloat(data.price.toString().replace(/[\$,]/g, ''));
+      const sqft = parseInt(data.squareFeet.toString().replace(/[,]/g, ''));
+      
+      // Very basic sanity check for price per sqft based on age
+      const pricePerSqft = price / sqft;
+      if (age > 100 && pricePerSqft > 500) {
+        quality.accuracy -= 10;
+        quality.issues.push('High price for very old property');
+      }
+    }
+    
+    // Reliability based on source quality and extraction confidence
+    quality.reliability = 85; // Base reliability score
+    
+    if (quality.missingFields.length === 0) {
+      quality.reliability += 10;
+    } else if (quality.missingFields.length > 2) {
+      quality.reliability -= 15;
+    }
+    
+    if (quality.issues.length > 0) {
+      quality.reliability -= (quality.issues.length * 5);
+    }
+    
+    // Overall score calculation
+    quality.score = Math.round(
+      (quality.completeness * 0.4) +
+      (quality.accuracy * 0.4) +
+      (quality.reliability * 0.2)
+    );
+    
+    quality.score = Math.max(0, Math.min(100, quality.score));
+    
+    console.log('📊 Data quality assessment:', quality);
+    
+  } catch (error) {
+    console.warn('Error calculating data quality:', error);
+    quality.score = 50; // Default moderate score on error
+  }
+  
+  return quality;
 }
 
 // Function to monitor for new ChatGPT messages with completion detection
@@ -985,20 +1518,56 @@ function setupResponseMonitor() {
     
     // Check if we're waiting for confirmation in prompt splitting mode
     if (promptSplittingState.currentPhase === 'waiting_confirmation') {
-      console.log('🔍 Checking for confirmation in response...');
+      console.log('🔍 ===== CONFIRMATION DETECTION DEBUG =====');
+      console.log('🔍 Current phase:', promptSplittingState.currentPhase);
+      console.log('🔍 Pending property link:', promptSplittingState.pendingPropertyLink);
+      console.log('🔍 Full response text:', messageText);
+      console.log('🔍 Response length:', messageText.length);
+      console.log('🔍 Response text preview:', messageText.substring(0, 300));
+      console.log('🔍 Testing confirmation detection...');
+      
       if (detectConfirmation(messageText)) {
         console.log('✅ Confirmation detected! Proceeding to send property link...');
         handleConfirmationReceived();
         return;
       } else {
-        console.log('❌ No confirmation detected, checking timeout...');
+        console.log('❌ No confirmation detected in response');
+        console.log('❌ Testing each pattern individually:');
+        
+        // Test each pattern individually for debugging
+        const patterns = [
+          /yes,?\s*i\s*understand/i,
+          /yes\s*i\s*understand/i,
+          /i\s*understand/i,
+          /understood/i,
+          /ready\s*to\s*analyze/i,
+          /ready/i,
+          /yes,?\s*i.{0,20}understand/i,
+          /understand.{0,20}ready/i,
+          /ready.{0,20}analyze/i,
+          /yes.{0,50}ready/i,
+          /\byes\b/i
+        ];
+        
+        patterns.forEach((pattern, index) => {
+          const matches = pattern.test(messageText.trim());
+          console.log(`❌ Pattern ${index + 1} (${pattern.source}): ${matches ? '✅ MATCH' : '❌ no match'}`);
+          if (matches) {
+            console.log(`❌ But detectConfirmation still returned false for pattern: ${pattern.source}`);
+          }
+        });
+        
         const timeElapsed = Date.now() - promptSplittingState.confirmationStartTime;
+        console.log('⏰ Time elapsed:', timeElapsed, 'ms, timeout:', promptSplittingState.confirmationTimeout, 'ms');
         if (timeElapsed > promptSplittingState.confirmationTimeout) {
           console.log('⏰ Confirmation timeout, falling back to single prompt...');
           handleConfirmationTimeout();
           return;
+        } else {
+          console.log('⏰ Still within timeout window, will continue waiting');
         }
       }
+      console.log('🔍 ===== END CONFIRMATION DEBUG =====');
     }
     
     // Process the analysis data
@@ -1020,6 +1589,48 @@ function setupResponseMonitor() {
     console.log(`Found ${keywordMatches} property keywords in completed response`);
     
     if (keywordMatches >= 2) {
+      // Add null check for currentPropertyAnalysis
+      if (!currentPropertyAnalysis) {
+        console.log('⚠️ No active property analysis session, but detected property keywords');
+        console.log('🔍 This might be a response from prompt splitting or a different analysis');
+        
+        // If we're in prompt splitting mode, this could be the analysis response
+        if (promptSplittingState.currentPhase === 'complete' || 
+            promptSplittingState.currentPhase === 'sending_link') {
+          console.log('📝 Processing response from prompt splitting flow...');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && Object.keys(analysisData.extractedData).length > 0 && 
+              promptSplittingState.pendingPropertyLink) {
+            
+            console.log('✅ Successfully extracted analysis data from split prompt response');
+            
+            // Send the analysis data with the pending property link
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `split_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response) {
+                console.log('✅ Split prompt analysis data sent successfully:', response);
+                if (response.success) {
+                  console.log('🎉 Split prompt property analysis saved!');
+                }
+              }
+            }).catch(err => {
+              console.error('❌ Failed to send split prompt analysis data:', err);
+            });
+            
+            // Reset prompt splitting state
+            resetPromptSplittingState();
+          }
+        }
+        return;
+      }
+      
       console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
       console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
@@ -1123,6 +1734,14 @@ function setupResponseMonitor() {
       
       const messageText = newMessage.textContent || newMessage.innerText || '';
       
+      // Debug logging for all messages when waiting for confirmation
+      if (promptSplittingState.currentPhase === 'waiting_confirmation') {
+        console.log('📨 New message detected while waiting for confirmation:');
+        console.log('  - Message length:', messageText.length);
+        console.log('  - Current phase:', promptSplittingState.currentPhase);
+        console.log('  - Message preview:', messageText.substring(0, 150));
+      }
+      
       // Skip if we've already processed this exact message for this property
       const currentUrl = currentPropertyAnalysis?.url;
       if (currentUrl && processedMessagesPerProperty.has(currentUrl)) {
@@ -1130,6 +1749,13 @@ function setupResponseMonitor() {
         if (processedMessages.includes(messageText)) {
           return;
         }
+      }
+      
+      // Check for prompt splitting first, regardless of property analysis session
+      if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
+        console.log('🔍 Found message while waiting for confirmation:', messageText.substring(0, 100));
+        processCompletedResponse(messageText, currentUrl);
+        return; // Don't process as regular property analysis
       }
       
       // Only process if we have an active property analysis session
@@ -1413,17 +2039,23 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Wait for input field to be available
     const inputField = await waitForInputField(5000);
     
-    // Get custom prompt from storage or use default
+    // Get custom prompt from storage or generate dynamic prompt
     const result = await safeChromeFall(
       () => chrome.storage.local.get(['customPrompt']),
       { customPrompt: null }
     );
-    const promptTemplate = result.customPrompt || getDefaultPromptTemplate();
+    
+    // Use custom prompt if available, otherwise generate dynamic prompt based on column selection
+    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
 
     // Check if we should use prompt splitting
     const fullPrompt = promptTemplate
       .replace('{PROPERTY_URL}', propertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
+      
+    console.log('📏 Full prompt length:', fullPrompt.length, 'characters');
+    console.log('🔧 Prompt splitting threshold:', promptSplittingState.lengthThreshold);
+    console.log('⚙️ Prompt splitting enabled:', promptSplittingState.enabled);
       
     if (shouldSplitPrompt(fullPrompt)) {
       console.log('📝 Using prompt splitting approach for better link processing');
@@ -1467,9 +2099,12 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       promptSplittingState.confirmationStartTime = Date.now();
       
       console.log('⏰ Starting confirmation timer...');
+      console.log('🔗 Pending property link set to:', promptSplittingState.pendingPropertyLink);
+      console.log('📋 Prompt splitting state after setup:', promptSplittingState);
       showPromptSplittingIndicator('waiting_confirmation', 'Waiting for ChatGPT confirmation...');
       
       setTimeout(() => {
+        console.log('📤 Submitting instructions message...');
         submitMessage();
       }, 500);
       
@@ -1578,6 +2213,17 @@ window.addEventListener('error', function(event) {
 if (isChatGPTSite()) {
   try {
     console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
+    
+    // Add debug function for testing prompt splitting
+    window.debugPromptSplitting = function(testResponse) {
+      console.log('🧪 Testing prompt splitting with:', testResponse);
+      const result = detectConfirmation(testResponse || "Yes, I understand");
+      console.log('🧪 Test result:', result);
+      if (result && promptSplittingState.currentPhase === 'waiting_confirmation') {
+        console.log('🧪 Triggering handleConfirmationReceived');
+        handleConfirmationReceived();
+      }
+    };
     
     // Load prompt splitting settings asynchronously
     loadPromptSplittingSettings().catch(error => {
@@ -1713,3 +2359,51 @@ if (isChatGPTSite()) {
 } else {
   console.log('❌ ChatGPT Helper Extension is not active on this site');
 }
+
+// Debug function to check current prompt splitting state
+window.debugPromptSplitting = function(testResponse) {
+  console.log('🧪 Testing prompt splitting with:', testResponse);
+  const result = detectConfirmation(testResponse || "Yes, I understand");
+  console.log('🧪 Test result:', result);
+  if (result && promptSplittingState.currentPhase === 'waiting_confirmation') {
+    console.log('🧪 Triggering handleConfirmationReceived');
+    handleConfirmationReceived();
+  }
+};
+
+// Add comprehensive debugging function
+window.debugPromptSplittingState = function() {
+  console.log('=== PROMPT SPLITTING DEBUG INFO ===');
+  console.log('🔧 Current state:', promptSplittingState);
+  console.log('🔧 Enabled:', promptSplittingState.enabled);
+  console.log('🔧 Length threshold:', promptSplittingState.lengthThreshold);
+  console.log('🔧 Current phase:', promptSplittingState.currentPhase);
+  console.log('🔧 Pending property link:', promptSplittingState.pendingPropertyLink);
+  console.log('🔧 Fallback attempted:', promptSplittingState.fallbackAttempted);
+  
+  // Test dynamic prompt length
+  generateDynamicPrompt().then(prompt => {
+    const testPrompt = prompt.replace('{PROPERTY_URL}', 'https://example.com/test-property')
+                            .replace('{DATE}', new Date().toLocaleDateString());
+    console.log('🔧 Sample dynamic prompt length:', testPrompt.length);
+    console.log('🔧 Would trigger splitting:', shouldSplitPrompt(testPrompt));
+    console.log('🔧 Sample prompt preview:', testPrompt.substring(0, 200) + '...');
+  });
+  
+  // Check input field status
+  const inputField = document.querySelector('textarea[data-id="root"]') || 
+                    document.querySelector('#prompt-textarea') ||
+                    document.querySelector('textarea') ||
+                    document.querySelector('[contenteditable="true"]');
+  console.log('🔧 Input field found:', !!inputField);
+  console.log('🔧 Input field type:', inputField ? inputField.tagName : 'none');
+  
+  console.log('=== END DEBUG INFO ===');
+};
+
+// Add function to manually test prompt splitting with a property link
+window.testPromptSplitting = function(propertyLink) {
+  const testLink = propertyLink || 'https://example.com/test-property';
+  console.log('🧪 Testing prompt splitting with link:', testLink);
+  insertPropertyAnalysisPrompt(testLink);
+};

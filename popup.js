@@ -299,22 +299,122 @@ function generateAnalysisPreview(analysis) {
   if (!analysis || !analysis.extractedData) return '';
   
   const data = analysis.extractedData;
-  const preview = [];
   
-  if (data.price) preview.push(`💰 ${data.price}`);
-  if (data.bedrooms) preview.push(`🛏️ ${data.bedrooms} bed`);
-  if (data.bathrooms) preview.push(`🚿 ${data.bathrooms} bath`);
-  if (data.squareFeet) preview.push(`📐 ${data.squareFeet} sq ft`);
+  // Add data quality indicator if available
+  const qualityIndicator = analysis.dataQuality ? getQualityIndicator(analysis.dataQuality.score) : '';
   
-  const previewText = preview.join(' • ');
-  
-  return previewText ? `
+  return `
     <div class="analysis-preview">
-      <div class="analysis-summary">${previewText}</div>
-      ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
-      ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
+      <!-- Core Property Information (Default Export Fields) -->
+      <div class="core-property-info" style="
+        background: var(--secondary-background);
+        padding: var(--space-md);
+        border-radius: var(--radius-sm);
+        margin-bottom: var(--space-sm);
+        border-left: 3px solid var(--primary);
+      ">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+          <h4 style="margin: 0; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+            Core Property Details
+          </h4>
+          ${qualityIndicator}
+        </div>
+        
+        <div class="property-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm);">
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Address</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.streetName ? data.streetName : '📍 Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Property Price</div>
+            <div style="font-weight: var(--font-weight-semibold); color: var(--primary); font-size: var(--font-size-lg);">
+              ${data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '💰 Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Bedrooms</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.bedrooms ? `🛏️ ${data.bedrooms} bed${data.bedrooms > 1 ? 's' : ''}` : '🛏️ Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Property Type</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.propertyType ? `🏠 ${data.propertyType}` : '🏠 Not extracted'}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Additional Information (if available) -->
+      ${(data.bathrooms || data.squareFeet || data.estimatedRentalIncome) ? `
+        <div class="additional-info" style="
+          display: grid; 
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
+          gap: var(--space-xs); 
+          margin-bottom: var(--space-sm);
+          font-size: var(--font-size-sm);
+        ">
+          ${data.bathrooms ? `<span style="color: var(--text-secondary);">🚿 ${data.bathrooms} bath${parseFloat(data.bathrooms) > 1 ? 's' : ''}</span>` : ''}
+          ${data.squareFeet ? `<span style="color: var(--text-secondary);">📐 ${data.squareFeet} sq ft</span>` : ''}
+          ${data.estimatedRentalIncome ? `<span style="color: var(--primary); font-weight: var(--font-weight-medium);">💵 $${parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, '')).toLocaleString()}/mo</span>` : ''}
+        </div>
+      ` : ''}
+      
+      <!-- Investment Metrics (if available) -->
+      ${(data.pricePerSqFt || data.capRate || data.onePercentRule || data.locationScore) ? `
+        <div class="investment-metrics" style="
+          display: flex; 
+          flex-wrap: wrap; 
+          gap: var(--space-xs); 
+          margin-bottom: var(--space-sm);
+          font-size: var(--font-size-sm);
+        ">
+          ${data.pricePerSqFt ? `<span style="background: #f0f9ff; color: #0369a1; padding: 2px 6px; border-radius: 3px;">$${data.pricePerSqFt}/sq ft</span>` : ''}
+          ${data.capRate ? `<span style="background: #f0fdf4; color: #166534; padding: 2px 6px; border-radius: 3px;">${data.capRate}% cap rate</span>` : ''}
+          ${data.onePercentRule ? `<span style="background: ${parseFloat(data.onePercentRule) >= 1.0 ? '#f0fdf4' : '#fef2f2'}; color: ${parseFloat(data.onePercentRule) >= 1.0 ? '#166534' : '#dc2626'}; padding: 2px 6px; border-radius: 3px;">${data.onePercentRule}% (1% rule)</span>` : ''}
+          ${data.locationScore ? `<span style="background: #fefce8; color: #a16207; padding: 2px 6px; border-radius: 3px;">📍 ${data.locationScore}</span>` : ''}
+        </div>
+      ` : ''}
+      
+      <!-- Pros and Cons (if available) -->
+      ${(data.pros || data.cons) ? `
+        <div class="analysis-summary" style="font-size: var(--font-size-sm);">
+          ${data.pros ? `<div class="analysis-pros" style="color: #16a34a; margin-bottom: var(--space-xs);">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
+          ${data.cons ? `<div class="analysis-cons" style="color: #dc2626;">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
+        </div>
+      ` : ''}
     </div>
-  ` : '';
+  `;
+}
+
+// Helper function to get quality indicator
+function getQualityIndicator(score) {
+  if (!score) return '';
+  
+  let indicator = '';
+  let color = '';
+  
+  if (score >= 90) {
+    indicator = '🟢';
+    color = '#16a34a';
+  } else if (score >= 75) {
+    indicator = '🟡';
+    color = '#ca8a04';
+  } else if (score >= 60) {
+    indicator = '🟠';
+    color = '#ea580c';
+  } else {
+    indicator = '🔴';
+    color = '#dc2626';
+  }
+  
+  return ` <span style="font-size: var(--font-size-sm); color: ${color};" title="Data Quality: ${score}%">${indicator}</span>`;
 }
 
 // Function to show full analysis in a modal or detailed view
@@ -383,23 +483,108 @@ function showFullAnalysis(propertyItem) {
           </div>
           
           ${Object.keys(data).length > 0 ? `
-            <div class="extracted-data" style="
+            <!-- Core Property Information (Highlighted) -->
+            <div class="core-property-modal" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-lg);
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              border-radius: var(--radius-md);
+              border: 2px solid var(--primary);
+              box-shadow: 0 4px 12px rgba(16, 163, 127, 0.1);
+            ">
+              <h4 style="margin: 0 0 var(--space-lg) 0; font-size: var(--font-size-xl); color: var(--text-primary); display: flex; align-items: center; gap: var(--space-sm);">
+                🏠 Core Property Details
+                ${analysis.dataQuality ? getQualityIndicator(analysis.dataQuality.score) : ''}
+              </h4>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-md);">
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">ADDRESS</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.streetName || '📍 Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">PROPERTY PRICE</div>
+                  <div style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--primary);">
+                    ${data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '💰 Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">BEDROOMS</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.bedrooms ? `🛏️ ${data.bedrooms} bedroom${data.bedrooms > 1 ? 's' : ''}` : '🛏️ Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">PROPERTY TYPE</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.propertyType ? `🏠 ${data.propertyType}` : '🏠 Not extracted'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional Property Details -->
+            ${(data.bathrooms || data.squareFeet || data.yearBuilt || data.neighborhood || data.locationScore) ? `
+            <div class="additional-details" style="
               margin-bottom: var(--space-lg);
               padding: var(--space-md);
               background: var(--secondary-background);
               border-radius: var(--radius-sm);
               border: 1px solid var(--border);
             ">
-              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Property Details</h4>
-              ${data.price ? `<div style="margin: var(--space-xs) 0;"><strong>Price:</strong> $${data.price}</div>` : ''}
-              ${data.bedrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Additional Details</h4>
               ${data.bathrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
               ${data.squareFeet ? `<div style="margin: var(--space-xs) 0;"><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
               ${data.yearBuilt ? `<div style="margin: var(--space-xs) 0;"><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
-              ${data.lotSize ? `<div style="margin: var(--space-xs) 0;"><strong>Lot Size:</strong> ${data.lotSize}</div>` : ''}
-              ${data.propertyType ? `<div style="margin: var(--space-xs) 0;"><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
+              ${data.propertyAge ? `<div style="margin: var(--space-xs) 0;"><strong>Property Age:</strong> ${data.propertyAge} years</div>` : ''}
               ${data.neighborhood ? `<div style="margin: var(--space-xs) 0;"><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
+              ${data.locationScore ? `<div style="margin: var(--space-xs) 0;"><strong>Location Score:</strong> ${data.locationScore}</div>` : ''}
             </div>
+            ` : ''}
+            
+            <!-- Investment Metrics -->
+            ${(data.estimatedRentalIncome || data.pricePerSqFt || data.capRate) ? `
+            <div class="investment-metrics" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-md);
+              background: #f0f9ff;
+              border-radius: var(--radius-sm);
+              border: 1px solid #bfdbfe;
+            ">
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Investment Metrics</h4>
+              ${data.estimatedRentalIncome ? `<div style="margin: var(--space-xs) 0;"><strong>Est. Monthly Rent:</strong> $${parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, '')).toLocaleString()}</div>` : ''}
+              ${data.pricePerSqFt ? `<div style="margin: var(--space-xs) 0;"><strong>Price per Sq Ft:</strong> $${data.pricePerSqFt}</div>` : ''}
+              ${data.capRate ? `<div style="margin: var(--space-xs) 0;"><strong>Cap Rate:</strong> ${data.capRate}%</div>` : ''}
+              ${data.onePercentRule ? `<div style="margin: var(--space-xs) 0;"><strong>1% Rule:</strong> ${data.onePercentRule}% ${parseFloat(data.onePercentRule) >= 1.0 ? '✅' : '❌'}</div>` : ''}
+              ${data.grossRentMultiplier ? `<div style="margin: var(--space-xs) 0;"><strong>Gross Rent Multiplier:</strong> ${data.grossRentMultiplier}</div>` : ''}
+              ${data.rentalGrowthPotential ? `<div style="margin: var(--space-xs) 0;"><strong>Rental Growth:</strong> ${data.rentalGrowthPotential}</div>` : ''}
+            </div>
+            ` : ''}
           ` : ''}
           
           ${data.pros ? `
@@ -952,47 +1137,42 @@ async function getCurrentPrompt() {
   }
 }
 
-// Default column configuration
+// Default column configuration matching specification requirements
 const DEFAULT_COLUMNS = [
-  // Core Property Information
-  { id: 'price', name: 'Price', description: 'Property asking price', category: 'core', enabled: true, order: 1 },
-  { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 2 },
-  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: true, order: 3 },
-  { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: true, order: 4 },
-  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: true, order: 5 },
-  { id: 'propertyType', name: 'Property Type', description: 'Type of property (house, condo, apartment, etc.)', category: 'core', enabled: true, order: 6 },
+  // Core Property Information (Default Export Fields - according to spec)
+  { id: 'streetName', name: 'Street Name', description: 'Property street address', category: 'core', enabled: true, order: 1 },
+  { id: 'price', name: 'Property Price', description: 'Property asking price', category: 'core', enabled: true, order: 2 },
+  { id: 'bedrooms', name: 'Number of Bedrooms', description: 'Number of bedrooms', category: 'core', enabled: true, order: 3 },
+  { id: 'propertyType', name: 'Type of Property', description: 'House/Apartment classification', category: 'core', enabled: true, order: 4 },
   
-  // Financial Analysis
-  { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: true, order: 7 },
+  // Additional Property Information (Disabled by Default)
+  { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms', category: 'core', enabled: false, order: 5 },
+  { id: 'squareFeet', name: 'Square Footage', description: 'Property size in square feet', category: 'core', enabled: false, order: 6 },
+  { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was built', category: 'core', enabled: false, order: 7 },
+  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'core', enabled: false, order: 8 },
   
-  // Location & Scoring
-  { id: 'locationScore', name: 'Location & Neighborhood Scoring', description: 'Location quality score (e.g., 7/10, 2/10)', category: 'scoring', enabled: true, order: 8 },
-  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Assessment of rental income growth potential (Growth: High/Strong/Moderate/Low/Limited)', category: 'analysis', enabled: true, order: 9 },
+  // Financial Analysis (Disabled by Default)
+  { id: 'estimatedRentalIncome', name: 'Estimated Monthly Rental Income', description: 'Estimated monthly rental income potential', category: 'financial', enabled: false, order: 9 },
+  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'financial', enabled: false, order: 10 },
+  { id: 'capRate', name: 'Cap Rate', description: 'Annual return percentage', category: 'financial', enabled: false, order: 11 },
+  { id: 'onePercentRule', name: '1% Rule', description: 'Monthly rent to price ratio', category: 'financial', enabled: false, order: 12 },
+  { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price to annual rent ratio', category: 'financial', enabled: false, order: 13 },
   
-  // Additional Optional Columns (disabled by default)
-  { id: 'address', name: 'Address/URL', description: 'Property address or property URL', category: 'identification', enabled: false, order: 10 },
-  { id: 'source', name: 'Source', description: 'Website source (Zillow, Realtor.com, etc.)', category: 'identification', enabled: false, order: 11 },
-  { id: 'analysisDate', name: 'Analysis Date', description: 'Date when analysis was performed', category: 'identification', enabled: false, order: 12 },
-  { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Calculated price per square foot', category: 'metrics', enabled: false, order: 13 },
-  { id: 'propertyAge', name: 'Property Age', description: 'Age of the property in years', category: 'metrics', enabled: false, order: 14 },
-  { id: 'neighborhood', name: 'Neighborhood', description: 'Property location/neighborhood name', category: 'metrics', enabled: false, order: 15 },
-  { id: 'overallScore', name: 'Overall Score', description: 'Overall property score (1-10)', category: 'scores', enabled: false, order: 16 },
-  { id: 'investmentScore', name: 'Investment Score', description: 'Investment potential score (1-10)', category: 'scores', enabled: false, order: 17 },
-  { id: 'marketScore', name: 'Market Score', description: 'Market value score (1-10)', category: 'scores', enabled: false, order: 18 },
-  { id: 'conditionScore', name: 'Condition Score', description: 'Property condition score (1-10)', category: 'scores', enabled: false, order: 19 },
-  { id: 'monthlyPayment', name: 'Est. Monthly Payment', description: 'Estimated monthly mortgage payment', category: 'financial', enabled: false, order: 20 },
-  { id: 'priceVsMarket', name: 'Price vs Market', description: 'Price comparison to market value', category: 'financial', enabled: false, order: 21 },
-  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment potential summary', category: 'financial', enabled: false, order: 22 },
-  { id: 'valueRating', name: 'Value Rating', description: 'Overall value rating', category: 'financial', enabled: false, order: 23 },
-  { id: 'topPros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 24 },
-  { id: 'topCons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 25 },
-  { id: 'redFlagsCount', name: 'Red Flags Count', description: 'Number of warning indicators', category: 'analysis', enabled: false, order: 26 },
-  { id: 'keyConcerns', name: 'Key Concerns', description: 'Primary issues summary', category: 'analysis', enabled: false, order: 27 },
-  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Detailed market assessment', category: 'analysis', enabled: false, order: 28 },
-  { id: 'investmentDetails', name: 'Investment Details', description: 'Complete investment analysis', category: 'analysis', enabled: false, order: 29 },
-  { id: 'allPros', name: 'All Pros', description: 'Complete advantages list', category: 'analysis', enabled: false, order: 30 },
-  { id: 'allCons', name: 'All Cons', description: 'Complete disadvantages list', category: 'analysis', enabled: false, order: 31 },
-  { id: 'redFlagsDetail', name: 'Red Flags Detail', description: 'Detailed warning information', category: 'analysis', enabled: false, order: 32 }
+  // Location & Scoring (Disabled by Default)
+  { id: 'locationScore', name: 'Location Score', description: 'Location quality score (X/10)', category: 'scoring', enabled: false, order: 14 },
+  { id: 'rentalGrowthPotential', name: 'Rental Growth Potential', description: 'Growth potential assessment', category: 'scoring', enabled: false, order: 15 },
+  
+  // Investment Analysis (Disabled by Default)
+  { id: 'pros', name: 'Top 3 Pros', description: 'Key property advantages', category: 'analysis', enabled: false, order: 16 },
+  { id: 'cons', name: 'Top 3 Cons', description: 'Main property concerns', category: 'analysis', enabled: false, order: 17 },
+  { id: 'redFlags', name: 'Red Flags', description: 'Warning indicators', category: 'analysis', enabled: false, order: 18 },
+  { id: 'investmentPotential', name: 'Investment Potential', description: 'Investment summary', category: 'analysis', enabled: false, order: 19 },
+  { id: 'marketAnalysis', name: 'Market Analysis', description: 'Market assessment', category: 'analysis', enabled: false, order: 20 },
+  
+  // Identification (Disabled by Default)
+  { id: 'address', name: 'Property URL', description: 'Direct link to property', category: 'identification', enabled: false, order: 21 },
+  { id: 'source', name: 'Source', description: 'Website source', category: 'identification', enabled: false, order: 22 },
+  { id: 'analysisDate', name: 'Analysis Date', description: 'Date of analysis', category: 'identification', enabled: false, order: 23 }
 ];
 
 // Column Configuration Functions
@@ -1553,6 +1733,14 @@ function getInputType(columnType) {
   }
 }
 
+// Helper function to get custom column value from property item
+function getCustomColumnValue(propertyItem, column) {
+  if (!propertyItem.customColumns || !propertyItem.customColumns[column.id]) {
+    return column.defaultValue || '';
+  }
+  return propertyItem.customColumns[column.id];
+}
+
 // Export function (updated for comprehensive data extraction)
 async function exportPropertyHistory() {
   try {
@@ -1735,6 +1923,31 @@ async function exportPropertyHistory() {
       return 'Growth: Moderate';
     };
     
+    // Helper function to extract street name from analysis
+    const extractStreetName = (analysis) => {
+      if (!analysis) return '';
+      
+      // Try to extract street addresses with common patterns
+      const streetPatterns = [
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:address|located at|property)[:\s]*([^\n\r,.;]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
+        /(?:street|address)[:\s]*([^\n\r,.;]+)/gi
+      ];
+      
+      for (const pattern of streetPatterns) {
+        const match = analysis.match(pattern);
+        if (match && match[0]) {
+          // Clean up the extracted address
+          let address = match[0].replace(/^.*?(\d+\s+.*)$/, '$1').trim();
+          if (address.length > 5 && address.length < 100) {
+            return address;
+          }
+        }
+      }
+      
+      return '';
+    };
+    
     // Create CSV content
     const headers = enabledColumns.map(col => col.name);
     const csvRows = history.map(item => {
@@ -1747,12 +1960,18 @@ async function exportPropertyHistory() {
         const data = { ...storedData, ...analysisData };
         
         switch (column.id) {
+          case 'streetName':
+            return `"${data.streetName || storedData.streetName || extractStreetName(item.analysis?.fullAnalysis || '')}"`;
+            
           case 'price':
             const price = data.price || extractNumber(storedData.price);
             return price ? `$${price.toLocaleString()}` : '';
             
           case 'bedrooms':
             return data.bedrooms || extractNumber(storedData.bedrooms) || '';
+            
+          case 'propertyType':
+            return `"${data.propertyType || storedData.propertyType || ''}"`;
             
           case 'bathrooms':
             return data.bathrooms || extractNumber(storedData.bathrooms) || '';
@@ -1764,18 +1983,53 @@ async function exportPropertyHistory() {
           case 'yearBuilt':
             return data.yearBuilt || extractNumber(storedData.yearBuilt) || '';
             
-          case 'propertyType':
-            return `"${data.propertyType || storedData.propertyType || ''}"`;
+          case 'neighborhood':
+            return `"${data.neighborhood || storedData.neighborhood || ''}"`;
             
           case 'estimatedRentalIncome':
             const rental = data.rentalIncome || estimateRentalIncome(data, data.price || extractNumber(storedData.price));
             return rental ? `$${rental.toLocaleString()}` : '';
+            
+          case 'pricePerSqFt':
+            const priceForCalc = data.price || extractNumber(storedData.price);
+            const sqftForCalc = data.squareFeet || extractNumber(storedData.squareFeet);
+            return (priceForCalc && sqftForCalc) ? `$${(priceForCalc / sqftForCalc).toFixed(2)}` : '';
+            
+          case 'capRate':
+            const capPrice = data.price || extractNumber(storedData.price);
+            const capRental = data.rentalIncome || estimateRentalIncome(data, capPrice);
+            return (capPrice && capRental) ? `${((capRental * 12 / capPrice) * 100).toFixed(2)}%` : '';
+            
+          case 'onePercentRule':
+            const onePrice = data.price || extractNumber(storedData.price);
+            const oneRental = data.rentalIncome || estimateRentalIncome(data, onePrice);
+            return (onePrice && oneRental) ? `${((oneRental / onePrice) * 100).toFixed(2)}%` : '';
+            
+          case 'grossRentMultiplier':
+            const grmPrice = data.price || extractNumber(storedData.price);
+            const grmRental = data.rentalIncome || estimateRentalIncome(data, grmPrice);
+            return (grmPrice && grmRental) ? `${(grmPrice / (grmRental * 12)).toFixed(2)}` : '';
             
           case 'locationScore':
             return data.locationScore || inferLocationScore(item.analysis?.fullAnalysis || '');
             
           case 'rentalGrowthPotential':
             return `"${data.growthPotential || data.rentalGrowthPotential || inferRentalGrowthPotential(item.analysis?.fullAnalysis || '')}"`;
+            
+          case 'pros':
+            return `"${data.pros || storedData.pros || ''}"`;
+            
+          case 'cons':
+            return `"${data.cons || storedData.cons || ''}"`;
+            
+          case 'redFlags':
+            return `"${data.redFlags || storedData.redFlags || ''}"`;
+            
+          case 'investmentPotential':
+            return `"${data.investmentPotential || storedData.investmentPotential || ''}"`;
+            
+          case 'marketAnalysis':
+            return `"${data.marketAnalysis || storedData.marketAnalysis || ''}"`;
             
           case 'address':
             return `"${item.url}"`;
@@ -1785,18 +2039,6 @@ async function exportPropertyHistory() {
             
           case 'analysisDate':
             return `"${item.date}"`;
-            
-          case 'pricePerSqFt':
-            const priceForCalc = data.price || extractNumber(storedData.price);
-            const sqftForCalc = data.squareFeet || extractNumber(storedData.squareFeet);
-            return (priceForCalc && sqftForCalc) ? `$${(priceForCalc / sqftForCalc).toFixed(2)}` : '';
-            
-          case 'propertyAge':
-            const yearBuilt = data.yearBuilt || extractNumber(storedData.yearBuilt);
-            return yearBuilt ? new Date().getFullYear() - yearBuilt : '';
-            
-          case 'neighborhood':
-            return `"${data.neighborhood || storedData.neighborhood || ''}"`;
             
           default:
             if (column.isCustom) {
@@ -1836,7 +2078,7 @@ async function initializePromptSplittingSettings() {
       chrome.storage.local.get(['promptSplittingSettings'], (result) => {
         resolve(result.promptSplittingSettings || {
           enabled: true,
-          lengthThreshold: 500,
+          lengthThreshold: 200, // lowered for dynamic prompts
           confirmationTimeout: 15000,
           stats: {
             totalAttempts: 0,
@@ -1904,7 +2146,7 @@ async function savePromptSplittingSettings() {
     
     const settings = {
       enabled: enableCheckbox ? enableCheckbox.checked : true,
-      lengthThreshold: thresholdSlider ? parseInt(thresholdSlider.value) : 500,
+      lengthThreshold: thresholdSlider ? parseInt(thresholdSlider.value) : 200, // lowered for dynamic prompts
       confirmationTimeout: timeoutSlider ? parseInt(timeoutSlider.value) * 1000 : 15000,
       stats: currentSettings.stats || { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
     };
