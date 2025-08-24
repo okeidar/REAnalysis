@@ -192,22 +192,16 @@ async function handleConfirmationReceived() {
     inputField.focus();
     
     // Auto-submit the link
-          setTimeout(() => {
-        submitMessage();
-        promptSplittingState.currentPhase = 'analyzing'; // Set to analyzing phase to wait for property analysis
-        showPromptSplittingIndicator('analyzing', 'Waiting for property analysis...');
-        
-        // Set a timeout for the analyzing phase (2 minutes)
         setTimeout(() => {
-          if (promptSplittingState.currentPhase === 'analyzing') {
-            console.log('⏰ Analysis phase timeout - cleaning up');
-            showPromptSplittingIndicator('timeout', 'Analysis timeout - please check manually');
-            setTimeout(() => {
-              resetPromptSplittingState();
-            }, 3000);
-          }
-        }, 120000); // 2 minutes
-      }, 500);
+      submitMessage();
+      promptSplittingState.currentPhase = 'complete';
+      showPromptSplittingIndicator('complete', 'Analysis request sent successfully!');
+      
+      // Remove indicator after completion
+      setTimeout(() => {
+        removePromptSplittingIndicator();
+      }, 3000);
+    }, 500);
     
   } catch (error) {
     console.error('❌ Error sending property link:', error);
@@ -982,28 +976,16 @@ function setupResponseMonitor() {
       if (detectConfirmation(messageText)) {
         console.log('✅ Confirmation detected! Proceeding to send property link...');
         handleConfirmationReceived();
-        return; // Don't process this as property analysis
+        return;
       } else {
         console.log('❌ No confirmation detected, checking timeout...');
         const timeElapsed = Date.now() - promptSplittingState.confirmationStartTime;
         if (timeElapsed > promptSplittingState.confirmationTimeout) {
           console.log('⏰ Confirmation timeout, falling back to single prompt...');
           handleConfirmationTimeout();
-          return; // Don't process this as property analysis
-        } else {
-          console.log('⏳ Still waiting for confirmation, skipping property analysis processing');
-          return; // Don't process this as property analysis yet
+          return;
         }
       }
-    }
-    
-    // In analyzing phase, we should process the property analysis response
-    if (promptSplittingState.currentPhase === 'analyzing') {
-      console.log('📊 In analyzing phase - ready to process property analysis response');
-      // Continue to property analysis processing below
-    } else if (promptSplittingState.currentPhase === 'sending_link') {
-      console.log('📤 In sending_link phase - waiting for property analysis response...');
-      // Continue to property analysis processing below
     }
     
     // Process the analysis data
@@ -1024,12 +1006,10 @@ function setupResponseMonitor() {
     
     console.log(`Found ${keywordMatches} property keywords in completed response`);
     
-    // Only process property analysis if we have an active session and sufficient keywords
-    if (keywordMatches >= 2 && currentPropertyAnalysis) {
+    if (keywordMatches >= 2) {
       console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
       console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
-      console.log('🔄 Prompt splitting phase:', promptSplittingState.currentPhase || 'none');
       const analysisData = extractPropertyAnalysisData(messageText);
       
       if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
@@ -1078,24 +1058,13 @@ function setupResponseMonitor() {
           }
         }
         
-        // Show completion indicator for prompt splitting
-        if (promptSplittingState.currentPhase === 'analyzing') {
-          showPromptSplittingIndicator('complete', 'Property analysis completed successfully!');
-          setTimeout(() => {
-            removePromptSplittingIndicator();
-          }, 3000);
-        }
-        
-        // Reset the current analysis tracking and prompt splitting state
+        // Reset the current analysis tracking
         currentPropertyAnalysis = null;
-        resetPromptSplittingState(); // Clean up prompt splitting state after successful analysis
       } else {
         console.log('⚠️ No extractable data found in completed response');
         console.log('📝 Response preview:', messageText.substring(0, 500) + '...');
       }
-    } else if (keywordMatches >= 2 && !currentPropertyAnalysis) {
-      console.log('⚠️ Found property keywords but no active analysis session - possibly orphaned response');
-    } else {
+        } else {
       console.log('⚠️ Insufficient property keywords in completed response');
     }
     
