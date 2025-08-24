@@ -70,7 +70,7 @@ function splitPromptContent(promptTemplate, propertyLink) {
   
   return {
     instructions: instructionsPart + confirmationRequest,
-    linkMessage: `Please analyze this property listing: ${propertyLink}`
+    linkMessage: propertyLink  // Send only the raw link, no additional text
   };
 }
 
@@ -209,7 +209,7 @@ async function handleConfirmationReceived() {
       return;
     }
     
-    const linkMessage = `Please analyze this property listing: ${propertyLink}`;
+    const linkMessage = propertyLink;  // Send only the raw link
     
     // Insert the link message
     if (inputField.tagName === 'TEXTAREA') {
