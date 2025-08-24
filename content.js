@@ -1066,9 +1066,9 @@ function extractPropertyAnalysisData(responseText) {
         }
         
         const price = parseFloat(priceStr);
-        const isValid = !isNaN(price) && price >= 10000 && price <= 50000000;
+        const priceIsValid = !isNaN(price) && price >= 10000 && price <= 50000000;
         
-        if (!isValid) {
+        if (!priceIsValid) {
           console.log(`❌ Price validation failed for "${value}":`, {
             original: value,
             cleaned: priceStr,
@@ -1080,7 +1080,7 @@ function extractPropertyAnalysisData(responseText) {
           console.log(`✅ Price validation passed for "${value}" → ${price}`);
         }
         
-        return isValid;
+        return priceIsValid;
         
       case 'propertyType':
         return value && value.length > 2 && value.length < 100 && 
