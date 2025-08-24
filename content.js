@@ -699,6 +699,26 @@ function extractPropertyAnalysisData(responseText) {
         /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         
+        // Apartment/Unit address patterns
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir),?\s*(?:apt|apartment|unit|suite|ste|#)\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*apt\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*unit\s*[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Directional addresses (N, S, E, W)
+        /(\d+\s+[NSEW]\.?\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+(?:north|south|east|west)\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Highway and route addresses
+        /(\d+\s+(?:highway|hwy|route|rt|state\s+route|sr|county\s+road|cr)\s+[A-Za-z0-9-]+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+\s+highway)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Rural and named property addresses
+        /((?:old|new|historic|heritage|vintage)\s+[A-Za-z0-9\s]+?(?:road|rd|lane|ln|trail|path|way))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([A-Za-z0-9\s]+?(?:estates|manor|ranch|farm|acres|hills|heights|view|ridge|creek|river|lake|pond|woods|forest|meadow|grove|gardens|park|square|commons|crossing|bend|valley))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // International format addresses
+        /(\d+\s+[A-Za-z0-9\s\-'\.]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|crescent|close|terrace|row|mews|square|gardens|park|green|walk|path|trail|hill|mount|vista|point))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
         // Bullet point and structured formats (with source link support)
         /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
@@ -708,6 +728,13 @@ function extractPropertyAnalysisData(responseText) {
         
         // Address in quotes (avoiding conflict with source links in parentheses/brackets)
         /["']([^"']+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))['"]/gi,
+        
+        // PO Box patterns
+        /(po\s+box\s+\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(p\.?o\.?\s+box\s+\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Building/Complex addresses
+        /(\d+\s+[A-Za-z0-9\s]+?,?\s*(?:building|bldg|tower|complex)\s*[A-Za-z0-9]*)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         
         // Simple address patterns without requiring street types (with source link support)
         /(?:address|located)[:\s-]*([^\n,;\[\]]{10,80}?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
@@ -768,6 +795,28 @@ function extractPropertyAnalysisData(responseText) {
         /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK](?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
         /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
         
+        // Price ranges (extract first value)
+        /\$?\s*([\d,]+(?:\.\d{2})?)\s*[-–—]\s*\$?\s*[\d,]+(?:\.\d{2})?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:between|from)\s*\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:to|and|\-)\s*\$?\s*[\d,]+(?:\.\d{2})?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Approximation patterns
+        /(?:around|approximately|about|roughly|near|close\s+to|estimated\s+at)\s*\$?\s*([\d,]+(?:\.\d{2})?)[kKmM]?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$?\s*([\d,]+(?:\.\d{2})?)[kKmM]?\s*(?:or\s+so|give\s+or\s+take|ish|thereabouts)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // International currencies (convert to approximate USD)
+        /£\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // British Pound
+        /€\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // Euro
+        /¥\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g, // Yen
+        /CAD?\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/gi, // Canadian Dollar
+        /AUD?\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/gi, // Australian Dollar
+        
+        // Written numbers (limited set for common property prices)
+        /((?:one|two|three|four|five|six|seven|eight|nine)\s+hundred\s+(?:thousand|million)?)(?:\s*dollars?)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /((?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\s+thousand)(?:\s*dollars?)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Scientific notation patterns
+        /([\d.]+)[eE][+-]?(\d+)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
         // Handle spacing variations (with source link support)
         /(?:for|priced\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         
@@ -798,29 +847,91 @@ function extractPropertyAnalysisData(responseText) {
     // Bedroom extraction
     bedrooms: {
       patterns: [
+        // Basic bedroom patterns
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
         /(?:bedrooms)[:\s]*(\d+)/gi,
         /(\d+)[\s-]*(?:bed(?:room)?s?|br\b)/gi,
         /(\d+)\s*(?:bedroom|bed)(?!room)/gi, // Avoid matching "bedroom" in "bathrooms"
         /\b(\d+)\s*bed\b/gi,
-        /(\d+)\s*(?:bed)/gi
+        /(\d+)\s*(?:bed)/gi,
+        
+        // Range patterns (extract first number)
+        /(\d+)[-–—]\d+\s*(?:bed(?:room)?s?|br\b)/gi,
+        /(?:between\s+)?(\d+)\s*(?:to|and|\-)\s*\d+\s*(?:bed(?:room)?s?|br\b)/gi,
+        
+        // Complex descriptions
+        /(\d+)\s*(?:bed(?:room)?s?)?\s*\+\s*(?:den|office|study|flex)/gi,
+        /(\d+)\s*(?:bed(?:room)?s?)\s*(?:plus|with)\s*(?:den|office|study|flex)/gi,
+        
+        // Studio handling (0 bedrooms)
+        /studio(?:\s*apartment|\s*unit|\s*condo)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi, // Special case - returns "0"
+        
+        // Bullet points and structured formats
+        /[-•*]\s*(?:bedroom|bed)[s]?[:\s]*(\d+)/gi,
+        /(?:^|\n)\s*(?:bedroom|bed)[s]?[:\s]*(\d+)/gim,
+        
+        // Number spelled out (basic cases)
+        /(?:one|1)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "1"
+        /(?:two|2)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "2"
+        /(?:three|3)\s*(?:bed(?:room)?s?|br\b)/gi, // Returns "3"
+        /(?:four|4)\s*(?:bed(?:room)?s?|br\b)/gi // Returns "4"
       ],
       validator: (value) => {
+        // Handle special studio case
+        if (value.toLowerCase().includes('studio')) return 0;
+        
+        // Handle spelled out numbers
+        const spellMap = {'one': 1, 'two': 2, 'three': 3, 'four': 4};
+        const lower = value.toLowerCase();
+        for (const [word, num] of Object.entries(spellMap)) {
+          if (lower.includes(word)) return num;
+        }
+        
         const num = parseInt(value);
-        return num >= 0 && num <= 20;
+        return num >= 0 && num <= 50; // Expanded range
       }
     },
     
     // Bathroom extraction
     bathrooms: {
       patterns: [
+        // Basic bathroom patterns
         /(\d+(?:\.\d+)?)[\s-]*(?:bath(?:room)?s?|ba\b)/gi,
         /(?:bath(?:room)?s?|ba)[:\s]*(\d+(?:\.\d+)?)/gi,
-        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi
+        /(\d+(?:\.\d+)?)\s*(?:bathroom|bath)/gi,
+        
+        // Half bath patterns
+        /(\d+)(?:\.\d+)?\s*(?:full|complete)?\s*(?:bath(?:room)?s?)\s*(?:and|plus|\+)\s*(\d+)\s*(?:half|partial)\s*(?:bath(?:room)?s?)/gi,
+        /(\d+)\s*full\s*(?:bath(?:room)?s?)\s*(?:and|plus|\+)\s*(\d+)\s*half/gi,
+        /(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?)\s*\((\d+)\s*full,?\s*(\d+)\s*half\)/gi,
+        
+        // Range patterns (extract first number)
+        /(\d+(?:\.\d+)?)[-–—]\d+(?:\.\d+)?\s*(?:bath(?:room)?s?|ba\b)/gi,
+        /(?:between\s+)?(\d+(?:\.\d+)?)\s*(?:to|and|\-)\s*\d+(?:\.\d+)?\s*(?:bath(?:room)?s?|ba\b)/gi,
+        
+        // Specific formats
+        /(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?)\s*(?:plus|with)\s*(?:powder|guest|half)/gi,
+        
+        // Bullet points and structured formats
+        /[-•*]\s*(?:bathroom|bath)[s]?[:\s]*(\d+(?:\.\d+)?)/gi,
+        /(?:^|\n)\s*(?:bathroom|bath)[s]?[:\s]*(\d+(?:\.\d+)?)/gim,
+        
+        // Number spelled out (basic cases)
+        /(?:one|1)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "1"
+        /(?:two|2)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "2"
+        /(?:three|3)\s*(?:bath(?:room)?s?|ba\b)/gi, // Returns "3"
+        /(?:one\s+and\s+half|1\.5)\s*(?:bath(?:room)?s?|ba\b)/gi // Returns "1.5"
       ],
       validator: (value) => {
+        // Handle spelled out numbers
+        const spellMap = {'one': 1, 'two': 2, 'three': 3, 'one and half': 1.5};
+        const lower = value.toLowerCase();
+        for (const [word, num] of Object.entries(spellMap)) {
+          if (lower.includes(word)) return num;
+        }
+        
         const num = parseFloat(value);
-        return num >= 0 && num <= 20;
+        return num >= 0 && num <= 50; // Expanded range
       }
     },
     
@@ -896,30 +1007,94 @@ function extractPropertyAnalysisData(responseText) {
   function extractStructuredSections(text) {
     const sections = {};
     
-    // Extract PROPERTY DETAILS section
-    const propertyDetailsMatch = text.match(/\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (propertyDetailsMatch) {
-      sections.propertyDetails = propertyDetailsMatch[1].trim();
+    // Enhanced section detection with multiple format patterns
+    
+    // Extract PROPERTY DETAILS section (multiple formats)
+    const propertyDetailPatterns = [
+      /\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /PROPERTY\s+DETAILS\s*:?\s*([\s\S]*?)(?=(?:LOCATION|RENTAL|INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*PROPERTY\s+INFORMATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*LISTING\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROPERTY\s+OVERVIEW:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROPERTY\s+SPECIFICATIONS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of propertyDetailPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.propertyDetails = match[1].trim();
+        console.log('✅ Found PROPERTY DETAILS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract LOCATION & NEIGHBORHOOD ANALYSIS section
-    const locationMatch = text.match(/\*\*LOCATION\s+&\s+NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (locationMatch) {
-      sections.locationAnalysis = locationMatch[1].trim();
+    // Extract LOCATION & NEIGHBORHOOD ANALYSIS section (multiple formats)
+    const locationPatterns = [
+      /\*\*LOCATION\s+&\s+NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*LOCATION\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*NEIGHBORHOOD\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*LOCATION\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*LOCATION\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /LOCATION\s+(?:&\s+NEIGHBORHOOD\s+)?ANALYSIS\s*:?\s*([\s\S]*?)(?=(?:RENTAL|INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*LOCATION\s+INFORMATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*AREA\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of locationPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.locationAnalysis = match[1].trim();
+        console.log('✅ Found LOCATION ANALYSIS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract RENTAL INCOME ANALYSIS section
-    const rentalMatch = text.match(/\*\*RENTAL\s+INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (rentalMatch) {
-      sections.rentalAnalysis = rentalMatch[1].trim();
+    // Extract RENTAL INCOME ANALYSIS section (multiple formats)
+    const rentalPatterns = [
+      /\*\*RENTAL\s+INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*RENTAL\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*INCOME\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*RENTAL\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*RENTAL\s+.*?ANALYSIS\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /RENTAL\s+(?:INCOME\s+)?ANALYSIS\s*:?\s*([\s\S]*?)(?=(?:INVESTMENT|[A-Z\s&]+:)|$)/i,
+      /\*\*CASH\s+FLOW\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*FINANCIAL\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of rentalPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.rentalAnalysis = match[1].trim();
+        console.log('✅ Found RENTAL ANALYSIS using pattern:', pattern.source);
+        break;
+      }
     }
     
-    // Extract INVESTMENT SUMMARY section
-    const investmentMatch = text.match(/\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i);
-    if (investmentMatch) {
-      sections.investmentSummary = investmentMatch[1].trim();
+    // Extract INVESTMENT SUMMARY section (multiple formats)
+    const investmentPatterns = [
+      /\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*CONCLUSION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /##\s*INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=##|$)/i,
+      /#\s*INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=#|$)/i,
+      /INVESTMENT\s+SUMMARY\s*:?\s*([\s\S]*?)(?=(?:[A-Z\s&]+:)|$)/i,
+      /\*\*RECOMMENDATION:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*FINAL\s+ASSESSMENT:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i,
+      /\*\*PROS\s+AND\s+CONS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i
+    ];
+    
+    for (const pattern of investmentPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        sections.investmentSummary = match[1].trim();
+        console.log('✅ Found INVESTMENT SUMMARY using pattern:', pattern.source);
+        break;
+      }
     }
     
+    console.log('📊 Structured sections found:', Object.keys(sections));
     return sections;
   }
   
@@ -1025,20 +1200,33 @@ function extractPropertyAnalysisData(responseText) {
     switch (key) {
       case 'streetName':
         const streetCleaned = value.trim().replace(/["""]/g, '');
-        const streetHasNumber = streetCleaned.match(/\d/);
-        const streetNotKeywords = !streetCleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
-        const streetNotFeature = !streetCleaned.match(/bedroom|bathroom|sqft|square|feet/i);
-        const streetNotPrice = !streetCleaned.match(/^\$/);
-        const streetValidLength = streetCleaned.length >= 5 && streetCleaned.length <= 120;
+        
+        // Basic length and content checks
+        const streetValidLength = streetCleaned.length >= 3 && streetCleaned.length <= 150; // Relaxed from 5-120
+        const streetNotJustKeywords = !streetCleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+        const streetNotFeature = !streetCleaned.match(/^(bedroom|bathroom|sqft|square|feet|bath|bed)$/i); // Only reject if ENTIRE string is a feature
+        const streetNotPrice = !streetCleaned.match(/^\$[\d,]+/); // Only reject if starts with price format
         const streetNotJustNumber = !streetCleaned.match(/^\d+$/);
         
-        const streetValid = streetCleaned && streetValidLength && streetNotKeywords && streetHasNumber && streetNotJustNumber && streetNotPrice && streetNotFeature;
+        // Street indicators - either has number OR contains street-related words
+        const streetHasNumber = streetCleaned.match(/\d/);
+        const streetHasStreetWords = streetCleaned.match(/(street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir|highway|route|trail|path|row|terrace|crescent|grove|close|view|heights|estates|manor|park|square|walk|green|commons|crossing|bend|ridge|hill|valley|creek|river|lake|pond|wood|forest|meadow|field|garden|villa|residence|manor|estate|ranch|farm|cabin|cottage|house|home|mill|bridge|station|center|plaza|market|town|city|village|north|south|east|west|old|new|main|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(\s|$)/i);
+        const streetHasIndicators = streetHasNumber || streetHasStreetWords;
         
-        if (!streetValid) {
+        // More lenient validation - warn instead of reject for some cases
+        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
+        
+        if (streetIsLikelyValid && !streetHasIndicators) {
+          console.log(`⚠️ Street name "${streetCleaned}" passed basic validation but lacks typical street indicators (numbers or street words) - accepting anyway`);
+        }
+        
+        if (!streetIsLikelyValid) {
           console.log(`❌ Street name validation failed for "${value}":`, {
             cleaned: streetCleaned,
             validLength: streetValidLength,
             hasNumber: !!streetHasNumber,
+            hasStreetWords: !!streetHasStreetWords,
+            hasIndicators: streetHasIndicators,
             isNotJustKeywords: streetNotKeywords,
             isNotPropertyFeature: streetNotFeature,
             isNotPrice: streetNotPrice,
@@ -1048,26 +1236,46 @@ function extractPropertyAnalysisData(responseText) {
           console.log(`✅ Street name validation passed for "${streetCleaned}"`);
         }
         
-        return streetValid;
+        return streetIsLikelyValid;
                
       case 'bedrooms':
         const bedrooms = parseInt(value);
-        return bedrooms >= 0 && bedrooms <= 20;
+        // Expanded from 0-20 to 0-50 for large commercial/multi-family properties
+        const bedroomValid = bedrooms >= 0 && bedrooms <= 50;
+        if (!bedroomValid) {
+          console.log(`❌ Bedrooms validation failed for "${value}": parsed=${bedrooms}, range=0-50`);
+        }
+        return bedroomValid;
         
       case 'bathrooms':
         const bathrooms = parseFloat(value);
-        return bathrooms >= 0 && bathrooms <= 20;
+        // Expanded from 0-20 to 0-50 for large commercial/multi-family properties
+        const bathroomValid = bathrooms >= 0 && bathrooms <= 50;
+        if (!bathroomValid) {
+          console.log(`❌ Bathrooms validation failed for "${value}": parsed=${bathrooms}, range=0-50`);
+        }
+        return bathroomValid;
         
       case 'squareFeet':
         const sqft = parseInt(value.replace(/,/g, ''));
-        return sqft >= 100 && sqft <= 50000;
+        // Expanded from 100-50K to 50-500K to support tiny homes and large commercial
+        const sqftValid = sqft >= 50 && sqft <= 500000;
+        if (!sqftValid) {
+          console.log(`❌ Square feet validation failed for "${value}": parsed=${sqft}, range=50-500,000`);
+        }
+        return sqftValid;
         
       case 'yearBuilt':
         const year = parseInt(value);
-        return year >= 1800 && year <= new Date().getFullYear();
+        // Expanded from 1800 to 1600 for historic properties
+        const yearValid = year >= 1600 && year <= new Date().getFullYear();
+        if (!yearValid) {
+          console.log(`❌ Year built validation failed for "${value}": parsed=${year}, range=1600-${new Date().getFullYear()}`);
+        }
+        return yearValid;
         
       case 'price':
-        let priceStr = value.replace(/[,$]/g, '');
+        let priceStr = value.replace(/[,$£€¥]/g, ''); // Support more currencies
         
         // Handle K and M suffixes
         if (priceStr.match(/k$/i)) {
@@ -1077,7 +1285,8 @@ function extractPropertyAnalysisData(responseText) {
         }
         
         const price = parseFloat(priceStr);
-        const priceValid = !isNaN(price) && price >= 10000 && price <= 50000000;
+        // Relaxed price range: $1,000 to $100,000,000 (was $10K-$50M)
+        const priceValid = !isNaN(price) && price >= 1000 && price <= 100000000;
         
         if (!priceValid) {
           console.log(`❌ Price validation failed for "${value}":`, {
@@ -1085,7 +1294,8 @@ function extractPropertyAnalysisData(responseText) {
             cleaned: priceStr,
             parsed: price,
             isNumber: !isNaN(price),
-            inRange: price >= 10000 && price <= 50000000
+            inRange: price >= 1000 && price <= 100000000,
+            note: 'Expanded range: $1K - $100M to support more property types'
           });
         } else {
           console.log(`✅ Price validation passed for "${value}" → ${price}`);
@@ -1094,10 +1304,35 @@ function extractPropertyAnalysisData(responseText) {
         return priceValid;
         
       case 'propertyType':
-        return value && value.length > 2 && value.length < 100 && 
-               !value.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom|price|asking)$/i) &&
-               // Must contain property-related keywords
-               value.match(/(single|family|house|home|condo|apartment|townhouse|duplex|villa|ranch|colonial|tudor|contemporary|modern|bungalow|studio|loft|penthouse|cottage|cabin|mobile|manufactured|detached|residence|flat|unit|triplex|multi)/i);
+        const typeClean = value.trim();
+        const typeValidLength = typeClean.length > 2 && typeClean.length < 150; // Increased from 100
+        const typeNotJustKeywords = !typeClean.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom|price|asking)$/i);
+        
+        // Expanded property type keywords to be more inclusive
+        const typeHasPropertyKeywords = typeClean.match(/(single|family|house|home|condo|condominium|apartment|townhouse|duplex|villa|ranch|colonial|tudor|contemporary|modern|bungalow|studio|loft|penthouse|cottage|cabin|mobile|manufactured|detached|residence|flat|unit|triplex|multi|dwelling|building|estate|property|tiny|micro|prefab|modular|residential|commercial|mixed|use|office|retail|warehouse|industrial|land|lot|parcel|farm|agricultural|historic|heritage|luxury|executive|starter|investment|rental|vacation|second|primary|main|guest|accessory|adu|carriage|coach|granny|suite|basement|garage|conversion|new|construction|custom|spec|model|development|subdivision|community|gated|waterfront|beachfront|lakefront|oceanfront|mountain|view|golf|course|acre|acres|stories|story|level|split|bi|traditional|craftsman|victorian|mediterranean|spanish|french|greek|revival|cape|cod|farmhouse|log|timber|frame|brick|stone|stucco|siding|shingle|metal|concrete|block|adobe|rammed|earth|green|sustainable|eco|friendly|energy|efficient|solar|smart|tech|luxury|premium|high|end|mid|century|antique|historic|restored|renovated|updated|remodeled|original|character|charm|unique|custom|designed|architect|built|quality|construction|solid|well|maintained|move|ready|turnkey|fixer|upper|handyman|special|as|is|sold|where|stands)/i);
+        
+        // Accept if it has basic property indicators OR common real estate terms
+        const typeIsValid = typeValidLength && typeNotJustKeywords && (typeHasPropertyKeywords || 
+          // Additional acceptance for common terms that might not match above
+          typeClean.match(/(house|home|apartment|condo|unit|building|property|residence|dwelling)/i) ||
+          // Accept single words that are clearly property types
+          typeClean.match(/^(house|home|apartment|condo|townhouse|duplex|villa|ranch|bungalow|studio|loft|cottage|cabin|flat|unit)$/i)
+        );
+        
+        if (!typeIsValid) {
+          console.log(`❌ Property type validation failed for "${value}":`, {
+            original: value,
+            cleaned: typeClean,
+            validLength: typeValidLength,
+            notJustKeywords: typeNotJustKeywords,
+            hasPropertyKeywords: !!typeHasPropertyKeywords,
+            note: 'Expanded property type recognition'
+          });
+        } else {
+          console.log(`✅ Property type validation passed for "${typeClean}"`);
+        }
+        
+        return typeIsValid;
                
       default:
         return value && value.length > 0;
@@ -1723,38 +1958,55 @@ function setupResponseMonitor() {
   let responseBuffer = new Map(); // Buffer to track response completion
   let completionTimers = new Map(); // Timers for each property analysis
   
-  // Function to detect if ChatGPT is still writing (streaming)
+  // Enhanced function to detect if ChatGPT is still writing (streaming)
   const isResponseStreaming = () => {
     console.log('🔍 Checking if ChatGPT is still streaming...');
     
-    // Primary check: Look for the stop generation button
+    // Primary check: Look for the stop generation button (most reliable)
     const stopSelectors = [
       'button[data-testid*="stop"]',
       'button[aria-label*="stop" i]',
       'button[title*="stop" i]',
       'button:has([data-icon="stop"])',
-      '[role="button"][aria-label*="stop" i]'
+      '[role="button"][aria-label*="stop" i]',
+      'button[class*="stop"]',
+      '[data-state="stop"]',
+      'button:has(svg[class*="stop"])',
+      '[aria-label*="Stop generating"]',
+      '[title*="Stop generating"]'
     ];
     
     for (const selector of stopSelectors) {
-      const stopButton = document.querySelector(selector);
-      if (stopButton && 
-          stopButton.offsetHeight > 0 && 
-          !stopButton.disabled && 
-          window.getComputedStyle(stopButton).visibility !== 'hidden' &&
-          window.getComputedStyle(stopButton).display !== 'none') {
-        console.log('🔍 Found active stop button:', selector, stopButton);
-        return true;
+      try {
+        const stopButton = document.querySelector(selector);
+        if (stopButton && 
+            stopButton.offsetHeight > 0 && 
+            !stopButton.disabled && 
+            window.getComputedStyle(stopButton).visibility !== 'hidden' &&
+            window.getComputedStyle(stopButton).display !== 'none') {
+          console.log('🔍 Found active stop button:', selector, stopButton);
+          return true;
+        }
+      } catch (e) {
+        // Skip selector if it causes errors
+        continue;
       }
     }
     
-    // Secondary check: Look for streaming indicators
+    // Secondary check: Look for streaming indicators and visual cues
     const streamingIndicators = [
       '.result-streaming',
       '[class*="streaming"]',
       '[class*="loading"]',
       '.animate-pulse',
-      '[data-testid*="streaming"]'
+      '[data-testid*="streaming"]',
+      '[data-state="streaming"]',
+      '.thinking',
+      '.generating',
+      '.typing',
+      '[class*="dots"]',
+      '[class*="ellipsis"]',
+      '.cursor-blink'
     ];
     
     for (const indicator of streamingIndicators) {
@@ -1981,19 +2233,61 @@ function setupResponseMonitor() {
   };
   
   const checkForNewMessages = () => {
-    // Updated selectors for current ChatGPT interface (2024)
+    // Comprehensive selectors for ChatGPT interface with fallbacks for interface changes
     const messageSelectors = [
+      // Current primary selectors (December 2024)
       '[data-message-author-role="assistant"]',
       '[data-message-id] [data-message-author-role="assistant"]',
+      
+      // Alternative data attributes
+      '[data-author="assistant"]',
+      '[data-role="assistant"]',
+      '[role="assistant"]',
+      
+      // Class-based selectors (current)
       '.group.w-full.text-token-text-primary',
       '.group.final-completion',
       '.prose.result-streaming',
       '.prose',
       '[class*="markdown"]',
+      
+      // Message container patterns
       '[class*="message"][class*="assistant"]',
       '.message.assistant',
       '.group.assistant',
-      '[class*="assistant"]'
+      '[class*="assistant"]',
+      '.assistant-message',
+      '.bot-message',
+      '.ai-message',
+      '.response-message',
+      
+      // Generic conversation patterns
+      '.conversation-turn[data-author="assistant"]',
+      '.conversation-item[data-role="assistant"]',
+      '.chat-message.assistant',
+      '.message[data-sender="assistant"]',
+      '.turn.assistant',
+      
+      // Fallback content-based selectors
+      '[class*="response"]',
+      '[class*="reply"]',
+      '[class*="bot"]',
+      '[class*="ai"]',
+      
+      // Structure-based fallbacks (look for even-numbered message groups)
+      '.group:nth-child(even)',
+      '.message:nth-child(even)',
+      '.conversation-turn:nth-child(even)',
+      
+      // Last resort: any element with substantial text that's not user input
+      'div[class*="prose"]:not([class*="user"]):not([class*="human"]):not(textarea):not(input)',
+      'div[class*="text"]:not([class*="user"]):not([class*="human"]):not(textarea):not(input)',
+      
+      // OpenAI specific patterns (alternative domains)
+      '.result-thinking',
+      '.result-content',
+      '.completion-content',
+      '.generated-text'
     ];
     
     let messages = [];
@@ -2066,7 +2360,8 @@ function setupResponseMonitor() {
             // Length hasn't changed, use the previous length change time
             lastLengthChangeTime = previousBuffer.lastLengthChange || previousBuffer.lastUpdated;
             const stableTime = currentTime - lastLengthChangeTime;
-            if (stableTime > 2000) { // Length hasn't changed for 2 seconds
+            // More aggressive completion detection for faster processing
+            if (stableTime > 1500) { // Reduced from 2000ms to 1500ms for faster detection
               lengthStable = true;
               console.log('📏 Response length stable for', Math.round(stableTime/1000), 'seconds, likely complete');
             }
@@ -2122,14 +2417,14 @@ function setupResponseMonitor() {
             clearTimeout(completionTimers.get(currentUrl));
           }
           
-          // Set a shorter completion timer (2 seconds after last change)
+          // Set a shorter completion timer (1.5 seconds after last change for faster processing)
           completionTimers.set(currentUrl, setTimeout(() => {
             console.log('⏰ Completion timer triggered - assuming response is complete');
             const bufferedResponse = responseBuffer.get(currentUrl);
             if (bufferedResponse) {
               processCompletedResponse(bufferedResponse.messageText, currentUrl);
             }
-          }, 2000));
+          }, 1500)); // Reduced from 2000ms to 1500ms
         }
       }
       
