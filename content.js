@@ -708,10 +708,22 @@ function extractPropertyAnalysisData(responseText) {
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
-        /(?:price|cost|asking|listed|sale|selling|priced)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        // Standard price patterns
+        /(?:property\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
         /\$\s*([\d,]+(?:\.\d{2})?)/g,
         /(?:for|at|around)\s*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi,
+        // Bullet point and structured formats
+        /[-•*]\s*(?:price|asking\s+price)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gim,
+        // Colon separated formats
+        /price[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /asking[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        // Number followed by currency indicators
+        /\$?([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|price)/gi,
+        // Handle various spacing and formatting
+        /\$\s*([0-9,]+(?:\.[0-9]{2})?)\b/g,
+        /([0-9,]+(?:\.[0-9]{2})?)\s*dollars?\b/gi
       ],
       validator: (value) => {
         const num = parseFloat(value.replace(/,/g, ''));
@@ -778,11 +790,29 @@ function extractPropertyAnalysisData(responseText) {
     // Property type extraction
     propertyType: {
       patterns: [
-        /(?:property\s*type|type)[:\s]*([^.\n,]+)/gi,
-        /(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi,
-        /(?:this|the)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch|colonial|tudor|contemporary|modern)/gi
+        // Standard property type patterns
+        /(?:property\s*type|type\s*of\s*property|property\s*classification)[:\s-]*([^.\n,;]+)/gi,
+        /(?:type)[:\s-]*([^.\n,;]+)/gi,
+        // Specific property types with context
+        /(single\s*family\s*home?|single\s*family|detached\s*home|detached\s*house)/gi,
+        /(condominium|condo|apartment|flat|unit)/gi,
+        /(townhouse|townhome|row\s*house)/gi,
+        /(duplex|triplex|multi\s*family)/gi,
+        /(house|home|residence)/gi,
+        /(villa|ranch|colonial|tudor|contemporary|modern|bungalow)/gi,
+        // Bullet point and structured formats
+        /[-•*]\s*(?:property\s*type|type)[:\s-]*([^.\n,;]+)/gi,
+        /(?:^|\n)\s*(?:property\s*type|type)[:\s-]*([^.\n,;]+)/gim,
+        // Context-based extraction
+        /(?:this|the|a)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch)/gi,
+        /(?:is\s*a?|classified\s*as)\s*(single\s*family|condo|townhouse|apartment|duplex|house|home|villa|ranch)/gi,
+        // Common real estate terms
+        /(studio|loft|penthouse|cottage|cabin|mobile\s*home|manufactured\s*home)/gi
       ],
-      validator: (value) => value && value.length > 2 && value.length < 50
+      validator: (value) => {
+        return value && value.length > 2 && value.length < 100 && 
+               !value.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom)$/i);
+      }
     },
     
     // Lot size extraction
@@ -840,8 +870,11 @@ function extractPropertyAnalysisData(responseText) {
         /(?:address)[:\s]*([^\n,;]+)/gi
       ],
       price: [
-        /(?:price|asking)[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)/g
+        /(?:property\s+price|price|asking\s+price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)/g,
+        /[-•*]\s*(?:price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
+        /(?:^|\n)\s*(?:price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gim,
+        /\$\s*([0-9,]+(?:\.[0-9]{2})?)\b/g
       ],
       bedrooms: [
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
@@ -865,8 +898,16 @@ function extractPropertyAnalysisData(responseText) {
         /(\d{4})\s*(?:built)/gi
       ],
       propertyType: [
-        /(?:property\s+type)[:\s]*([^\n,]+)/gi,
-        /(?:type)[:\s]*(single\s+family|condo|townhouse|apartment|duplex|house|home)[^\n,]*/gi
+        /(?:property\s+type|type\s+of\s+property)[:\s-]*([^\n,;]+)/gi,
+        /(?:type)[:\s-]*([^\n,;]+)/gi,
+        /[-•*]\s*(?:property\s+type|type)[:\s-]*([^\n,;]+)/gi,
+        /(?:^|\n)\s*(?:property\s+type|type)[:\s-]*([^\n,;]+)/gim,
+        /(single\s+family\s+home?|single\s+family|detached\s+home|detached\s+house)/gi,
+        /(condominium|condo|apartment|flat|unit)/gi,
+        /(townhouse|townhome|row\s+house)/gi,
+        /(duplex|triplex|multi\s+family)/gi,
+        /(house|home|residence)/gi,
+        /(villa|ranch|colonial|tudor|contemporary|modern|bungalow)/gi
       ]
     };
     
@@ -893,6 +934,9 @@ function extractPropertyAnalysisData(responseText) {
         if (bestMatch) {
           analysis.extractedData[key] = bestMatch;
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+        } else {
+          console.log(`❌ Failed to extract ${key} from Property Details section`);
+          console.log(`🔍 Property Details text:`, text.substring(0, 500));
         }
       }
     }
@@ -919,6 +963,11 @@ function extractPropertyAnalysisData(responseText) {
       case 'price':
         const price = parseFloat(value.replace(/,/g, ''));
         return price >= 10000 && price <= 50000000;
+      case 'propertyType':
+        return value && value.length > 2 && value.length < 100 && 
+               !value.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom|price|asking)$/i) &&
+               // Must contain property-related keywords
+               value.match(/(single|family|house|home|condo|apartment|townhouse|duplex|villa|ranch|colonial|tudor|contemporary|modern|bungalow|studio|loft|penthouse|cottage|cabin|mobile|manufactured|detached|residence|flat|unit|triplex|multi)/i);
       default:
         return value && value.length > 0;
     }
@@ -1033,9 +1082,22 @@ function extractPropertyAnalysisData(responseText) {
       
       if (bestMatch) {
         analysis.extractedData[fieldName] = bestMatch;
-        console.log(`✅ Extracted ${fieldName}:`, bestMatch);
+        console.log(`✅ Extracted ${fieldName} (fallback):`, bestMatch);
       } else {
-        console.log(`❌ Failed to extract ${fieldName}`);
+        console.log(`❌ Failed to extract ${fieldName} from full response`);
+        // Show sample text around potential matches for debugging
+        if (fieldName === 'price') {
+          const priceContext = responseText.match(/.{0,50}(?:price|asking|\$[\d,]+).{0,50}/gi);
+          if (priceContext) {
+            console.log(`🔍 Price context found:`, priceContext.slice(0, 3));
+          }
+        }
+        if (fieldName === 'propertyType') {
+          const typeContext = responseText.match(/.{0,50}(?:type|house|home|condo|apartment|family).{0,50}/gi);
+          if (typeContext) {
+            console.log(`🔍 Property type context found:`, typeContext.slice(0, 3));
+          }
+        }
       }
     }
   }
@@ -1286,7 +1348,56 @@ function validateAndCleanData(data) {
     
     // Clean property type
     if (cleanedData.propertyType) {
-      cleanedData.propertyType = cleanedData.propertyType.trim().replace(/["""]/g, '');
+      let propType = cleanedData.propertyType.trim().replace(/["""]/g, '');
+      
+      // Standardize common property types
+      propType = propType.toLowerCase();
+      if (propType.match(/single\s*family/i)) {
+        propType = 'Single Family Home';
+      } else if (propType.match(/condo|condominium/i)) {
+        propType = 'Condominium';
+      } else if (propType.match(/townhouse|townhome|row\s*house/i)) {
+        propType = 'Townhouse';
+      } else if (propType.match(/apartment|flat|unit/i)) {
+        propType = 'Apartment';
+      } else if (propType.match(/duplex/i)) {
+        propType = 'Duplex';
+      } else if (propType.match(/triplex/i)) {
+        propType = 'Triplex';
+      } else if (propType.match(/house|home|residence/i) && !propType.match(/single/i)) {
+        propType = 'House';
+      } else if (propType.match(/villa/i)) {
+        propType = 'Villa';
+      } else if (propType.match(/ranch/i)) {
+        propType = 'Ranch';
+      } else if (propType.match(/colonial/i)) {
+        propType = 'Colonial';
+      } else if (propType.match(/tudor/i)) {
+        propType = 'Tudor';
+      } else if (propType.match(/contemporary|modern/i)) {
+        propType = 'Contemporary';
+      } else if (propType.match(/bungalow/i)) {
+        propType = 'Bungalow';
+      } else if (propType.match(/studio/i)) {
+        propType = 'Studio';
+      } else if (propType.match(/loft/i)) {
+        propType = 'Loft';
+      } else if (propType.match(/penthouse/i)) {
+        propType = 'Penthouse';
+      } else if (propType.match(/cottage/i)) {
+        propType = 'Cottage';
+      } else if (propType.match(/cabin/i)) {
+        propType = 'Cabin';
+      } else if (propType.match(/mobile|manufactured/i)) {
+        propType = 'Mobile Home';
+      } else {
+        // Capitalize first letter of each word
+        propType = propType.split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+      }
+      
+      cleanedData.propertyType = propType;
     }
     
     // Clean street name
