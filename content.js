@@ -1518,22 +1518,56 @@ function setupResponseMonitor() {
     
     // Check if we're waiting for confirmation in prompt splitting mode
     if (promptSplittingState.currentPhase === 'waiting_confirmation') {
-      console.log('🔍 Checking for confirmation in response...');
-      console.log('📝 Response text preview:', messageText.substring(0, 200));
+      console.log('🔍 ===== CONFIRMATION DETECTION DEBUG =====');
+      console.log('🔍 Current phase:', promptSplittingState.currentPhase);
+      console.log('🔍 Pending property link:', promptSplittingState.pendingPropertyLink);
+      console.log('🔍 Full response text:', messageText);
+      console.log('🔍 Response length:', messageText.length);
+      console.log('🔍 Response text preview:', messageText.substring(0, 300));
+      console.log('🔍 Testing confirmation detection...');
+      
       if (detectConfirmation(messageText)) {
         console.log('✅ Confirmation detected! Proceeding to send property link...');
         handleConfirmationReceived();
         return;
       } else {
-        console.log('❌ No confirmation detected, checking timeout...');
+        console.log('❌ No confirmation detected in response');
+        console.log('❌ Testing each pattern individually:');
+        
+        // Test each pattern individually for debugging
+        const patterns = [
+          /yes,?\s*i\s*understand/i,
+          /yes\s*i\s*understand/i,
+          /i\s*understand/i,
+          /understood/i,
+          /ready\s*to\s*analyze/i,
+          /ready/i,
+          /yes,?\s*i.{0,20}understand/i,
+          /understand.{0,20}ready/i,
+          /ready.{0,20}analyze/i,
+          /yes.{0,50}ready/i,
+          /\byes\b/i
+        ];
+        
+        patterns.forEach((pattern, index) => {
+          const matches = pattern.test(messageText.trim());
+          console.log(`❌ Pattern ${index + 1} (${pattern.source}): ${matches ? '✅ MATCH' : '❌ no match'}`);
+          if (matches) {
+            console.log(`❌ But detectConfirmation still returned false for pattern: ${pattern.source}`);
+          }
+        });
+        
         const timeElapsed = Date.now() - promptSplittingState.confirmationStartTime;
         console.log('⏰ Time elapsed:', timeElapsed, 'ms, timeout:', promptSplittingState.confirmationTimeout, 'ms');
         if (timeElapsed > promptSplittingState.confirmationTimeout) {
           console.log('⏰ Confirmation timeout, falling back to single prompt...');
           handleConfirmationTimeout();
           return;
+        } else {
+          console.log('⏰ Still within timeout window, will continue waiting');
         }
       }
+      console.log('🔍 ===== END CONFIRMATION DEBUG =====');
     }
     
     // Process the analysis data
@@ -2283,3 +2317,51 @@ if (isChatGPTSite()) {
 } else {
   console.log('❌ ChatGPT Helper Extension is not active on this site');
 }
+
+// Debug function to check current prompt splitting state
+window.debugPromptSplitting = function(testResponse) {
+  console.log('🧪 Testing prompt splitting with:', testResponse);
+  const result = detectConfirmation(testResponse || "Yes, I understand");
+  console.log('🧪 Test result:', result);
+  if (result && promptSplittingState.currentPhase === 'waiting_confirmation') {
+    console.log('🧪 Triggering handleConfirmationReceived');
+    handleConfirmationReceived();
+  }
+};
+
+// Add comprehensive debugging function
+window.debugPromptSplittingState = function() {
+  console.log('=== PROMPT SPLITTING DEBUG INFO ===');
+  console.log('🔧 Current state:', promptSplittingState);
+  console.log('🔧 Enabled:', promptSplittingState.enabled);
+  console.log('🔧 Length threshold:', promptSplittingState.lengthThreshold);
+  console.log('🔧 Current phase:', promptSplittingState.currentPhase);
+  console.log('🔧 Pending property link:', promptSplittingState.pendingPropertyLink);
+  console.log('🔧 Fallback attempted:', promptSplittingState.fallbackAttempted);
+  
+  // Test dynamic prompt length
+  generateDynamicPrompt().then(prompt => {
+    const testPrompt = prompt.replace('{PROPERTY_URL}', 'https://example.com/test-property')
+                            .replace('{DATE}', new Date().toLocaleDateString());
+    console.log('🔧 Sample dynamic prompt length:', testPrompt.length);
+    console.log('🔧 Would trigger splitting:', shouldSplitPrompt(testPrompt));
+    console.log('🔧 Sample prompt preview:', testPrompt.substring(0, 200) + '...');
+  });
+  
+  // Check input field status
+  const inputField = document.querySelector('textarea[data-id="root"]') || 
+                    document.querySelector('#prompt-textarea') ||
+                    document.querySelector('textarea') ||
+                    document.querySelector('[contenteditable="true"]');
+  console.log('🔧 Input field found:', !!inputField);
+  console.log('🔧 Input field type:', inputField ? inputField.tagName : 'none');
+  
+  console.log('=== END DEBUG INFO ===');
+};
+
+// Add function to manually test prompt splitting with a property link
+window.testPromptSplitting = function(propertyLink) {
+  const testLink = propertyLink || 'https://example.com/test-property';
+  console.log('🧪 Testing prompt splitting with link:', testLink);
+  insertPropertyAnalysisPrompt(testLink);
+};
