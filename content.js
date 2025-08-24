@@ -694,27 +694,33 @@ function extractPropertyAnalysisData(responseText) {
     // Street name extraction with comprehensive patterns
     streetName: {
       patterns: [
-        // Standard address patterns with street types
+        // Standard address patterns with street types (with source link support)
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Bullet point and structured formats (with source link support)
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        
+        // Full address patterns (number + street name) (with source link support)
+        /(?:^|\n|\.)\s*(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Address in quotes (avoiding conflict with source links in parentheses/brackets)
+        /["']([^"']+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))['"]/gi,
+        
+        // Simple address patterns without requiring street types (with source link support)
+        /(?:address|located)[:\s-]*([^\n,;\[\]]{10,80}?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Address with zip code - extract just the street part (with source link support)
+        /(\d+\s+[A-Za-z0-9\s]+?)(?:,\s*[A-Za-z\s]+,?\s*\d{5})(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Legacy patterns without source link support (fallback)
         /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
         /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;]+)/gi,
         /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
-        
-        // Bullet point and structured formats
         /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gi,
-        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gim,
-        
-        // Full address patterns (number + street name)
-        /(?:^|\n|\.)\s*(\d+\s+[A-Za-z0-9\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
-        
-        // Address in quotes or parentheses
-        /["']([^"']+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))['"]/gi,
-        /\(([^)]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))\)/gi,
-        
-        // Simple address patterns without requiring street types
-        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi,
-        
-        // Address with zip code - extract just the street part
-        /(\d+\s+[A-Za-z0-9\s]+)(?:,\s*[A-Za-z\s]+,?\s*\d{5})/gi
+        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi
       ],
       validator: (value) => {
         // Clean up the value
@@ -734,40 +740,45 @@ function extractPropertyAnalysisData(responseText) {
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
-        // Standard price patterns with various labels
-        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        // Standard price patterns with various labels (with source link support)
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
         
-        // Dollar sign patterns
+        // Dollar sign patterns (with source link support)
+        /\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gm,
+        
+        // Context-based price patterns (with source link support)
+        /(?:for|at|around|approximately|about)\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Bullet point and structured formats (with source link support)
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        
+        // Colon and dash separated formats (with source link support)
+        /(?:price|asking|sale|cost|listed)[:\s-]+\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Number followed by currency indicators or context (with source link support)
+        /\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|sale|selling|property\s+price|price)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Price in quotes or parentheses (without conflicting with source links)
+        /["']\$?\s*([\d,]+(?:\.\d{2})?)['"]/gi,
+        
+        // Price with K/M suffixes (with source link support)
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK](?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        
+        // Handle spacing variations (with source link support)
+        /(?:for|priced\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Numbers with explicit currency mentions (with source link support)
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollar|USD|usd|US\s+dollar)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        
+        // Legacy patterns without source link support (fallback)
         /\$\s*([\d,]+(?:\.\d{2})?)\b/g,
         /(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)/gm,
-        
-        // Context-based price patterns
         /(?:for|at|around|approximately|about)\s*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)/gi,
-        
-        // Bullet point and structured formats
-        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gim,
-        
-        // Colon and dash separated formats
-        /(?:price|asking|sale|cost|listed)[:\s-]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        
-        // Number followed by currency indicators or context
-        /\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|sale|selling|property\s+price|price)/gi,
-        
-        // Price in quotes or parentheses
-        /["']\$?\s*([\d,]+(?:\.\d{2})?)['"]/gi,
-        /\(\$?\s*([\d,]+(?:\.\d{2})?)\)/gi,
-        
-        // Price with K/M suffixes
-        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK]\b/g, // Will be multiplied by 1000 in processing
-        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?\b/g, // Will be multiplied by 1000000 in processing
-        
-        // Handle spacing variations
-        /(?:for|priced\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)/gi,
-        
-        // Numbers with explicit currency mentions
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollar|USD|usd|US\s+dollar)/gi
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)/gi
       ],
       validator: (value) => {
         let cleaned = value.replace(/[,$]/g, '');
@@ -917,22 +928,22 @@ function extractPropertyAnalysisData(responseText) {
     // Extract specific data points with enhanced patterns
     const patterns = {
       streetName: [
-        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
-        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;]+)/gi,
-        /(\d+\s+[A-Za-z0-9\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
-        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gi,
-        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gim,
-        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(\d+\s+[A-Za-z0-9\s]+?(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;\[\]]+?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        /(?:address|located)[:\s-]*([^\n,;\[\]]{10,80}?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi
       ],
       price: [
-        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|asking)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)\b/g,
-        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gim,
-        /(?:for|at|around)\s*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi,
-        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK]\b/g,
-        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?\b/g
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|asking)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gim,
+        /(?:for|at|around)\s*\$?\s*([\d,]+(?:\.\d{2})?)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?/gi,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK](?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?(?:\s*[\[\(](?:source|src|from)[:\s]*[^\]\)]+[\]\)])?\b/g
       ],
       bedrooms: [
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
@@ -2698,6 +2709,28 @@ window.quickTestPatterns = function() {
   ];
   
   console.log('🧪=== QUICK PATTERN TESTS ===');
+  
+  testCases.forEach((testCase, index) => {
+    console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
+    const result = extractPropertyAnalysisData(testCase);
+    console.log('   Result:', result.extractedData);
+  });
+};
+
+// Test patterns with source links
+window.testSourceLinks = function() {
+  const testCases = [
+    'Address: 123 Main Street [Source: Zillow.com]',
+    'Property Price: $450,000 [Source: Realtor.com]',
+    '• Address: 456 Oak Avenue (Source: MLS)',
+    '• Price: 350K [Source: Zillow]',
+    'This property at 789 Pine Road is priced at $400,000 [Source: Trulia]',
+    'Located at 321 Elm Street for approximately $425,000 (From: Realtor.com)',
+    'Price: $299,000 [Src: RedFin]',
+    'Address: 555 Elm Drive (Source: Property Records)'
+  ];
+  
+  console.log('🧪=== SOURCE LINK PATTERN TESTS ===');
   
   testCases.forEach((testCase, index) => {
     console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
