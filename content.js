@@ -1006,30 +1006,88 @@ function extractPropertyAnalysisData(responseText) {
   
   // Helper function to validate extracted values
   function validateExtractedValue(key, value) {
+    if (!value) {
+      console.log(`❌ Validation failed for ${key}: value is empty/null`);
+      return false;
+    }
+    
     switch (key) {
       case 'streetName':
-        return value && value.length > 5 && value.length < 100 && 
-               !value.match(/^(the|this|that|property|analysis|listing)$/i);
+        const cleaned = value.trim().replace(/["""]/g, '');
+        const hasNumber = cleaned.match(/\d/);
+        const isNotJustKeywords = !cleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+        const isNotPropertyFeature = !cleaned.match(/bedroom|bathroom|sqft|square|feet/i);
+        const isNotPrice = !cleaned.match(/^\$/);
+        const validLength = cleaned.length >= 5 && cleaned.length <= 120;
+        const isNotJustNumber = !cleaned.match(/^\d+$/);
+        
+        const isValid = cleaned && validLength && isNotJustKeywords && hasNumber && isNotJustNumber && isNotPrice && isNotPropertyFeature;
+        
+        if (!isValid) {
+          console.log(`❌ Street name validation failed for "${value}":`, {
+            cleaned: cleaned,
+            validLength: validLength,
+            hasNumber: !!hasNumber,
+            isNotJustKeywords: isNotJustKeywords,
+            isNotPropertyFeature: isNotPropertyFeature,
+            isNotPrice: isNotPrice,
+            isNotJustNumber: isNotJustNumber
+          });
+        } else {
+          console.log(`✅ Street name validation passed for "${cleaned}"`);
+        }
+        
+        return isValid;
+               
       case 'bedrooms':
         const bedrooms = parseInt(value);
         return bedrooms >= 0 && bedrooms <= 20;
+        
       case 'bathrooms':
         const bathrooms = parseFloat(value);
         return bathrooms >= 0 && bathrooms <= 20;
+        
       case 'squareFeet':
         const sqft = parseInt(value.replace(/,/g, ''));
         return sqft >= 100 && sqft <= 50000;
+        
       case 'yearBuilt':
         const year = parseInt(value);
         return year >= 1800 && year <= new Date().getFullYear();
+        
       case 'price':
-        const price = parseFloat(value.replace(/,/g, ''));
-        return price >= 10000 && price <= 50000000;
+        let priceStr = value.replace(/[,$]/g, '');
+        
+        // Handle K and M suffixes
+        if (priceStr.match(/k$/i)) {
+          priceStr = (parseFloat(priceStr.replace(/k$/i, '')) * 1000).toString();
+        } else if (priceStr.match(/m$/i)) {
+          priceStr = (parseFloat(priceStr.replace(/m$/i, '')) * 1000000).toString();
+        }
+        
+        const price = parseFloat(priceStr);
+        const isValid = !isNaN(price) && price >= 10000 && price <= 50000000;
+        
+        if (!isValid) {
+          console.log(`❌ Price validation failed for "${value}":`, {
+            original: value,
+            cleaned: priceStr,
+            parsed: price,
+            isNumber: !isNaN(price),
+            inRange: price >= 10000 && price <= 50000000
+          });
+        } else {
+          console.log(`✅ Price validation passed for "${value}" → ${price}`);
+        }
+        
+        return isValid;
+        
       case 'propertyType':
         return value && value.length > 2 && value.length < 100 && 
                !value.match(/^(the|this|that|property|analysis|listing|located|built|year|bedroom|bathroom|price|asking)$/i) &&
                // Must contain property-related keywords
                value.match(/(single|family|house|home|condo|apartment|townhouse|duplex|villa|ranch|colonial|tudor|contemporary|modern|bungalow|studio|loft|penthouse|cottage|cabin|mobile|manufactured|detached|residence|flat|unit|triplex|multi)/i);
+               
       default:
         return value && value.length > 0;
     }
@@ -2583,6 +2641,80 @@ window.debugPromptSplitting = function(testResponse) {
 };
 
 // Add comprehensive debugging function
+window.testPropertyExtraction = function(sampleResponse) {
+  console.log('🧪=== TESTING PROPERTY EXTRACTION ===');
+  console.log('📝 Input text length:', sampleResponse ? sampleResponse.length : 0);
+  
+  if (!sampleResponse) {
+    sampleResponse = `**PROPERTY DETAILS:**
+- Address: 123 Main Street
+- Property Price: $450,000
+- Bedrooms: 3
+- Bathrooms: 2
+- Property Type: Single Family Home
+- Square Footage: 1,500
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Location Score: 8/10
+- Great neighborhood with excellent schools
+
+**RENTAL INCOME ANALYSIS:**
+- Estimated Monthly Rental Income: $2,200
+
+**INVESTMENT SUMMARY:**
+- Strong investment potential
+- Good location and pricing`;
+  }
+  
+  console.log('📝 Sample text (first 400 chars):', sampleResponse.substring(0, 400) + '...');
+  
+  // Test extraction
+  console.log('🔍=== RUNNING FULL EXTRACTION ===');
+  const result = extractPropertyAnalysisData(sampleResponse);
+  
+  console.log('📊 EXTRACTION RESULTS:');
+  console.log('   Total data points extracted:', Object.keys(result.extractedData).length);
+  console.log('   Extracted data:', result.extractedData);
+  console.log('   Has streetName:', !!result.extractedData.streetName);
+  console.log('   Has price:', !!result.extractedData.price);
+  console.log('   Has propertyType:', !!result.extractedData.propertyType);
+  
+  return result;
+};
+
+// Quick test with common patterns
+window.quickTestPatterns = function() {
+  const testCases = [
+    'Address: 123 Main Street',
+    'Property Price: $450,000',
+    '• Address: 456 Oak Avenue',
+    '• Price: 350K',
+    'This property at 789 Pine Road is priced at $400,000',
+    'Located at 321 Elm Street for approximately $425,000'
+  ];
+  
+  console.log('🧪=== QUICK PATTERN TESTS ===');
+  
+  testCases.forEach((testCase, index) => {
+    console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
+    const result = extractPropertyAnalysisData(testCase);
+    console.log('   Result:', result.extractedData);
+  });
+};
+
+// Test function for current webpage
+window.testCurrentExtraction = function() {
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    console.log('🧪 Testing extraction on current ChatGPT response');
+    return window.testPropertyExtraction(messageText);
+  } else {
+    console.log('❌ No ChatGPT messages found on current page');
+    return null;
+  }
+};
 window.debugPromptSplittingState = function() {
   console.log('=== PROMPT SPLITTING DEBUG INFO ===');
   console.log('🔧 Current state:', promptSplittingState);
