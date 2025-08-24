@@ -694,40 +694,93 @@ function extractPropertyAnalysisData(responseText) {
     // Street name extraction with comprehensive patterns
     streetName: {
       patterns: [
-        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
-        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:address)[:\s]*([^\n,;]+)/gi
+        // Standard address patterns with street types
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;]+)/gi,
+        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        
+        // Bullet point and structured formats
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gim,
+        
+        // Full address patterns (number + street name)
+        /(?:^|\n|\.)\s*(\d+\s+[A-Za-z0-9\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        
+        // Address in quotes or parentheses
+        /["']([^"']+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))['"]/gi,
+        /\(([^)]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))\)/gi,
+        
+        // Simple address patterns without requiring street types
+        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi,
+        
+        // Address with zip code - extract just the street part
+        /(\d+\s+[A-Za-z0-9\s]+)(?:,\s*[A-Za-z\s]+,?\s*\d{5})/gi
       ],
       validator: (value) => {
-        return value && value.length > 5 && value.length < 100 && 
-               !value.match(/^(the|this|that|property|analysis|listing)$/i);
+        // Clean up the value
+        const cleaned = value.trim().replace(/["""]/g, '');
+        return cleaned && 
+               cleaned.length >= 5 && 
+               cleaned.length <= 120 && 
+               !cleaned.match(/^(the|this|that|property|analysis|listing|located|address|street)$/i) &&
+               !cleaned.match(/^(asking|price|for|sale|rent)$/i) &&
+               cleaned.match(/\d/) && // Must contain at least one number
+               !cleaned.match(/^\d+$/) && // Not just a number
+               !cleaned.match(/^\$/) && // Not a price
+               !cleaned.match(/bedroom|bathroom|sqft|square|feet/i); // Not a property feature
       }
     },
     
     // Price extraction with comprehensive patterns
     price: {
       patterns: [
-        // Standard price patterns
-        /(?:property\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)/g,
-        /(?:for|at|around)\s*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi,
+        // Standard price patterns with various labels
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|cost|asking|listed|sale|selling|priced)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        
+        // Dollar sign patterns
+        /\$\s*([\d,]+(?:\.\d{2})?)\b/g,
+        /(?:^|\s)\$\s*([\d,]+(?:\.\d{2})?)/gm,
+        
+        // Context-based price patterns
+        /(?:for|at|around|approximately|about)\s*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD|usd)/gi,
+        
         // Bullet point and structured formats
-        /[-•*]\s*(?:price|asking\s+price)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /(?:^|\n)\s*(?:price|asking\s+price)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gim,
-        // Colon separated formats
-        /price[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /asking[:\s]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        // Number followed by currency indicators
-        /\$?([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|price)/gi,
-        // Handle various spacing and formatting
-        /\$\s*([0-9,]+(?:\.[0-9]{2})?)\b/g,
-        /([0-9,]+(?:\.[0-9]{2})?)\s*dollars?\b/gi
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gim,
+        
+        // Colon and dash separated formats
+        /(?:price|asking|sale|cost|listed)[:\s-]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        
+        // Number followed by currency indicators or context
+        /\$?\s*([\d,]+(?:\.\d{2})?)\s*(?:asking|listed|sale|selling|property\s+price|price)/gi,
+        
+        // Price in quotes or parentheses
+        /["']\$?\s*([\d,]+(?:\.\d{2})?)['"]/gi,
+        /\(\$?\s*([\d,]+(?:\.\d{2})?)\)/gi,
+        
+        // Price with K/M suffixes
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK]\b/g, // Will be multiplied by 1000 in processing
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?\b/g, // Will be multiplied by 1000000 in processing
+        
+        // Handle spacing variations
+        /(?:for|priced\s+at)\s+\$\s*([\d,]+(?:\.\d{2})?)/gi,
+        
+        // Numbers with explicit currency mentions
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollar|USD|usd|US\s+dollar)/gi
       ],
       validator: (value) => {
-        const num = parseFloat(value.replace(/,/g, ''));
-        return num >= 10000 && num <= 50000000; // Reasonable price range
+        let cleaned = value.replace(/[,$]/g, '');
+        
+        // Handle K and M suffixes
+        if (cleaned.match(/k$/i)) {
+          cleaned = (parseFloat(cleaned.replace(/k$/i, '')) * 1000).toString();
+        } else if (cleaned.match(/m$/i)) {
+          cleaned = (parseFloat(cleaned.replace(/m$/i, '')) * 1000000).toString();
+        }
+        
+        const num = parseFloat(cleaned);
+        return !isNaN(num) && num >= 10000 && num <= 50000000; // Reasonable price range
       }
     },
     
@@ -864,17 +917,22 @@ function extractPropertyAnalysisData(responseText) {
     // Extract specific data points with enhanced patterns
     const patterns = {
       streetName: [
-        /(?:street\s+name|address)[:\s]*([^\n,]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:located\s+at|property\s+address)[:\s]*([^\n,]+)/gi,
-        /(\d+\s+[A-Za-z\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|st|ave|rd|dr|ln|blvd))/gi,
-        /(?:address)[:\s]*([^\n,;]+)/gi
+        /(?:street\s+name|property\s+address|address)[:\s-]*([^\n,;]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        /(?:located\s+at|property\s+address|situated\s+at)[:\s-]*([^\n,;]+)/gi,
+        /(\d+\s+[A-Za-z0-9\s]+(?:street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|pl|ct|cir))/gi,
+        /[-•*]\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gi,
+        /(?:^|\n)\s*(?:address|street\s+name)[:\s-]*([^\n,;]+)/gim,
+        /(?:address|located)[:\s-]*([^\n,;]{10,80})/gi
       ],
       price: [
-        /(?:property\s+price|price|asking\s+price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /\$\s*([\d,]+(?:\.\d{2})?)/g,
-        /[-•*]\s*(?:price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gi,
-        /(?:^|\n)\s*(?:price|asking)[:\s-]*\$?([\d,]+(?:\.\d{2})?)/gim,
-        /\$\s*([0-9,]+(?:\.[0-9]{2})?)\b/g
+        /(?:property\s+price|asking\s+price|sale\s+price|list\s+price|price|asking)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /\$\s*([\d,]+(?:\.\d{2})?)\b/g,
+        /[-•*]\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /(?:^|\n)\s*(?:price|asking\s+price|sale\s+price|property\s+price)[:\s-]*\$?\s*([\d,]+(?:\.\d{2})?)/gim,
+        /(?:for|at|around)\s*\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+        /([\d,]+(?:\.\d{2})?)\s*(?:dollars?|USD)/gi,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[kK]\b/g,
+        /\$?\s*([\d,]+(?:\.\d+)?)\s*[mM](?:illion)?\b/g
       ],
       bedrooms: [
         /(?:bedroom)[s]?[:\s]*(\d+)/gi,
@@ -936,7 +994,11 @@ function extractPropertyAnalysisData(responseText) {
           console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
         } else {
           console.log(`❌ Failed to extract ${key} from Property Details section`);
-          console.log(`🔍 Property Details text:`, text.substring(0, 500));
+          if (key === 'streetName' || key === 'price') {
+            console.log(`🔍 Property Details text for ${key}:`, text.substring(0, 800));
+            // Show what patterns were tried
+            console.log(`🔍 Patterns tested for ${key}:`, patterns[key].length);
+          }
         }
       }
     }
@@ -1090,6 +1152,14 @@ function extractPropertyAnalysisData(responseText) {
           const priceContext = responseText.match(/.{0,50}(?:price|asking|\$[\d,]+).{0,50}/gi);
           if (priceContext) {
             console.log(`🔍 Price context found:`, priceContext.slice(0, 3));
+          }
+        }
+        if (fieldName === 'streetName') {
+          const addressContext = responseText.match(/.{0,50}(?:address|street|located|\d+\s+[A-Za-z]+).{0,50}/gi);
+          if (addressContext && addressContext.length > 0) {
+            console.log(`🔍 Address context found:`, addressContext.slice(0, 3));
+          } else {
+            console.log(`🔍 No address context found in response`);
           }
         }
         if (fieldName === 'propertyType') {
@@ -1281,11 +1351,20 @@ function validateAndCleanData(data) {
   try {
     // Clean and validate price
     if (cleanedData.price) {
-      const priceNum = parseFloat(cleanedData.price.toString().replace(/[\$,]/g, ''));
-      if (priceNum >= 10000 && priceNum <= 50000000) {
+      let priceStr = cleanedData.price.toString().replace(/[\$,]/g, '');
+      
+      // Handle K and M suffixes
+      if (priceStr.match(/k$/i)) {
+        priceStr = (parseFloat(priceStr.replace(/k$/i, '')) * 1000).toString();
+      } else if (priceStr.match(/m$/i)) {
+        priceStr = (parseFloat(priceStr.replace(/m$/i, '')) * 1000000).toString();
+      }
+      
+      const priceNum = parseFloat(priceStr);
+      if (!isNaN(priceNum) && priceNum >= 10000 && priceNum <= 50000000) {
         cleanedData.price = priceNum.toString();
       } else {
-        console.warn('❌ Invalid price detected:', cleanedData.price);
+        console.warn('❌ Invalid price detected:', cleanedData.price, '→', priceNum);
         delete cleanedData.price;
       }
     }
@@ -1402,9 +1481,30 @@ function validateAndCleanData(data) {
     
     // Clean street name
     if (cleanedData.streetName) {
-      cleanedData.streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
-      if (cleanedData.streetName.length < 5 || cleanedData.streetName.length > 100) {
-        console.warn('❌ Invalid street name length:', cleanedData.streetName);
+      let streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
+      
+      // Additional validation checks
+      const hasNumber = streetName.match(/\d/);
+      const isNotJustKeywords = !streetName.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+      const isNotPropertyFeature = !streetName.match(/bedroom|bathroom|sqft|square|feet/i);
+      const isNotPrice = !streetName.match(/^\$/);
+      
+      if (streetName.length >= 5 && 
+          streetName.length <= 120 && 
+          hasNumber && 
+          isNotJustKeywords && 
+          isNotPropertyFeature && 
+          isNotPrice) {
+        cleanedData.streetName = streetName;
+      } else {
+        console.warn('❌ Invalid street name - failed validation:', {
+          streetName: streetName,
+          length: streetName.length,
+          hasNumber: !!hasNumber,
+          isNotJustKeywords: isNotJustKeywords,
+          isNotPropertyFeature: isNotPropertyFeature,
+          isNotPrice: isNotPrice
+        });
         delete cleanedData.streetName;
       }
     }
