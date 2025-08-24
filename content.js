@@ -4,8 +4,9 @@ console.log('ChatGPT Helper Extension loaded on:', window.location.href);
 // Function to check if extension context is still valid
 function isExtensionContextValid() {
   try {
-    return chrome.runtime && chrome.runtime.id;
+    return !!(chrome && chrome.runtime && chrome.runtime.id);
   } catch (err) {
+    console.warn('Extension context validation failed:', err);
     return false;
   }
 }
@@ -14,15 +15,17 @@ function isExtensionContextValid() {
 function safeChromeFall(apiCall, fallbackValue = null) {
   try {
     if (!isExtensionContextValid()) {
-      console.log('⚠️ Extension context invalidated, skipping chrome API call');
+      console.warn('⚠️ Extension context invalidated, skipping chrome API call');
       return Promise.resolve(fallbackValue);
     }
     return apiCall();
   } catch (err) {
-    if (err.message && err.message.includes('Extension context invalidated')) {
-      console.log('⚠️ Extension context invalidated during API call');
+    if (err && (err.message && err.message.includes('Extension context invalidated') || 
+               err.message && err.message.includes('Unexpected token'))) {
+      console.warn('⚠️ Extension context invalidated during API call:', err.message);
       return Promise.resolve(fallbackValue);
     }
+    console.error('Chrome API call failed:', err);
     throw err;
   }
 }
@@ -33,10 +36,401 @@ let currentPropertyAnalysis = null;
 // Track processed messages per property URL to prevent cross-contamination
 let processedMessagesPerProperty = new Map();
 
+// Prompt splitting state management
+let promptSplittingState = {
+  enabled: true,
+  lengthThreshold: 500, // characters
+  confirmationTimeout: 15000, // 15 seconds
+  currentPhase: null, // 'instructions', 'waiting_confirmation', 'sending_link', 'complete'
+  pendingPropertyLink: null,
+  confirmationStartTime: null,
+  fallbackAttempted: false
+};
+
 // Check if we're on ChatGPT
 function isChatGPTSite() {
   return window.location.hostname === 'chatgpt.com' || 
          window.location.hostname === 'chat.openai.com';
+}
+
+// Prompt splitting utility functions
+function shouldSplitPrompt(prompt) {
+  return promptSplittingState.enabled && 
+         prompt.length > promptSplittingState.lengthThreshold;
+}
+
+function splitPromptContent(promptTemplate, propertyLink) {
+  // Split the prompt into instructions and link parts
+  const instructionsPart = promptTemplate.replace('{PROPERTY_URL}', '[PROPERTY_LINK_PLACEHOLDER]')
+                                        .replace('{DATE}', new Date().toLocaleDateString())
+                                        .replace('Property Link: [PROPERTY_LINK_PLACEHOLDER]', '')
+                                        .trim();
+  
+  const confirmationRequest = '\n\nSay "Yes, I understand" if you understand these instructions and are ready to analyze a property listing.';
+  
+  return {
+    instructions: instructionsPart + confirmationRequest,
+    linkMessage: `Please analyze this property listing: ${propertyLink}`
+  };
+}
+
+function detectConfirmation(responseText) {
+  if (!responseText || typeof responseText !== 'string') return false;
+  
+  const confirmationPatterns = [
+    /yes,?\s*i\s*understand/i,
+    /yes\s*i\s*understand/i,
+    /i\s*understand/i,
+    /understood/i,
+    /ready\s*to\s*analyze/i,
+    /ready/i,
+    /yes/i
+  ];
+  
+  return confirmationPatterns.some(pattern => pattern.test(responseText.trim()));
+}
+
+function resetPromptSplittingState() {
+  promptSplittingState.currentPhase = null;
+  promptSplittingState.pendingPropertyLink = null;
+  promptSplittingState.confirmationStartTime = null;
+  promptSplittingState.fallbackAttempted = false;
+  removePromptSplittingIndicator();
+}
+
+// Visual indicator functions for prompt splitting status
+function showPromptSplittingIndicator(phase, message) {
+  removePromptSplittingIndicator();
+  
+  const indicator = document.createElement('div');
+  indicator.id = 'prompt-splitting-indicator';
+  indicator.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="spinner" style="width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top: 2px solid #10a37f; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <span>${message}</span>
+    </div>
+  `;
+  indicator.style.cssText = `
+    position: fixed;
+    top: 60px;
+    right: 10px;
+    background: #ffffff;
+    color: #2d3748;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: system-ui, -apple-system, sans-serif;
+    z-index: 10001;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #e2e8f0;
+    max-width: 250px;
+  `;
+  
+  // Add spinner animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  document.body.appendChild(indicator);
+  
+  console.log(`🔄 Showing prompt splitting indicator: ${phase} - ${message}`);
+}
+
+function removePromptSplittingIndicator() {
+  const indicator = document.getElementById('prompt-splitting-indicator');
+  if (indicator) {
+    indicator.remove();
+  }
+}
+
+// Handler for when confirmation is received
+async function handleConfirmationReceived() {
+  console.log('🔗 Checking pending property link:', promptSplittingState.pendingPropertyLink);
+  console.log('🔗 Prompt splitting state:', promptSplittingState);
+  
+  if (!promptSplittingState.pendingPropertyLink) {
+    console.error('❌ No pending property link to send');
+    console.error('❌ Current prompt splitting state:', promptSplittingState);
+    return;
+  }
+  
+  try {
+    promptSplittingState.currentPhase = 'sending_link';
+    console.log('📤 Sending property link:', promptSplittingState.pendingPropertyLink);
+    
+    // Show status indicator
+    showPromptSplittingIndicator('sending_link', 'Sending property link...');
+    
+    // Track successful split
+    await updatePromptSplittingStats('success');
+    
+    // Wait a moment for UI to be ready
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const inputField = await waitForInputField(5000);
+    if (!inputField) {
+      throw new Error('Could not find input field for sending link');
+    }
+    
+    const propertyLink = promptSplittingState.pendingPropertyLink;
+    console.log('🔗 About to create link message with:', propertyLink);
+    
+    if (!propertyLink || propertyLink === 'null' || propertyLink === 'undefined') {
+      console.error('❌ Invalid property link detected:', propertyLink);
+      await handleSplittingFallback();
+      return;
+    }
+    
+    const linkMessage = `Please analyze this property listing: ${propertyLink}`;
+    
+    // Insert the link message
+    if (inputField.tagName === 'TEXTAREA') {
+      inputField.value = '';
+      inputField.focus();
+      inputField.value = linkMessage;
+      inputField.dispatchEvent(new Event('input', { bubbles: true }));
+      inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (inputField.contentEditable === 'true') {
+      inputField.textContent = '';
+      inputField.focus();
+      inputField.textContent = linkMessage;
+      inputField.dispatchEvent(new Event('input', { bubbles: true }));
+      inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    inputField.focus();
+    
+    // Auto-submit the link
+        setTimeout(() => {
+      submitMessage();
+      promptSplittingState.currentPhase = 'complete';
+      showPromptSplittingIndicator('complete', 'Analysis request sent successfully!');
+      
+      // Remove indicator after completion
+      setTimeout(() => {
+        removePromptSplittingIndicator();
+      }, 3000);
+    }, 500);
+    
+  } catch (error) {
+    console.error('❌ Error sending property link:', error);
+    await handleSplittingFallback();
+  }
+}
+
+// Handler for confirmation timeout
+async function handleConfirmationTimeout() {
+  if (promptSplittingState.fallbackAttempted) {
+    console.log('❌ Fallback already attempted, giving up');
+    resetPromptSplittingState();
+    return;
+  }
+  
+  console.log('⏰ Confirmation timeout - attempting fallback to single prompt');
+  await handleSplittingFallback();
+}
+
+// Fallback to single prompt approach
+async function handleSplittingFallback() {
+  if (!promptSplittingState.pendingPropertyLink) {
+    console.error('❌ No pending property link for fallback');
+    resetPromptSplittingState();
+    return;
+  }
+  
+  try {
+    promptSplittingState.fallbackAttempted = true;
+    console.log('🔄 Falling back to single prompt approach');
+    
+    // Show fallback status
+    showPromptSplittingIndicator('fallback', 'Using fallback approach...');
+    
+    // Track fallback usage
+    await updatePromptSplittingStats('fallback');
+    
+    // Clear the current conversation and start fresh with full prompt
+    const inputField = await waitForInputField(5000);
+    if (!inputField) {
+      throw new Error('Could not find input field for fallback');
+    }
+    
+    // Get the original prompt template
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['customPrompt']),
+      { customPrompt: null }
+    );
+    const promptTemplate = result.customPrompt || getDefaultPromptTemplate();
+    
+    // Create the full prompt with link
+    const fullPrompt = promptTemplate
+      .replace('{PROPERTY_URL}', promptSplittingState.pendingPropertyLink)
+      .replace('{DATE}', new Date().toLocaleDateString());
+    
+    // Insert the full prompt
+    if (inputField.tagName === 'TEXTAREA') {
+      inputField.value = '';
+      inputField.focus();
+      inputField.value = fullPrompt;
+      inputField.dispatchEvent(new Event('input', { bubbles: true }));
+      inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (inputField.contentEditable === 'true') {
+      inputField.textContent = '';
+      inputField.focus();
+      inputField.textContent = fullPrompt;
+      inputField.dispatchEvent(new Event('input', { bubbles: true }));
+      inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    inputField.focus();
+    
+    // Auto-submit the fallback prompt
+    setTimeout(() => {
+      submitMessage();
+      resetPromptSplittingState();
+    }, 1000);
+    
+  } catch (error) {
+    console.error('❌ Error in splitting fallback:', error);
+    resetPromptSplittingState();
+    throw error;
+  }
+}
+
+// Helper function to get default prompt template
+function getDefaultPromptTemplate() {
+  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+**REQUIRED DATA EXTRACTION:**
+1. **Price**: Exact asking price (include currency symbol)
+2. **Bedrooms**: Number of bedrooms (numeric)
+3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
+4. **Square Footage**: Total square footage (numeric)
+5. **Year Built**: Construction year (4-digit year)
+6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
+7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
+8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections:
+
+**PROPERTY DETAILS:**
+- List all the required data points above in a clear format
+- Include any additional relevant specifications (lot size, parking, etc.)
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Provide your location score (X/10) with detailed justification
+- Analyze proximity to schools, shopping, transportation, employment centers
+- Assess neighborhood safety, walkability, and future development plans
+- Comment on property taxes, HOA fees, and local regulations
+
+**RENTAL INCOME ANALYSIS:**
+- Provide your estimated monthly rental income with reasoning
+- Compare to local rental comps if possible
+- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
+  * Population growth trends
+  * Economic development in the area
+  * New construction and inventory levels
+  * Employment opportunities and job market
+  * Infrastructure improvements planned
+
+**INVESTMENT SUMMARY:**
+- Overall investment grade and reasoning
+- Top 3 advantages (pros)
+- Top 3 concerns or limitations (cons)
+- Any red flags or warning signs
+- Price comparison to market value
+- Recommendation for this property as a rental investment
+
+**FORMAT REQUIREMENTS:**
+- Use clear headings and bullet points
+- Include specific numbers and percentages where possible
+- Provide location score in X/10 format
+- Categorize rental growth potential clearly
+- Be concise but thorough in your analysis
+
+Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+
+Property Link: {PROPERTY_URL}`;
+}
+
+// Performance tracking functions for prompt splitting
+async function updatePromptSplittingStats(type) {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['promptSplittingSettings']),
+      { promptSplittingSettings: null }
+    );
+    
+    const settings = result.promptSplittingSettings || {
+      enabled: true,
+      lengthThreshold: 500,
+      confirmationTimeout: 15000,
+      stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
+    };
+    
+    // Update stats based on type
+    switch (type) {
+      case 'attempt':
+        settings.stats.totalAttempts++;
+        console.log('📊 Tracked prompt splitting attempt');
+        break;
+      case 'success':
+        settings.stats.successfulSplits++;
+        console.log('📊 Tracked successful prompt split');
+        break;
+      case 'fallback':
+        settings.stats.fallbacksUsed++;
+        console.log('📊 Tracked fallback usage');
+        break;
+    }
+    
+    // Save updated stats
+    await safeChromeFall(
+      () => chrome.storage.local.set({ promptSplittingSettings: settings }),
+      null
+    );
+    
+  } catch (error) {
+    console.warn('Failed to update prompt splitting stats:', error);
+  }
+}
+
+async function loadPromptSplittingSettings() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['promptSplittingSettings']),
+      { promptSplittingSettings: null }
+    );
+    
+    const settings = result.promptSplittingSettings || {
+      enabled: true,
+      lengthThreshold: 500,
+      confirmationTimeout: 15000,
+      stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
+    };
+    
+    // Update global state
+    promptSplittingState.enabled = settings.enabled;
+    promptSplittingState.lengthThreshold = settings.lengthThreshold;
+    promptSplittingState.confirmationTimeout = settings.confirmationTimeout;
+    
+    console.log('✅ Loaded prompt splitting settings:', {
+      enabled: settings.enabled,
+      threshold: settings.lengthThreshold,
+      timeout: settings.confirmationTimeout,
+      stats: settings.stats
+    });
+    
+    return settings;
+  } catch (error) {
+    console.warn('Failed to load prompt splitting settings:', error);
+    return null;
+  }
 }
 
 // Function to extract key information from ChatGPT response
@@ -303,34 +697,42 @@ function extractPropertyAnalysisData(responseText) {
   
   // Function to extract data from RENTAL INCOME ANALYSIS section
   function extractFromRentalAnalysis(text, analysis) {
-    // Extract estimated monthly rental income
-    const rentalIncomeMatch = text.match(/\$?([\d,]+)\s*(?:per\s+month|monthly|\/month)/gi);
-    if (rentalIncomeMatch && rentalIncomeMatch[0]) {
-      const match = rentalIncomeMatch[0].match(/\$?([\d,]+)/);
-      if (match) {
-        analysis.extractedData.estimatedRentalIncome = match[1].replace(/,/g, '');
-        console.log(`✅ Extracted estimated rental income:`, analysis.extractedData.estimatedRentalIncome);
-      }
-    }
-    
-    // Extract rental growth potential with Excel-friendly format
-    const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
-    if (growthMatch && growthMatch[0]) {
-      // Check if it already has "Growth:" prefix
-      if (growthMatch[0].toLowerCase().includes('growth:')) {
-        analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
-      } else {
-        const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+    try {
+      // Extract estimated monthly rental income
+      const rentalIncomeMatch = text.match(/\$?([\d,]+)\s*(?:per\s+month|monthly|\/month)/gi);
+      if (rentalIncomeMatch && rentalIncomeMatch[0]) {
+        const match = rentalIncomeMatch[0].match(/\$?([\d,]+)/);
         if (match) {
-          analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+          analysis.extractedData.estimatedRentalIncome = match[1].replace(/,/g, '');
+          console.log(`✅ Extracted estimated rental income:`, analysis.extractedData.estimatedRentalIncome);
         }
       }
-      console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
+    } catch (error) {
+      console.warn('Error in rental income extraction:', error.message);
     }
     
-    // Store the full rental analysis
-    analysis.extractedData.rentalAnalysis = text.substring(0, 1000);
-    console.log(`✅ Stored rental analysis (${text.length} chars)`);
+    try {
+      // Extract rental growth potential with Excel-friendly format
+      const growthMatch = text.match(/(?:rental\s+growth\s+potential|growth\s+potential)[:\s]*(?:"?Growth:\s*)?(high|strong|moderate|low|limited)(?:"?)/gi);
+      if (growthMatch && growthMatch[0]) {
+        // Check if it already has "Growth:" prefix
+        if (growthMatch[0].toLowerCase().includes('growth:')) {
+          analysis.extractedData.rentalGrowthPotential = growthMatch[0].replace(/.*growth:\s*/gi, 'Growth: ').replace(/[""]/g, '');
+        } else {
+          const match = growthMatch[0].match(/(high|strong|moderate|low|limited)/gi);
+          if (match) {
+            analysis.extractedData.rentalGrowthPotential = `Growth: ${match[0].charAt(0).toUpperCase() + match[0].slice(1)}`;
+          }
+        }
+        console.log(`✅ Extracted rental growth potential:`, analysis.extractedData.rentalGrowthPotential);
+      }
+      
+      // Store the full rental analysis
+      analysis.extractedData.rentalAnalysis = text.substring(0, 1000);
+      console.log(`✅ Stored rental analysis (${text.length} chars)`);
+    } catch (error) {
+      console.warn('Error in rental growth potential extraction:', error.message);
+    }
   }
   
   // Function to extract data from INVESTMENT SUMMARY section
@@ -581,6 +983,24 @@ function setupResponseMonitor() {
       completionTimers.delete(currentUrl);
     }
     
+    // Check if we're waiting for confirmation in prompt splitting mode
+    if (promptSplittingState.currentPhase === 'waiting_confirmation') {
+      console.log('🔍 Checking for confirmation in response...');
+      if (detectConfirmation(messageText)) {
+        console.log('✅ Confirmation detected! Proceeding to send property link...');
+        handleConfirmationReceived();
+        return;
+      } else {
+        console.log('❌ No confirmation detected, checking timeout...');
+        const timeElapsed = Date.now() - promptSplittingState.confirmationStartTime;
+        if (timeElapsed > promptSplittingState.confirmationTimeout) {
+          console.log('⏰ Confirmation timeout, falling back to single prompt...');
+          handleConfirmationTimeout();
+          return;
+        }
+      }
+    }
+    
     // Process the analysis data
     const propertyKeywords = [
       'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
@@ -657,7 +1077,7 @@ function setupResponseMonitor() {
         console.log('⚠️ No extractable data found in completed response');
         console.log('📝 Response preview:', messageText.substring(0, 500) + '...');
       }
-    } else {
+        } else {
       console.log('⚠️ Insufficient property keywords in completed response');
     }
     
@@ -966,6 +1386,8 @@ function waitForInputField(maxWait = 10000) {
 // Function to insert text into ChatGPT input
 async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
+  console.log('🔍 Property link type:', typeof propertyLink);
+  console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
@@ -996,67 +1418,68 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       () => chrome.storage.local.get(['customPrompt']),
       { customPrompt: null }
     );
-    const promptTemplate = result.customPrompt || `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+    const promptTemplate = result.customPrompt || getDefaultPromptTemplate();
 
-**REQUIRED DATA EXTRACTION:**
-1. **Price**: Exact asking price (include currency symbol)
-2. **Bedrooms**: Number of bedrooms (numeric)
-3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
-4. **Square Footage**: Total square footage (numeric)
-5. **Year Built**: Construction year (4-digit year)
-6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
-7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
-8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
-
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections:
-
-**PROPERTY DETAILS:**
-- List all the required data points above in a clear format
-- Include any additional relevant specifications (lot size, parking, etc.)
-
-**LOCATION & NEIGHBORHOOD ANALYSIS:**
-- Provide your location score (X/10) with detailed justification
-- Analyze proximity to schools, shopping, transportation, employment centers
-- Assess neighborhood safety, walkability, and future development plans
-- Comment on property taxes, HOA fees, and local regulations
-
-**RENTAL INCOME ANALYSIS:**
-- Provide your estimated monthly rental income with reasoning
-- Compare to local rental comps if possible
-- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
-  * Population growth trends
-  * Economic development in the area
-  * New construction and inventory levels
-  * Employment opportunities and job market
-  * Infrastructure improvements planned
-
-**INVESTMENT SUMMARY:**
-- Overall investment grade and reasoning
-- Top 3 advantages (pros)
-- Top 3 concerns or limitations (cons)
-- Any red flags or warning signs
-- Price comparison to market value
-- Recommendation for this property as a rental investment
-
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Provide location score in X/10 format
-- Categorize rental growth potential clearly
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
-
-Property Link: {PROPERTY_URL}`;
-
-    // Replace variables in the prompt
-    const prompt = promptTemplate
+    // Check if we should use prompt splitting
+    const fullPrompt = promptTemplate
       .replace('{PROPERTY_URL}', propertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
-    
-    console.log('Inserting prompt into input field:', inputField);
+      
+    if (shouldSplitPrompt(fullPrompt)) {
+      console.log('📝 Using prompt splitting approach for better link processing');
+      
+      // Track attempt
+      await updatePromptSplittingStats('attempt');
+      
+      // Reset any existing state
+      resetPromptSplittingState();
+      
+      // Split the prompt
+      const splitPrompt = splitPromptContent(promptTemplate, propertyLink);
+      
+      // Set up state for the splitting process
+      promptSplittingState.currentPhase = 'instructions';
+      promptSplittingState.pendingPropertyLink = propertyLink;
+      
+      console.log('📤 Sending instructions first...');
+      console.log('📝 Instructions length:', splitPrompt.instructions.length);
+      console.log('🔗 Pending property link:', promptSplittingState.pendingPropertyLink);
+      
+      // Insert instructions first
+      if (inputField.tagName === 'TEXTAREA') {
+        inputField.value = '';
+        inputField.focus();
+        inputField.value = splitPrompt.instructions;
+        inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (inputField.contentEditable === 'true') {
+        inputField.textContent = '';
+        inputField.focus();
+        inputField.textContent = splitPrompt.instructions;
+        inputField.dispatchEvent(new Event('input', { bubbles: true }));
+        inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      inputField.focus();
+      
+      // Submit instructions and wait for confirmation
+      promptSplittingState.currentPhase = 'waiting_confirmation';
+      promptSplittingState.confirmationStartTime = Date.now();
+      
+      console.log('⏰ Starting confirmation timer...');
+      showPromptSplittingIndicator('waiting_confirmation', 'Waiting for ChatGPT confirmation...');
+      
+      setTimeout(() => {
+        submitMessage();
+      }, 500);
+      
+      return true;
+    } else {
+      console.log('📝 Using single prompt approach (below threshold)');
+      
+      // Use the original single prompt approach
+      const prompt = fullPrompt;
+      console.log('Inserting prompt into input field:', inputField);
     
     // Clear existing content first
     if (inputField.tagName === 'TEXTAREA') {
@@ -1082,14 +1505,16 @@ Property Link: {PROPERTY_URL}`;
       inputField.dispatchEvent(new CompositionEvent('compositionend'));
     }
     
-    // Ensure the field has focus
-    inputField.focus();
-    
-    console.log('Prompt inserted successfully');
-    return true;
+      // Ensure the field has focus
+      inputField.focus();
+      
+      console.log('Prompt inserted successfully');
+      return true;
+    }
     
   } catch (error) {
     console.error('Failed to insert prompt:', error);
+    resetPromptSplittingState(); // Clean up state on error
     return false;
   }
 }
@@ -1140,12 +1565,27 @@ function submitMessage() {
   }, 1000);
 }
 
+// Global error handler for uncaught syntax errors
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message && event.error.message.includes('Unexpected token')) {
+    console.warn('ChatGPT Helper: Caught syntax error (likely extension context invalidation):', event.error.message);
+    event.preventDefault(); // Prevent the error from propagating
+    return true;
+  }
+});
+
 // Initialize extension only on ChatGPT
 if (isChatGPTSite()) {
-  console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
-  
-  // Add a visual indicator that the extension is active
-  function addExtensionIndicator() {
+  try {
+    console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
+    
+    // Load prompt splitting settings asynchronously
+    loadPromptSplittingSettings().catch(error => {
+      console.warn('Failed to load prompt splitting settings:', error);
+    });
+    
+    // Add a visual indicator that the extension is active
+    function addExtensionIndicator() {
     // Check if indicator already exists
     if (document.getElementById('chatgpt-helper-indicator')) {
       return;
@@ -1209,6 +1649,9 @@ if (isChatGPTSite()) {
       
     } else if (request.action === 'analyzeProperty') {
       console.log('Received property analysis request:', request.link);
+      console.log('🔍 Request object:', request);
+      console.log('🔍 Link type:', typeof request.link);
+      console.log('🔍 Link value:', request.link);
       
       // Handle async operation properly
       (async () => {
@@ -1231,6 +1674,24 @@ if (isChatGPTSite()) {
       
       // Return true to indicate we'll send response asynchronously
       return true;
+      
+    } else if (request.action === 'updatePromptSplittingSettings') {
+      console.log('Received prompt splitting settings update:', request.settings);
+      
+      // Update local settings
+      if (request.settings) {
+        promptSplittingState.enabled = request.settings.enabled;
+        promptSplittingState.lengthThreshold = request.settings.lengthThreshold;
+        promptSplittingState.confirmationTimeout = request.settings.confirmationTimeout;
+        
+        console.log('✅ Updated prompt splitting settings:', {
+          enabled: promptSplittingState.enabled,
+          threshold: promptSplittingState.lengthThreshold,
+          timeout: promptSplittingState.confirmationTimeout
+        });
+      }
+      
+      sendResponse({ success: true });
     }
   });
   
@@ -1243,6 +1704,12 @@ if (isChatGPTSite()) {
     }
   });
   
+  } catch (initError) {
+    console.error('ChatGPT Helper Extension initialization failed:', initError);
+    if (initError.message && initError.message.includes('Unexpected token')) {
+      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
+    }
+  }
 } else {
   console.log('❌ ChatGPT Helper Extension is not active on this site');
 }

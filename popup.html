@@ -664,6 +664,88 @@
               </div>
             </div>
             
+            <!-- Prompt Splitting Settings -->
+            <div class="collapsible" style="margin-bottom: var(--space-md);">
+              <button class="collapsible-header" id="togglePromptSplittingBtn">
+                <span>🔀 Prompt Splitting</span>
+                <span class="collapsible-icon">▼</span>
+              </button>
+              
+              <div class="collapsible-content hidden" id="promptSplittingContent">
+                <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
+                  Improve link processing by splitting long prompts into instructions and property link phases.
+                </p>
+                
+                <div class="form-group">
+                  <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                    <input type="checkbox" id="enablePromptSplitting" checked>
+                    Enable Prompt Splitting
+                  </label>
+                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                    Automatically split prompts longer than the threshold for better link fetching
+                  </small>
+                </div>
+                
+                <div class="form-group">
+                  <label for="promptLengthThreshold" class="form-label">
+                    Length Threshold: <span id="thresholdValue">500</span> characters
+                  </label>
+                  <input 
+                    type="range" 
+                    id="promptLengthThreshold" 
+                    min="200" 
+                    max="2000" 
+                    value="500" 
+                    step="50"
+                    style="width: 100%;"
+                  >
+                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                    Prompts longer than this will be split into two phases
+                  </small>
+                </div>
+                
+                <div class="form-group">
+                  <label for="confirmationTimeout" class="form-label">
+                    Confirmation Timeout: <span id="timeoutValue">15</span> seconds
+                  </label>
+                  <input 
+                    type="range" 
+                    id="confirmationTimeout" 
+                    min="5" 
+                    max="60" 
+                    value="15" 
+                    step="5"
+                    style="width: 100%;"
+                  >
+                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                    How long to wait for ChatGPT's confirmation before falling back
+                  </small>
+                </div>
+                
+                <div class="info-grid" style="margin: var(--space-md) 0;">
+                  <div class="info-item">
+                    <div class="info-label">Success Rate</div>
+                    <div class="info-value" id="splittingSuccessRate">No data yet</div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Total Attempts</div>
+                    <div class="info-value" id="splittingAttempts">0</div>
+                  </div>
+                </div>
+                
+                <div class="btn-group">
+                  <button id="resetSplittingStatsBtn" class="btn btn-ghost btn-sm">
+                    📊 Reset Stats
+                  </button>
+                  <button id="saveSplittingSettingsBtn" class="btn btn-primary btn-sm">
+                    💾 Save Settings
+                  </button>
+                </div>
+                
+                <div id="splittingMessage" class="message"></div>
+              </div>
+            </div>
+            
             <!-- Column Configuration -->
             <div class="collapsible">
               <button class="collapsible-header" id="toggleColumnsBtn">
