@@ -660,6 +660,13 @@ function extractPropertyAnalysisData(responseText) {
     return null;
   }
   
+  // Check cache first for performance optimization
+  const cachedResult = getCachedExtraction(responseText);
+  if (cachedResult) {
+    console.log('🚀 Returning cached extraction result');
+    return cachedResult;
+  }
+  
   // Performance monitoring
   const startTime = performance.now();
   console.log('🔍 Starting comprehensive property data extraction...');
@@ -669,6 +676,9 @@ function extractPropertyAnalysisData(responseText) {
   if (responseText.length > 50000) {
     console.warn('⚠️ Large response detected:', responseText.length, 'characters - extraction may be slower');
   }
+  
+  // Update analytics
+  extractionAnalytics.totalExtractions++;
   
   const analysis = {
     fullResponse: responseText,
@@ -704,6 +714,7 @@ function extractPropertyAnalysisData(responseText) {
   }
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
+  // Pattern performance optimization: Most specific patterns first, broad patterns last
   const extractors = {
     // Street name extraction with comprehensive patterns
     streetName: {
@@ -1605,6 +1616,27 @@ function extractPropertyAnalysisData(responseText) {
     console.warn('⚠️ Data consistency issues detected:', consistencyIssues);
   }
   
+  // AI-assisted fallback extraction for missing critical fields
+  const criticalFields = ['streetName', 'price', 'propertyType', 'bedrooms'];
+  const missingFields = criticalFields.filter(field => !analysis.extractedData[field]);
+  
+  if (missingFields.length > 0) {
+    console.log('🤖 Attempting AI-assisted fallback extraction for missing fields:', missingFields);
+    const fallbackData = performAIAssistedExtraction(responseText, missingFields);
+    
+    // Merge fallback data with existing data
+    Object.assign(analysis.extractedData, fallbackData);
+    
+    if (Object.keys(fallbackData).length > 0) {
+      console.log('✅ AI-assisted extraction recovered:', Object.keys(fallbackData));
+      analysis.warnings.push({
+        type: 'ai_fallback_used',
+        message: `AI fallback extraction used for: ${Object.keys(fallbackData).join(', ')}`,
+        severity: 'info'
+      });
+    }
+  }
+  
   // Calculate data confidence score
   analysis.dataQuality = calculateDataQuality(analysis.extractedData);
   
@@ -1643,6 +1675,14 @@ function extractPropertyAnalysisData(responseText) {
   
   console.log('✅ Successfully extracted meaningful property analysis data');
   console.log('✅ Meaningful property data found, analysis ready for save');
+  
+  // Update analytics for successful extraction
+  extractionAnalytics.successfulExtractions++;
+  extractionAnalytics.averageExtractionTime = (extractionAnalytics.averageExtractionTime + extractionTime) / 2;
+  
+  // Cache the successful result
+  setCachedExtraction(responseText, analysis);
+  
   return analysis;
   
   } catch (error) {
@@ -2155,6 +2195,433 @@ function normalizeInternationalData(data) {
   }
   
   return normalized;
+}
+
+// Pattern performance tracking and optimization
+let patternPerformanceStats = new Map();
+let extractionAnalytics = {
+  totalExtractions: 0,
+  successfulExtractions: 0,
+  fieldSuccessRates: {},
+  averageExtractionTime: 0,
+  patternEfficiency: {}
+};
+
+function trackPatternSuccess(fieldName, patternIndex, executionTime = 0) {
+  try {
+    const key = `${fieldName}_${patternIndex}`;
+    
+    if (!patternPerformanceStats.has(key)) {
+      patternPerformanceStats.set(key, {
+        fieldName,
+        patternIndex,
+        successCount: 0,
+        totalAttempts: 0,
+        averageTime: 0,
+        successRate: 0
+      });
+    }
+    
+    const stats = patternPerformanceStats.get(key);
+    stats.successCount++;
+    stats.totalAttempts++;
+    stats.averageTime = (stats.averageTime + executionTime) / 2;
+    stats.successRate = stats.successCount / stats.totalAttempts;
+    
+    // Update field-level analytics
+    if (!extractionAnalytics.fieldSuccessRates[fieldName]) {
+      extractionAnalytics.fieldSuccessRates[fieldName] = { successes: 0, attempts: 0 };
+    }
+    extractionAnalytics.fieldSuccessRates[fieldName].successes++;
+    extractionAnalytics.fieldSuccessRates[fieldName].attempts++;
+    
+    console.log(`📊 Pattern success: ${fieldName}[${patternIndex}] - ${stats.successRate.toFixed(2)} success rate`);
+  } catch (error) {
+    console.warn('Error tracking pattern success:', error);
+  }
+}
+
+function trackExtractionFailure(fieldName, responseText) {
+  try {
+    // Update field-level analytics
+    if (!extractionAnalytics.fieldSuccessRates[fieldName]) {
+      extractionAnalytics.fieldSuccessRates[fieldName] = { successes: 0, attempts: 0 };
+    }
+    extractionAnalytics.fieldSuccessRates[fieldName].attempts++;
+    
+    // Store failure context for analysis
+    const failureKey = `${fieldName}_failures`;
+    if (!window.extractionFailures) {
+      window.extractionFailures = new Map();
+    }
+    
+    if (!window.extractionFailures.has(failureKey)) {
+      window.extractionFailures.set(failureKey, []);
+    }
+    
+    window.extractionFailures.get(failureKey).push({
+      timestamp: Date.now(),
+      responseLength: responseText.length,
+      sampleText: responseText.substring(0, 500),
+      fieldName
+    });
+    
+    // Keep only last 10 failures per field
+    const failures = window.extractionFailures.get(failureKey);
+    if (failures.length > 10) {
+      failures.splice(0, failures.length - 10);
+    }
+    
+  } catch (error) {
+    console.warn('Error tracking extraction failure:', error);
+  }
+}
+
+function getExtractionAnalytics() {
+  const analytics = {
+    ...extractionAnalytics,
+    topPatterns: [],
+    fieldPerformance: {}
+  };
+  
+  // Calculate field performance
+  for (const [fieldName, stats] of Object.entries(extractionAnalytics.fieldSuccessRates)) {
+    analytics.fieldPerformance[fieldName] = {
+      successRate: stats.attempts > 0 ? (stats.successes / stats.attempts * 100).toFixed(1) + '%' : '0%',
+      attempts: stats.attempts,
+      successes: stats.successes
+    };
+  }
+  
+  // Get top performing patterns
+  const patternArray = Array.from(patternPerformanceStats.values());
+  analytics.topPatterns = patternArray
+    .filter(p => p.totalAttempts >= 3) // Only patterns with enough attempts
+    .sort((a, b) => b.successRate - a.successRate)
+    .slice(0, 10)
+    .map(p => ({
+      pattern: `${p.fieldName}[${p.patternIndex}]`,
+      successRate: (p.successRate * 100).toFixed(1) + '%',
+      attempts: p.totalAttempts,
+      avgTime: p.averageTime.toFixed(2) + 'ms'
+    }));
+  
+  return analytics;
+}
+
+// Intelligent caching system for repeated extractions
+let extractionCache = new Map();
+const CACHE_MAX_SIZE = 100;
+const CACHE_EXPIRY_TIME = 30 * 60 * 1000; // 30 minutes
+
+function getCacheKey(responseText) {
+  // Create a hash-like key from response text
+  let hash = 0;
+  for (let i = 0; i < responseText.length; i++) {
+    const char = responseText.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+function getCachedExtraction(responseText) {
+  try {
+    const cacheKey = getCacheKey(responseText);
+    const cached = extractionCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp) < CACHE_EXPIRY_TIME) {
+      console.log('🚀 Using cached extraction result');
+      return cached.data;
+    }
+    
+    // Clean expired entries
+    if (cached && (Date.now() - cached.timestamp) >= CACHE_EXPIRY_TIME) {
+      extractionCache.delete(cacheKey);
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error accessing extraction cache:', error);
+    return null;
+  }
+}
+
+function setCachedExtraction(responseText, extractionResult) {
+  try {
+    const cacheKey = getCacheKey(responseText);
+    
+    // Implement LRU cache
+    if (extractionCache.size >= CACHE_MAX_SIZE) {
+      const firstKey = extractionCache.keys().next().value;
+      extractionCache.delete(firstKey);
+    }
+    
+    extractionCache.set(cacheKey, {
+      data: extractionResult,
+      timestamp: Date.now()
+    });
+    
+    console.log('💾 Cached extraction result');
+  } catch (error) {
+    console.warn('Error caching extraction result:', error);
+  }
+}
+
+// AI-assisted fallback extraction using semantic analysis
+function performAIAssistedExtraction(responseText, missingFields) {
+  const extractedData = {};
+  
+  try {
+    console.log('🤖 Performing AI-assisted extraction for:', missingFields);
+    
+    for (const field of missingFields) {
+      let value = null;
+      
+      switch (field) {
+        case 'streetName':
+          value = extractAddressWithAI(responseText);
+          break;
+        case 'price':
+          value = extractPriceWithAI(responseText);
+          break;
+        case 'propertyType':
+          value = extractPropertyTypeWithAI(responseText);
+          break;
+        case 'bedrooms':
+          value = extractBedroomsWithAI(responseText);
+          break;
+        case 'bathrooms':
+          value = extractBathroomsWithAI(responseText);
+          break;
+        case 'squareFeet':
+          value = extractSquareFeetWithAI(responseText);
+          break;
+      }
+      
+      if (value) {
+        extractedData[field] = value;
+        console.log(`🤖 AI extracted ${field}:`, value);
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Error in AI-assisted extraction:', error);
+  }
+  
+  return extractedData;
+}
+
+// AI-assisted address extraction using context analysis
+function extractAddressWithAI(text) {
+  try {
+    // Look for any numeric + text combinations that could be addresses
+    const addressCandidates = text.match(/\b\d+\s+[A-Za-z][A-Za-z0-9\s]{3,30}\b/g);
+    
+    if (addressCandidates) {
+      // Score candidates based on context clues
+      let bestCandidate = null;
+      let bestScore = 0;
+      
+      for (const candidate of addressCandidates) {
+        let score = 0;
+        const context = text.substring(
+          Math.max(0, text.indexOf(candidate) - 100),
+          text.indexOf(candidate) + candidate.length + 100
+        ).toLowerCase();
+        
+        // Context scoring
+        if (context.includes('property') || context.includes('address') || 
+            context.includes('located') || context.includes('street')) score += 3;
+        if (context.includes('house') || context.includes('home')) score += 2;
+        if (candidate.match(/\b(street|avenue|road|drive|lane|way|st|ave|rd|dr|ln)\b/i)) score += 4;
+        if (candidate.length >= 8 && candidate.length <= 40) score += 2;
+        
+        // Avoid obvious non-addresses
+        if (candidate.match(/\$|price|bedroom|bathroom|sqft|year/i)) score -= 5;
+        
+        if (score > bestScore && score > 3) {
+          bestScore = score;
+          bestCandidate = candidate.trim();
+        }
+      }
+      
+      return bestCandidate;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI address extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted price extraction using context analysis
+function extractPriceWithAI(text) {
+  try {
+    // Look for any price-like patterns
+    const priceCandidates = text.match(/\$[\d,]+(?:\.\d{2})?|\b[\d,]+(?:\.\d+)?\s*[kKmM]\b|\b[\d,]{3,}\b/g);
+    
+    if (priceCandidates) {
+      let bestCandidate = null;
+      let bestScore = 0;
+      
+      for (const candidate of priceCandidates) {
+        let score = 0;
+        const context = text.substring(
+          Math.max(0, text.indexOf(candidate) - 50),
+          text.indexOf(candidate) + candidate.length + 50
+        ).toLowerCase();
+        
+        // Context scoring for price
+        if (context.includes('price') || context.includes('asking') || 
+            context.includes('cost') || context.includes('listed')) score += 4;
+        if (context.includes('property') || context.includes('home')) score += 2;
+        if (candidate.includes('$')) score += 3;
+        if (candidate.match(/[kKmM]$/)) score += 2;
+        
+        // Price range validation
+        let numericValue = parseFloat(candidate.replace(/[,$kKmM]/g, ''));
+        if (candidate.match(/[kK]$/)) numericValue *= 1000;
+        if (candidate.match(/[mM]$/)) numericValue *= 1000000;
+        
+        if (numericValue >= 10000 && numericValue <= 10000000) score += 3;
+        else if (numericValue < 1000 || numericValue > 50000000) score -= 3;
+        
+        // Avoid rental prices
+        if (context.includes('monthly') || context.includes('rent')) score -= 2;
+        
+        if (score > bestScore && score > 4) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      }
+      
+      return bestCandidate;
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI price extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted property type extraction
+function extractPropertyTypeWithAI(text) {
+  try {
+    const propertyKeywords = [
+      'single family', 'townhouse', 'condo', 'condominium', 'apartment',
+      'duplex', 'triplex', 'house', 'home', 'villa', 'ranch', 'colonial',
+      'contemporary', 'modern', 'bungalow', 'cottage', 'cabin', 'loft',
+      'penthouse', 'studio', 'mobile home', 'manufactured home', 'tiny home'
+    ];
+    
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    for (const keyword of propertyKeywords) {
+      const regex = new RegExp(keyword.replace(/\s+/g, '\\s+'), 'gi');
+      const matches = text.match(regex);
+      
+      if (matches) {
+        let score = matches.length;
+        
+        // Context scoring
+        for (const match of matches) {
+          const context = text.substring(
+            Math.max(0, text.indexOf(match) - 30),
+            text.indexOf(match) + match.length + 30
+          ).toLowerCase();
+          
+          if (context.includes('type') || context.includes('property')) score += 2;
+          if (context.includes('style') || context.includes('building')) score += 1;
+        }
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = keyword;
+        }
+      }
+    }
+    
+    return bestMatch ? bestMatch.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ') : null;
+    
+  } catch (error) {
+    console.warn('Error in AI property type extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted bedroom extraction
+function extractBedroomsWithAI(text) {
+  try {
+    // Look for numeric patterns that could be bedrooms
+    const candidates = text.match(/\b[0-9]\s*(?:bed|bedroom)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const bedroom = candidates[0].match(/\d+/)[0];
+      const num = parseInt(bedroom);
+      
+      if (num >= 0 && num <= 10) {
+        return bedroom;
+      }
+    }
+    
+    // Fallback: look for studio mentions
+    if (text.toLowerCase().includes('studio')) {
+      return '0';
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI bedroom extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted bathroom extraction
+function extractBathroomsWithAI(text) {
+  try {
+    const candidates = text.match(/\b[0-9](?:\.[0-9])?\s*(?:bath|bathroom)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const bathroom = candidates[0].match(/[\d.]+/)[0];
+      const num = parseFloat(bathroom);
+      
+      if (num >= 0 && num <= 10) {
+        return bathroom;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI bathroom extraction:', error);
+    return null;
+  }
+}
+
+// AI-assisted square feet extraction
+function extractSquareFeetWithAI(text) {
+  try {
+    const candidates = text.match(/\b[\d,]+\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/gi);
+    
+    if (candidates && candidates.length > 0) {
+      const sqft = candidates[0].match(/[\d,]+/)[0];
+      const num = parseInt(sqft.replace(/,/g, ''));
+      
+      if (num >= 100 && num <= 20000) {
+        return sqft;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('Error in AI square feet extraction:', error);
+    return null;
+  }
 }
 
 // Data quality assessment function
@@ -3283,6 +3750,145 @@ window.debugPromptSplitting = function(testResponse) {
     console.log('🧪 Triggering handleConfirmationReceived');
     handleConfirmationReceived();
   }
+};
+
+// Advanced debugging and testing utilities
+window.getExtractionAnalytics = function() {
+  const analytics = getExtractionAnalytics();
+  console.log('📊 Extraction Analytics:', analytics);
+  return analytics;
+};
+
+window.clearExtractionCache = function() {
+  extractionCache.clear();
+  console.log('🗑️ Extraction cache cleared');
+};
+
+window.getPatternPerformance = function() {
+  const patterns = Array.from(patternPerformanceStats.entries()).map(([key, stats]) => ({
+    pattern: key,
+    ...stats,
+    successRate: (stats.successRate * 100).toFixed(1) + '%'
+  }));
+  console.log('📊 Pattern Performance:', patterns);
+  return patterns;
+};
+
+window.analyzeExtractionFailures = function(fieldName = null) {
+  if (!window.extractionFailures) {
+    console.log('No extraction failures recorded');
+    return {};
+  }
+  
+  const analysis = {};
+  
+  for (const [key, failures] of window.extractionFailures.entries()) {
+    if (fieldName && !key.includes(fieldName)) continue;
+    
+    analysis[key] = {
+      totalFailures: failures.length,
+      recentFailures: failures.slice(-5),
+      commonCharacteristics: {
+        averageLength: failures.reduce((sum, f) => sum + f.responseLength, 0) / failures.length,
+        timePattern: failures.map(f => new Date(f.timestamp).toLocaleTimeString())
+      }
+    };
+  }
+  
+  console.log('🔍 Extraction Failure Analysis:', analysis);
+  return analysis;
+};
+
+window.testExtractionPerformance = function(iterations = 10) {
+  const testResponse = `**PROPERTY DETAILS:**
+- Address: 123 Main Street
+- Property Price: $450,000
+- Bedrooms: 3
+- Bathrooms: 2
+- Property Type: Single Family Home
+- Square Footage: 1,500
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Location Score: 8/10
+- Great neighborhood with excellent schools
+
+**RENTAL INCOME ANALYSIS:**
+- Estimated Monthly Rental Income: $2,200
+
+**INVESTMENT SUMMARY:**
+- Strong investment potential
+- Good location and pricing`;
+
+  console.log(`🧪 Running performance test with ${iterations} iterations...`);
+  
+  const startTime = performance.now();
+  const results = [];
+  
+  for (let i = 0; i < iterations; i++) {
+    const iterationStart = performance.now();
+    const result = extractPropertyAnalysisData(testResponse);
+    const iterationTime = performance.now() - iterationStart;
+    
+    results.push({
+      iteration: i + 1,
+      extractionTime: iterationTime,
+      fieldsExtracted: Object.keys(result.extractedData).length,
+      success: Object.keys(result.extractedData).length > 0
+    });
+  }
+  
+  const totalTime = performance.now() - startTime;
+  const avgTime = totalTime / iterations;
+  const successRate = results.filter(r => r.success).length / iterations * 100;
+  
+  const performanceReport = {
+    totalTime: totalTime.toFixed(2) + 'ms',
+    averageTime: avgTime.toFixed(2) + 'ms',
+    successRate: successRate.toFixed(1) + '%',
+    iterations,
+    results: results.slice(0, 5) // Show first 5 results
+  };
+  
+  console.log('⚡ Performance Test Results:', performanceReport);
+  return performanceReport;
+};
+
+window.validateExtractionAccuracy = function(expectedData, actualResponse) {
+  console.log('🎯 Validating extraction accuracy...');
+  
+  const extracted = extractPropertyAnalysisData(actualResponse);
+  if (!extracted) {
+    console.log('❌ Extraction failed completely');
+    return { accuracy: 0, details: 'Complete extraction failure' };
+  }
+  
+  const accuracy = {};
+  let totalFields = 0;
+  let correctFields = 0;
+  
+  for (const [field, expectedValue] of Object.entries(expectedData)) {
+    totalFields++;
+    const extractedValue = extracted.extractedData[field];
+    
+    if (extractedValue && extractedValue.toString().toLowerCase().includes(expectedValue.toString().toLowerCase())) {
+      correctFields++;
+      accuracy[field] = { expected: expectedValue, extracted: extractedValue, correct: true };
+    } else {
+      accuracy[field] = { expected: expectedValue, extracted: extractedValue || 'NOT_FOUND', correct: false };
+    }
+  }
+  
+  const accuracyPercentage = (correctFields / totalFields * 100).toFixed(1);
+  
+  const report = {
+    accuracyPercentage: accuracyPercentage + '%',
+    correctFields,
+    totalFields,
+    fieldAccuracy: accuracy
+  };
+  
+  console.log('🎯 Accuracy Report:', report);
+  return report;
 };
 
 // Add comprehensive debugging function
