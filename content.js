@@ -1013,31 +1013,31 @@ function extractPropertyAnalysisData(responseText) {
     
     switch (key) {
       case 'streetName':
-        const cleaned = value.trim().replace(/["""]/g, '');
-        const hasNumber = cleaned.match(/\d/);
-        const isNotJustKeywords = !cleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
-        const isNotPropertyFeature = !cleaned.match(/bedroom|bathroom|sqft|square|feet/i);
-        const isNotPrice = !cleaned.match(/^\$/);
-        const validLength = cleaned.length >= 5 && cleaned.length <= 120;
-        const isNotJustNumber = !cleaned.match(/^\d+$/);
+        const streetCleaned = value.trim().replace(/["""]/g, '');
+        const streetHasNumber = streetCleaned.match(/\d/);
+        const streetNotKeywords = !streetCleaned.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
+        const streetNotFeature = !streetCleaned.match(/bedroom|bathroom|sqft|square|feet/i);
+        const streetNotPrice = !streetCleaned.match(/^\$/);
+        const streetValidLength = streetCleaned.length >= 5 && streetCleaned.length <= 120;
+        const streetNotJustNumber = !streetCleaned.match(/^\d+$/);
         
-        const isValid = cleaned && validLength && isNotJustKeywords && hasNumber && isNotJustNumber && isNotPrice && isNotPropertyFeature;
+        const streetValid = streetCleaned && streetValidLength && streetNotKeywords && streetHasNumber && streetNotJustNumber && streetNotPrice && streetNotFeature;
         
-        if (!isValid) {
+        if (!streetValid) {
           console.log(`❌ Street name validation failed for "${value}":`, {
-            cleaned: cleaned,
-            validLength: validLength,
-            hasNumber: !!hasNumber,
-            isNotJustKeywords: isNotJustKeywords,
-            isNotPropertyFeature: isNotPropertyFeature,
-            isNotPrice: isNotPrice,
-            isNotJustNumber: isNotJustNumber
+            cleaned: streetCleaned,
+            validLength: streetValidLength,
+            hasNumber: !!streetHasNumber,
+            isNotJustKeywords: streetNotKeywords,
+            isNotPropertyFeature: streetNotFeature,
+            isNotPrice: streetNotPrice,
+            isNotJustNumber: streetNotJustNumber
           });
         } else {
-          console.log(`✅ Street name validation passed for "${cleaned}"`);
+          console.log(`✅ Street name validation passed for "${streetCleaned}"`);
         }
         
-        return isValid;
+        return streetValid;
                
       case 'bedrooms':
         const bedrooms = parseInt(value);
@@ -1066,9 +1066,9 @@ function extractPropertyAnalysisData(responseText) {
         }
         
         const price = parseFloat(priceStr);
-        const priceIsValid = !isNaN(price) && price >= 10000 && price <= 50000000;
+        const priceValid = !isNaN(price) && price >= 10000 && price <= 50000000;
         
-        if (!priceIsValid) {
+        if (!priceValid) {
           console.log(`❌ Price validation failed for "${value}":`, {
             original: value,
             cleaned: priceStr,
@@ -1080,7 +1080,7 @@ function extractPropertyAnalysisData(responseText) {
           console.log(`✅ Price validation passed for "${value}" → ${price}`);
         }
         
-        return priceIsValid;
+        return priceValid;
         
       case 'propertyType':
         return value && value.length > 2 && value.length < 100 && 
