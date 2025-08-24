@@ -117,7 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadPropertyHistory();
   await loadCustomPrompt();
   await loadColumnConfiguration();
+  await initializePromptSplittingSettings();
   await initializePopup();
+  
+  // Set up collapsibles and prompt splitting listeners
+  setupCollapsibles();
+  addPromptSplittingEventListeners();
   
   // Set up periodic refresh for pending analyses
   setInterval(async () => {
@@ -1820,5 +1825,193 @@ async function exportPropertyHistory() {
   } catch (error) {
     console.error('Error exporting property history:', error);
     showError('Failed to export property history');
+  }
+}
+
+// Prompt Splitting Settings Management
+async function initializePromptSplittingSettings() {
+  try {
+    // Load settings from storage
+    const settings = await new Promise((resolve) => {
+      chrome.storage.local.get(['promptSplittingSettings'], (result) => {
+        resolve(result.promptSplittingSettings || {
+          enabled: true,
+          lengthThreshold: 500,
+          confirmationTimeout: 15000,
+          stats: {
+            totalAttempts: 0,
+            successfulSplits: 0,
+            fallbacksUsed: 0
+          }
+        });
+      });
+    });
+    
+    // Update UI elements
+    const enableCheckbox = document.getElementById('enablePromptSplitting');
+    const thresholdSlider = document.getElementById('promptLengthThreshold');
+    const timeoutSlider = document.getElementById('confirmationTimeout');
+    const thresholdValue = document.getElementById('thresholdValue');
+    const timeoutValue = document.getElementById('timeoutValue');
+    const successRate = document.getElementById('splittingSuccessRate');
+    const attempts = document.getElementById('splittingAttempts');
+    
+    if (enableCheckbox) enableCheckbox.checked = settings.enabled;
+    if (thresholdSlider) thresholdSlider.value = settings.lengthThreshold;
+    if (timeoutSlider) timeoutSlider.value = settings.confirmationTimeout / 1000;
+    if (thresholdValue) thresholdValue.textContent = settings.lengthThreshold;
+    if (timeoutValue) timeoutValue.textContent = Math.round(settings.confirmationTimeout / 1000);
+    
+    // Update stats
+    if (settings.stats.totalAttempts > 0) {
+      const rate = Math.round((settings.stats.successfulSplits / settings.stats.totalAttempts) * 100);
+      if (successRate) successRate.textContent = `${rate}% (${settings.stats.successfulSplits}/${settings.stats.totalAttempts})`;
+    } else {
+      if (successRate) successRate.textContent = 'No data yet';
+    }
+    if (attempts) attempts.textContent = settings.stats.totalAttempts;
+    
+    // Add event listeners for sliders
+    if (thresholdSlider) {
+      thresholdSlider.addEventListener('input', (e) => {
+        if (thresholdValue) thresholdValue.textContent = e.target.value;
+      });
+    }
+    
+    if (timeoutSlider) {
+      timeoutSlider.addEventListener('input', (e) => {
+        if (timeoutValue) timeoutValue.textContent = e.target.value;
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error initializing prompt splitting settings:', error);
+  }
+}
+
+async function savePromptSplittingSettings() {
+  try {
+    const enableCheckbox = document.getElementById('enablePromptSplitting');
+    const thresholdSlider = document.getElementById('promptLengthThreshold');
+    const timeoutSlider = document.getElementById('confirmationTimeout');
+    
+    // Get current stats
+    const currentSettings = await new Promise((resolve) => {
+      chrome.storage.local.get(['promptSplittingSettings'], (result) => {
+        resolve(result.promptSplittingSettings || { stats: { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 } });
+      });
+    });
+    
+    const settings = {
+      enabled: enableCheckbox ? enableCheckbox.checked : true,
+      lengthThreshold: thresholdSlider ? parseInt(thresholdSlider.value) : 500,
+      confirmationTimeout: timeoutSlider ? parseInt(timeoutSlider.value) * 1000 : 15000,
+      stats: currentSettings.stats || { totalAttempts: 0, successfulSplits: 0, fallbacksUsed: 0 }
+    };
+    
+    // Save to storage
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ promptSplittingSettings: settings }, resolve);
+    });
+    
+    // Send settings to content script
+    try {
+      const tabs = await new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, resolve);
+      });
+      
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'updatePromptSplittingSettings',
+          settings: settings
+        });
+      }
+    } catch (err) {
+      console.log('Could not send settings to content script:', err);
+    }
+    
+    showPromptSplittingMessage('Settings saved successfully!', 'success');
+    
+  } catch (error) {
+    console.error('Error saving prompt splitting settings:', error);
+    showPromptSplittingMessage('Failed to save settings', 'error');
+  }
+}
+
+async function resetPromptSplittingStats() {
+  try {
+    const currentSettings = await new Promise((resolve) => {
+      chrome.storage.local.get(['promptSplittingSettings'], (result) => {
+        resolve(result.promptSplittingSettings || {});
+      });
+    });
+    
+    currentSettings.stats = {
+      totalAttempts: 0,
+      successfulSplits: 0,
+      fallbacksUsed: 0
+    };
+    
+    await new Promise((resolve) => {
+      chrome.storage.local.set({ promptSplittingSettings: currentSettings }, resolve);
+    });
+    
+    // Update UI
+    const successRate = document.getElementById('splittingSuccessRate');
+    const attempts = document.getElementById('splittingAttempts');
+    if (successRate) successRate.textContent = 'No data yet';
+    if (attempts) attempts.textContent = '0';
+    
+    showPromptSplittingMessage('Statistics reset successfully!', 'success');
+    
+  } catch (error) {
+    console.error('Error resetting prompt splitting stats:', error);
+    showPromptSplittingMessage('Failed to reset statistics', 'error');
+  }
+}
+
+function showPromptSplittingMessage(message, type = 'success') {
+  const messageElement = document.getElementById('splittingMessage');
+  if (!messageElement) return;
+  
+  messageElement.textContent = message;
+  messageElement.className = `message ${type}`;
+  messageElement.style.display = 'block';
+  
+  setTimeout(() => {
+    messageElement.style.display = 'none';
+  }, 3000);
+}
+
+// Add prompt splitting settings event listeners
+function addPromptSplittingEventListeners() {
+  // Collapsible toggle
+  const toggleBtn = document.getElementById('togglePromptSplittingBtn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const content = document.getElementById('promptSplittingContent');
+      const icon = toggleBtn.querySelector('.collapsible-icon');
+      
+      if (content && icon) {
+        content.classList.toggle('hidden');
+        icon.textContent = content.classList.contains('hidden') ? '▼' : '▲';
+      }
+    });
+  }
+  
+  // Save settings button
+  const saveBtn = document.getElementById('saveSplittingSettingsBtn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', savePromptSplittingSettings);
+  }
+  
+  // Reset stats button
+  const resetBtn = document.getElementById('resetSplittingStatsBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Are you sure you want to reset all prompt splitting statistics?')) {
+        resetPromptSplittingStats();
+      }
+    });
   }
 }
