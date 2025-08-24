@@ -1589,6 +1589,48 @@ function setupResponseMonitor() {
     console.log(`Found ${keywordMatches} property keywords in completed response`);
     
     if (keywordMatches >= 2) {
+      // Add null check for currentPropertyAnalysis
+      if (!currentPropertyAnalysis) {
+        console.log('⚠️ No active property analysis session, but detected property keywords');
+        console.log('🔍 This might be a response from prompt splitting or a different analysis');
+        
+        // If we're in prompt splitting mode, this could be the analysis response
+        if (promptSplittingState.currentPhase === 'complete' || 
+            promptSplittingState.currentPhase === 'sending_link') {
+          console.log('📝 Processing response from prompt splitting flow...');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && Object.keys(analysisData.extractedData).length > 0 && 
+              promptSplittingState.pendingPropertyLink) {
+            
+            console.log('✅ Successfully extracted analysis data from split prompt response');
+            
+            // Send the analysis data with the pending property link
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `split_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response) {
+                console.log('✅ Split prompt analysis data sent successfully:', response);
+                if (response.success) {
+                  console.log('🎉 Split prompt property analysis saved!');
+                }
+              }
+            }).catch(err => {
+              console.error('❌ Failed to send split prompt analysis data:', err);
+            });
+            
+            // Reset prompt splitting state
+            resetPromptSplittingState();
+          }
+        }
+        return;
+      }
+      
       console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
       console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
