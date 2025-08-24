@@ -1563,8 +1563,10 @@ if (isChatGPTSite()) {
   try {
     console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
     
-    // Load prompt splitting settings
-    await loadPromptSplittingSettings();
+    // Load prompt splitting settings asynchronously
+    loadPromptSplittingSettings().catch(error => {
+      console.warn('Failed to load prompt splitting settings:', error);
+    });
     
     // Add a visual indicator that the extension is active
     function addExtensionIndicator() {
