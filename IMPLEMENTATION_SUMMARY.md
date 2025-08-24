@@ -39,11 +39,12 @@ Successfully implemented the comprehensive data extraction enhancement system as
 - **Cash-on-Cash Return**: Estimated return on investment (simplified)
 
 ### 5. **Enhanced UI Components**
-- **Property Card Previews**: Shows key metrics and investment indicators
+- **Core Property Display**: Prominently features the 4 default export fields (Address, Property Price, Number of Bedrooms, Property Type)
+- **Structured Property Cards**: Grid layout highlighting essential property information
 - **Data Quality Indicators**: Color-coded quality scores (🟢🟡🟠🔴)
-- **Investment Metrics Display**: Dedicated section for financial analysis
-- **Enhanced Property Modal**: Comprehensive view with all extracted data
-- **Quality Scoring**: Visual indicators for data completeness and accuracy
+- **Investment Metrics Display**: Color-coded badges for financial analysis
+- **Enhanced Property Modal**: Dedicated highlighted section for core property details
+- **Visual Hierarchy**: Clear emphasis on the most important property data
 
 ### 6. **User-Selected Column Export**
 - **Dynamic CSV Generation**: Exports only user-selected columns

@@ -299,37 +299,98 @@ function generateAnalysisPreview(analysis) {
   if (!analysis || !analysis.extractedData) return '';
   
   const data = analysis.extractedData;
-  const preview = [];
-  
-  // Core property info
-  if (data.price) preview.push(`💰 $${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}`);
-  if (data.bedrooms) preview.push(`🛏️ ${data.bedrooms} bed`);
-  if (data.bathrooms) preview.push(`🚿 ${data.bathrooms} bath`);
-  if (data.squareFeet) preview.push(`📐 ${data.squareFeet} sq ft`);
-  
-  const previewText = preview.join(' • ');
-  
-  // Investment metrics preview
-  const investmentMetrics = [];
-  if (data.pricePerSqFt) investmentMetrics.push(`$${data.pricePerSqFt}/sq ft`);
-  if (data.capRate) investmentMetrics.push(`${data.capRate}% cap rate`);
-  if (data.onePercentRule) investmentMetrics.push(`${data.onePercentRule}% (1% rule)`);
-  if (data.locationScore) investmentMetrics.push(`📍 ${data.locationScore}`);
-  
-  const metricsText = investmentMetrics.length > 0 ? investmentMetrics.join(' • ') : '';
   
   // Add data quality indicator if available
   const qualityIndicator = analysis.dataQuality ? getQualityIndicator(analysis.dataQuality.score) : '';
   
-  return previewText ? `
+  return `
     <div class="analysis-preview">
-      <div class="analysis-summary">${previewText}${qualityIndicator}</div>
-      ${metricsText ? `<div class="analysis-metrics" style="color: var(--accent); font-size: var(--font-size-sm); margin-top: var(--space-xs);">${metricsText}</div>` : ''}
-      ${data.estimatedRentalIncome ? `<div class="rental-estimate" style="color: var(--primary); font-weight: var(--font-weight-medium); margin-top: var(--space-xs);">💵 Est. rent: $${parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, '')).toLocaleString()}/mo</div>` : ''}
-      ${data.pros ? `<div class="analysis-pros">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
-      ${data.cons ? `<div class="analysis-cons">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
+      <!-- Core Property Information (Default Export Fields) -->
+      <div class="core-property-info" style="
+        background: var(--secondary-background);
+        padding: var(--space-md);
+        border-radius: var(--radius-sm);
+        margin-bottom: var(--space-sm);
+        border-left: 3px solid var(--primary);
+      ">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm);">
+          <h4 style="margin: 0; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+            Core Property Details
+          </h4>
+          ${qualityIndicator}
+        </div>
+        
+        <div class="property-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm);">
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Address</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.streetName ? data.streetName : '📍 Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Property Price</div>
+            <div style="font-weight: var(--font-weight-semibold); color: var(--primary); font-size: var(--font-size-lg);">
+              ${data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '💰 Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Bedrooms</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.bedrooms ? `🛏️ ${data.bedrooms} bed${data.bedrooms > 1 ? 's' : ''}` : '🛏️ Not extracted'}
+            </div>
+          </div>
+          
+          <div class="property-field">
+            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 2px;">Property Type</div>
+            <div style="font-weight: var(--font-weight-medium); color: var(--text-primary);">
+              ${data.propertyType ? `🏠 ${data.propertyType}` : '🏠 Not extracted'}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Additional Information (if available) -->
+      ${(data.bathrooms || data.squareFeet || data.estimatedRentalIncome) ? `
+        <div class="additional-info" style="
+          display: grid; 
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); 
+          gap: var(--space-xs); 
+          margin-bottom: var(--space-sm);
+          font-size: var(--font-size-sm);
+        ">
+          ${data.bathrooms ? `<span style="color: var(--text-secondary);">🚿 ${data.bathrooms} bath${parseFloat(data.bathrooms) > 1 ? 's' : ''}</span>` : ''}
+          ${data.squareFeet ? `<span style="color: var(--text-secondary);">📐 ${data.squareFeet} sq ft</span>` : ''}
+          ${data.estimatedRentalIncome ? `<span style="color: var(--primary); font-weight: var(--font-weight-medium);">💵 $${parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, '')).toLocaleString()}/mo</span>` : ''}
+        </div>
+      ` : ''}
+      
+      <!-- Investment Metrics (if available) -->
+      ${(data.pricePerSqFt || data.capRate || data.onePercentRule || data.locationScore) ? `
+        <div class="investment-metrics" style="
+          display: flex; 
+          flex-wrap: wrap; 
+          gap: var(--space-xs); 
+          margin-bottom: var(--space-sm);
+          font-size: var(--font-size-sm);
+        ">
+          ${data.pricePerSqFt ? `<span style="background: #f0f9ff; color: #0369a1; padding: 2px 6px; border-radius: 3px;">$${data.pricePerSqFt}/sq ft</span>` : ''}
+          ${data.capRate ? `<span style="background: #f0fdf4; color: #166534; padding: 2px 6px; border-radius: 3px;">${data.capRate}% cap rate</span>` : ''}
+          ${data.onePercentRule ? `<span style="background: ${parseFloat(data.onePercentRule) >= 1.0 ? '#f0fdf4' : '#fef2f2'}; color: ${parseFloat(data.onePercentRule) >= 1.0 ? '#166534' : '#dc2626'}; padding: 2px 6px; border-radius: 3px;">${data.onePercentRule}% (1% rule)</span>` : ''}
+          ${data.locationScore ? `<span style="background: #fefce8; color: #a16207; padding: 2px 6px; border-radius: 3px;">📍 ${data.locationScore}</span>` : ''}
+        </div>
+      ` : ''}
+      
+      <!-- Pros and Cons (if available) -->
+      ${(data.pros || data.cons) ? `
+        <div class="analysis-summary" style="font-size: var(--font-size-sm);">
+          ${data.pros ? `<div class="analysis-pros" style="color: #16a34a; margin-bottom: var(--space-xs);">👍 ${data.pros.substring(0, 80)}${data.pros.length > 80 ? '...' : ''}</div>` : ''}
+          ${data.cons ? `<div class="analysis-cons" style="color: #dc2626;">👎 ${data.cons.substring(0, 80)}${data.cons.length > 80 ? '...' : ''}</div>` : ''}
+        </div>
+      ` : ''}
     </div>
-  ` : '';
+  `;
 }
 
 // Helper function to get quality indicator
@@ -422,26 +483,91 @@ function showFullAnalysis(propertyItem) {
           </div>
           
           ${Object.keys(data).length > 0 ? `
-            <div class="extracted-data" style="
+            <!-- Core Property Information (Highlighted) -->
+            <div class="core-property-modal" style="
+              margin-bottom: var(--space-lg);
+              padding: var(--space-lg);
+              background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+              border-radius: var(--radius-md);
+              border: 2px solid var(--primary);
+              box-shadow: 0 4px 12px rgba(16, 163, 127, 0.1);
+            ">
+              <h4 style="margin: 0 0 var(--space-lg) 0; font-size: var(--font-size-xl); color: var(--text-primary); display: flex; align-items: center; gap: var(--space-sm);">
+                🏠 Core Property Details
+                ${analysis.dataQuality ? getQualityIndicator(analysis.dataQuality.score) : ''}
+              </h4>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-bottom: var(--space-md);">
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">ADDRESS</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.streetName || '📍 Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">PROPERTY PRICE</div>
+                  <div style="font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); color: var(--primary);">
+                    ${data.price ? `$${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}` : '💰 Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">BEDROOMS</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.bedrooms ? `🛏️ ${data.bedrooms} bedroom${data.bedrooms > 1 ? 's' : ''}` : '🛏️ Not extracted'}
+                  </div>
+                </div>
+                
+                <div class="core-field" style="
+                  padding: var(--space-md);
+                  background: var(--background);
+                  border-radius: var(--radius-sm);
+                  border: 1px solid #cbd5e1;
+                ">
+                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-xs); font-weight: var(--font-weight-medium);">PROPERTY TYPE</div>
+                  <div style="font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); color: var(--text-primary);">
+                    ${data.propertyType ? `🏠 ${data.propertyType}` : '🏠 Not extracted'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional Property Details -->
+            ${(data.bathrooms || data.squareFeet || data.yearBuilt || data.neighborhood || data.locationScore) ? `
+            <div class="additional-details" style="
               margin-bottom: var(--space-lg);
               padding: var(--space-md);
               background: var(--secondary-background);
               border-radius: var(--radius-sm);
               border: 1px solid var(--border);
             ">
-              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Property Details</h4>
-              ${data.streetName ? `<div style="margin: var(--space-xs) 0;"><strong>Address:</strong> ${data.streetName}</div>` : ''}
-              ${data.price ? `<div style="margin: var(--space-xs) 0;"><strong>Price:</strong> $${parseFloat(data.price.toString().replace(/[\$,]/g, '')).toLocaleString()}</div>` : ''}
-              ${data.bedrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bedrooms:</strong> ${data.bedrooms}</div>` : ''}
+              <h4 style="margin: 0 0 var(--space-md) 0; font-size: var(--font-size-lg); color: var(--text-primary);">Additional Details</h4>
               ${data.bathrooms ? `<div style="margin: var(--space-xs) 0;"><strong>Bathrooms:</strong> ${data.bathrooms}</div>` : ''}
               ${data.squareFeet ? `<div style="margin: var(--space-xs) 0;"><strong>Square Feet:</strong> ${data.squareFeet}</div>` : ''}
               ${data.yearBuilt ? `<div style="margin: var(--space-xs) 0;"><strong>Year Built:</strong> ${data.yearBuilt}</div>` : ''}
               ${data.propertyAge ? `<div style="margin: var(--space-xs) 0;"><strong>Property Age:</strong> ${data.propertyAge} years</div>` : ''}
-              ${data.propertyType ? `<div style="margin: var(--space-xs) 0;"><strong>Property Type:</strong> ${data.propertyType}</div>` : ''}
               ${data.neighborhood ? `<div style="margin: var(--space-xs) 0;"><strong>Neighborhood:</strong> ${data.neighborhood}</div>` : ''}
               ${data.locationScore ? `<div style="margin: var(--space-xs) 0;"><strong>Location Score:</strong> ${data.locationScore}</div>` : ''}
             </div>
+            ` : ''}
             
+            <!-- Investment Metrics -->
             ${(data.estimatedRentalIncome || data.pricePerSqFt || data.capRate) ? `
             <div class="investment-metrics" style="
               margin-bottom: var(--space-lg);
