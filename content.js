@@ -2902,6 +2902,10 @@ function setupResponseMonitor() {
         }
       }
       console.log('🔍 ===== END CONFIRMATION DEBUG =====');
+      
+      // During waiting_confirmation phase, we ONLY handle confirmation - don't save any analysis
+      console.log('⏩ Skipping analysis save during waiting_confirmation phase - will only save response to property link');
+      return;
     }
     
     // Process the analysis data
@@ -2935,7 +2939,7 @@ function setupResponseMonitor() {
         // If we're in prompt splitting mode, this could be the analysis response
         if (promptSplittingState.currentPhase === 'complete' || 
             promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 Processing response from prompt splitting flow...');
+          console.log('📝 Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
           
           const analysisData = extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
@@ -2975,7 +2979,7 @@ function setupResponseMonitor() {
       const analysisData = extractPropertyAnalysisData(messageText);
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
-        console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
+        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
         console.log('📊 Extracted data summary:', {
           propertyUrl: currentPropertyAnalysis.url,
           sessionId: currentPropertyAnalysis.sessionId,
@@ -3133,7 +3137,9 @@ function setupResponseMonitor() {
       
       // Check for prompt splitting first, regardless of property analysis session
       if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
-        console.log('🔍 Found message while waiting for confirmation:', messageText.substring(0, 100));
+        console.log('🔍 Found message while waiting for confirmation (NOT SAVING - waiting for property link response):', messageText.substring(0, 100));
+        // Don't save this response - we only want the response AFTER the property link is sent
+        // Just continue to trigger sending the property link
         processCompletedResponse(messageText, currentUrl);
         return; // Don't process as regular property analysis
       }
