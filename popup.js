@@ -1030,26 +1030,26 @@ async function initializePopup() {
   }
 }
 
-// Default prompt for property analysis
-const DEFAULT_PROMPT = `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+// Default prompt for property analysis - optimized for better data extraction
+const DEFAULT_PROMPT = `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment. 
 
-**REQUIRED DATA EXTRACTION:**
-1. **Price**: Exact asking price (include currency symbol)
-2. **Bedrooms**: Number of bedrooms (numeric)
-3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
-4. **Square Footage**: Total square footage (numeric)
-5. **Year Built**: Construction year (4-digit year)
-6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
-7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
-8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
-9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
-
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections:
+**CRITICAL: Start your response with this exact format for data extraction:**
 
 **PROPERTY DETAILS:**
-- List all the required data points above in a clear format
-- Include any additional relevant specifications (lot size, parking, etc.)
+- Address: [Full street address]
+- Property Price: $[Exact amount]
+- Bedrooms: [Number]
+- Bathrooms: [Number]
+- Square Footage: [Number] sq ft
+- Year Built: [4-digit year]
+- Property Type: [Single Family Home/Condo/Townhouse/Apartment/etc.]
+
+**FINANCIAL ANALYSIS:**
+- Estimated Monthly Rental Income: $[Amount]
+- Location Score: [Number]/10
+- Rental Growth Potential: Growth: [High/Strong/Moderate/Low/Limited]
+
+[Then continue with your detailed analysis...]
 
 **LOCATION & NEIGHBORHOOD ANALYSIS:**
 - Provide your location score (X/10) with detailed justification
@@ -1060,7 +1060,7 @@ Please organize your response with clear sections:
 **RENTAL INCOME ANALYSIS:**
 - Provide your estimated monthly rental income with reasoning
 - Compare to local rental comps if possible
-- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
+- Assess rental growth potential with specific factors:
   * Population growth trends
   * Economic development in the area
   * New construction and inventory levels
@@ -1075,14 +1075,7 @@ Please organize your response with clear sections:
 - Price comparison to market value
 - Recommendation for this property as a rental investment
 
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Provide location score in X/10 format
-- Categorize rental growth potential clearly
-- Be concise but thorough in your analysis
-
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+**IMPORTANT:** Please ensure the data in the PROPERTY DETAILS section is accurate and clearly formatted as shown above for proper data extraction.
 
 Property Link: {PROPERTY_URL}`;
 
