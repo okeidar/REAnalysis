@@ -209,6 +209,14 @@ async function handleConfirmationReceived() {
       return;
     }
     
+    // For split prompt: start tracking NOW since we're about to send the property link
+    currentPropertyAnalysis = {
+      url: propertyLink,
+      timestamp: Date.now(),
+      sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    console.log('🎯 Split prompt analysis session started (sending property link):', currentPropertyAnalysis.sessionId);
+    
     const linkMessage = propertyLink;  // Send only the raw link
     
     // Insert the link message
@@ -2936,10 +2944,12 @@ function setupResponseMonitor() {
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
         console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
-        // If we're in prompt splitting mode, this could be the analysis response
+        // FALLBACK: If we're in prompt splitting mode, this could be the analysis response
+        // NOTE: This should normally not be needed anymore since currentPropertyAnalysis 
+        // is now set consistently when the property link is sent
         if (promptSplittingState.currentPhase === 'complete' || 
             promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
           
           const analysisData = extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
@@ -3407,14 +3417,8 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis.url);
   }
   
-  // Track this property analysis with enhanced metadata
-  currentPropertyAnalysis = {
-    url: propertyLink,
-    timestamp: Date.now(),
-    sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('🎯 New property analysis session started:', currentPropertyAnalysis.sessionId);
+  // We'll set currentPropertyAnalysis later depending on the prompt approach
+  // For consistency: only start tracking AFTER the property link is sent
   
   // Clear any previous processed messages for this property to allow fresh analysis
   if (processedMessagesPerProperty.has(propertyLink)) {
@@ -3498,6 +3502,14 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       return true;
     } else {
       console.log('📝 Using single prompt approach (below threshold)');
+      
+      // For single prompt: start tracking now since the prompt contains the property link
+      currentPropertyAnalysis = {
+        url: propertyLink,
+        timestamp: Date.now(),
+        sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      console.log('🎯 Single prompt analysis session started:', currentPropertyAnalysis.sessionId);
       
       // Use the original single prompt approach
       const prompt = fullPrompt;
