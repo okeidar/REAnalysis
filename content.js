@@ -2938,7 +2938,7 @@ function setupResponseMonitor() {
           console.log('📝 Processing response from prompt splitting flow...');
           
           const analysisData = extractPropertyAnalysisData(messageText);
-          if (analysisData && Object.keys(analysisData.extractedData).length > 0 && 
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
               promptSplittingState.pendingPropertyLink) {
             
             console.log('✅ Successfully extracted analysis data from split prompt response');
@@ -2974,7 +2974,7 @@ function setupResponseMonitor() {
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
       const analysisData = extractPropertyAnalysisData(messageText);
       
-      if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+      if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
         console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
         console.log('📊 Extracted data summary:', {
           propertyUrl: currentPropertyAnalysis.url,
@@ -4075,7 +4075,7 @@ window.forceExtractCurrent = function() {
   // Force extraction
   const analysisData = extractPropertyAnalysisData(messageText);
   
-  if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+  if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
     console.log('✅ Extraction successful!');
     console.log('📊 Extracted data:', analysisData.extractedData);
     
