@@ -209,6 +209,14 @@ async function handleConfirmationReceived() {
       return;
     }
     
+    // For split prompt: start tracking NOW since we're about to send the property link
+    currentPropertyAnalysis = {
+      url: propertyLink,
+      timestamp: Date.now(),
+      sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    };
+    console.log('🎯 Split prompt analysis session started (sending property link):', currentPropertyAnalysis.sessionId);
+    
     const linkMessage = propertyLink;  // Send only the raw link
     
     // Insert the link message
@@ -2902,6 +2910,10 @@ function setupResponseMonitor() {
         }
       }
       console.log('🔍 ===== END CONFIRMATION DEBUG =====');
+      
+      // During waiting_confirmation phase, we ONLY handle confirmation - don't save any analysis
+      console.log('⏩ Skipping analysis save during waiting_confirmation phase - will only save response to property link');
+      return;
     }
     
     // Process the analysis data
@@ -2932,13 +2944,15 @@ function setupResponseMonitor() {
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
         console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
-        // If we're in prompt splitting mode, this could be the analysis response
+        // FALLBACK: If we're in prompt splitting mode, this could be the analysis response
+        // NOTE: This should normally not be needed anymore since currentPropertyAnalysis 
+        // is now set consistently when the property link is sent
         if (promptSplittingState.currentPhase === 'complete' || 
             promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 Processing response from prompt splitting flow...');
+          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
           
           const analysisData = extractPropertyAnalysisData(messageText);
-          if (analysisData && Object.keys(analysisData.extractedData).length > 0 && 
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
               promptSplittingState.pendingPropertyLink) {
             
             console.log('✅ Successfully extracted analysis data from split prompt response');
@@ -2974,8 +2988,8 @@ function setupResponseMonitor() {
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
       const analysisData = extractPropertyAnalysisData(messageText);
       
-      if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
-        console.log('✅ Successfully extracted analysis data for:', currentPropertyAnalysis.url);
+      if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
+        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
         console.log('📊 Extracted data summary:', {
           propertyUrl: currentPropertyAnalysis.url,
           sessionId: currentPropertyAnalysis.sessionId,
@@ -3133,7 +3147,9 @@ function setupResponseMonitor() {
       
       // Check for prompt splitting first, regardless of property analysis session
       if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
-        console.log('🔍 Found message while waiting for confirmation:', messageText.substring(0, 100));
+        console.log('🔍 Found message while waiting for confirmation (NOT SAVING - waiting for property link response):', messageText.substring(0, 100));
+        // Don't save this response - we only want the response AFTER the property link is sent
+        // Just continue to trigger sending the property link
         processCompletedResponse(messageText, currentUrl);
         return; // Don't process as regular property analysis
       }
@@ -3401,14 +3417,8 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis.url);
   }
   
-  // Track this property analysis with enhanced metadata
-  currentPropertyAnalysis = {
-    url: propertyLink,
-    timestamp: Date.now(),
-    sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-  };
-  
-  console.log('🎯 New property analysis session started:', currentPropertyAnalysis.sessionId);
+  // We'll set currentPropertyAnalysis later depending on the prompt approach
+  // For consistency: only start tracking AFTER the property link is sent
   
   // Clear any previous processed messages for this property to allow fresh analysis
   if (processedMessagesPerProperty.has(propertyLink)) {
@@ -3492,6 +3502,14 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       return true;
     } else {
       console.log('📝 Using single prompt approach (below threshold)');
+      
+      // For single prompt: start tracking now since the prompt contains the property link
+      currentPropertyAnalysis = {
+        url: propertyLink,
+        timestamp: Date.now(),
+        sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      console.log('🎯 Single prompt analysis session started:', currentPropertyAnalysis.sessionId);
       
       // Use the original single prompt approach
       const prompt = fullPrompt;
@@ -4075,7 +4093,7 @@ window.forceExtractCurrent = function() {
   // Force extraction
   const analysisData = extractPropertyAnalysisData(messageText);
   
-  if (analysisData && Object.keys(analysisData.extractedData).length > 0) {
+  if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
     console.log('✅ Extraction successful!');
     console.log('📊 Extracted data:', analysisData.extractedData);
     
