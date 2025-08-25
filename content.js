@@ -1801,10 +1801,10 @@ function validateAndCleanData(data) {
       }
       
       const priceNum = parseFloat(priceStr);
-      if (!isNaN(priceNum) && priceNum >= 10000 && priceNum <= 50000000) {
+      if (!isNaN(priceNum) && priceNum >= 5000 && priceNum <= 100000000) {
         cleanedData.price = priceNum.toString();
       } else {
-        console.warn('❌ Invalid price detected:', cleanedData.price, '→', priceNum);
+        console.warn('❌ Invalid price detected:', cleanedData.price, '→', priceNum, '(need $5K-$100M)');
         delete cleanedData.price;
       }
     }
@@ -1812,10 +1812,10 @@ function validateAndCleanData(data) {
     // Clean and validate bedrooms
     if (cleanedData.bedrooms) {
       const beds = parseInt(cleanedData.bedrooms);
-      if (beds >= 0 && beds <= 20) {
+      if (beds >= 0 && beds <= 50) {
         cleanedData.bedrooms = beds.toString();
       } else {
-        console.warn('❌ Invalid bedrooms count:', cleanedData.bedrooms);
+        console.warn('❌ Invalid bedrooms count:', cleanedData.bedrooms, '(need 0-50)');
         delete cleanedData.bedrooms;
       }
     }
@@ -1823,10 +1823,10 @@ function validateAndCleanData(data) {
     // Clean and validate bathrooms
     if (cleanedData.bathrooms) {
       const baths = parseFloat(cleanedData.bathrooms);
-      if (baths >= 0 && baths <= 20) {
+      if (baths >= 0 && baths <= 50) {
         cleanedData.bathrooms = baths.toString();
       } else {
-        console.warn('❌ Invalid bathrooms count:', cleanedData.bathrooms);
+        console.warn('❌ Invalid bathrooms count:', cleanedData.bathrooms, '(need 0-50)');
         delete cleanedData.bathrooms;
       }
     }
@@ -1834,10 +1834,10 @@ function validateAndCleanData(data) {
     // Clean and validate square feet
     if (cleanedData.squareFeet) {
       const sqft = parseInt(cleanedData.squareFeet.toString().replace(/[,]/g, ''));
-      if (sqft >= 100 && sqft <= 50000) {
+      if (sqft >= 50 && sqft <= 500000) {
         cleanedData.squareFeet = sqft.toString();
       } else {
-        console.warn('❌ Invalid square footage:', cleanedData.squareFeet);
+        console.warn('❌ Invalid square footage:', cleanedData.squareFeet, '(need 50-500,000)');
         delete cleanedData.squareFeet;
       }
     }
@@ -1846,10 +1846,10 @@ function validateAndCleanData(data) {
     if (cleanedData.yearBuilt) {
       const year = parseInt(cleanedData.yearBuilt);
       const currentYear = new Date().getFullYear();
-      if (year >= 1800 && year <= currentYear) {
+      if (year >= 1600 && year <= currentYear) {
         cleanedData.yearBuilt = year.toString();
       } else {
-        console.warn('❌ Invalid year built:', cleanedData.yearBuilt);
+        console.warn('❌ Invalid year built:', cleanedData.yearBuilt, `(need 1600-${currentYear})`);
         delete cleanedData.yearBuilt;
       }
     }
@@ -1919,32 +1919,41 @@ function validateAndCleanData(data) {
       cleanedData.propertyType = propType;
     }
     
-    // Clean street name
+    // Clean street name using the same validation logic as extraction
     if (cleanedData.streetName) {
       let streetName = cleanedData.streetName.trim().replace(/["""]/g, '');
       
-      // Additional validation checks
-      const hasNumber = streetName.match(/\d/);
-      const isNotJustKeywords = !streetName.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i);
-      const isNotPropertyFeature = !streetName.match(/bedroom|bathroom|sqft|square|feet/i);
-      const isNotPrice = !streetName.match(/^\$/);
+      // Use the same lenient validation as the extraction validator
+      let isValid = false;
       
-      if (streetName.length >= 5 && 
-          streetName.length <= 120 && 
-          hasNumber && 
-          isNotJustKeywords && 
-          isNotPropertyFeature && 
-          isNotPrice) {
+      // Basic requirements
+      if (streetName && streetName.length >= 3 && streetName.length <= 120) {
+        // Reject obvious non-addresses
+        if (!streetName.match(/^(the|this|that|property|analysis|listing|located|address|street|asking|price|for|sale|rent)$/i) &&
+            !streetName.match(/^(bedroom|bathroom|sqft|square|feet|bath|bed)$/i) &&
+            !streetName.match(/^\$[\d,]+/) &&
+            !streetName.match(/^\d+$/)) {
+          
+          // Accept if it has a number (most addresses do)
+          if (streetName.match(/\d/)) {
+            isValid = true;
+          }
+          // Accept if it has street-related words (even without numbers)
+          else if (streetName.match(/(street|avenue|road|drive|lane|way|boulevard|place|court|circle|st|ave|rd|dr|ln|blvd|highway|route|trail|path|manor|estate|park|square|walk|green|commons|hill|valley|creek|river|lake|pond|wood|forest|meadow|field|garden|villa|residence|ranch|farm|cabin|cottage|house|home|center|plaza|market)(\s|$)/i)) {
+            isValid = true;
+          }
+          // Be more lenient - accept anything that looks like it could be an address
+          else if (streetName.length >= 8 && streetName.match(/[A-Za-z]/) && !streetName.match(/(bedroom|bathroom|sqft|square|feet|price|asking|for|sale|rent|analysis|property|listing)/i)) {
+            isValid = true;
+          }
+        }
+      }
+      
+      if (isValid) {
         cleanedData.streetName = streetName;
+        console.log(`✅ Street name cleaned and validated: "${streetName}"`);
       } else {
-        console.warn('❌ Invalid street name - failed validation:', {
-          streetName: streetName,
-          length: streetName.length,
-          hasNumber: !!hasNumber,
-          isNotJustKeywords: isNotJustKeywords,
-          isNotPropertyFeature: isNotPropertyFeature,
-          isNotPrice: isNotPrice
-        });
+        console.warn('❌ Invalid street name - failed validation:', streetName);
         delete cleanedData.streetName;
       }
     } // Fixed: Added missing closing brace

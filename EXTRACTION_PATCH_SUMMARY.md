@@ -6,6 +6,12 @@
 - **Issue**: ReferenceError in streetName validation (`streetNotKeywords` undefined)
 - **Fix**: Changed to `streetNotJustKeywords` in line 1242 of content.js
 
+### 🚨 **CRITICAL: Validation Mismatch Fixed** ✅
+- **Issue**: Data extracted successfully but then deleted during cleaning due to inconsistent validation ranges
+- **Problem**: Extraction validator allowed $5K-$100M but cleaning validator only allowed $10K-$50M
+- **Fix**: Synchronized all validation ranges between extraction and cleaning phases
+- **Result**: Data now properly survives the cleaning process and appears in UI
+
 ### 2. **Simplified Regex Patterns** ✅
 - **Issue**: 20+ complex regex patterns per field causing conflicts and poor performance
 - **Fix**: Reduced to 6 focused patterns for streetName and 7 for price
