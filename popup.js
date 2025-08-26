@@ -2733,7 +2733,7 @@ async function loadPromptHistory() {
     }
     
     const historyHTML = history.slice(0, 5).map((item, index) => `
-      <div style="padding: var(--space-sm); border-bottom: 1px solid var(--border); cursor: pointer;" onclick="restorePromptVersion(${index})">
+      <div style="padding: var(--space-sm); border-bottom: 1px solid var(--border); cursor: pointer;" data-action="restore-prompt" data-index="${index}">
         <div style="font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
           ${new Date(item.timestamp).toLocaleDateString()} ${new Date(item.timestamp).toLocaleTimeString()}
         </div>
@@ -2744,6 +2744,15 @@ async function loadPromptHistory() {
     `).join('');
     
     historyDiv.innerHTML = historyHTML;
+    
+    // Add event listeners for prompt history
+    historyDiv.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action="restore-prompt"]');
+      if (target) {
+        const index = parseInt(target.dataset.index);
+        restorePromptVersion(index);
+      }
+    });
     
   } catch (error) {
     console.error('Error loading prompt history:', error);
@@ -2778,8 +2787,7 @@ async function restorePromptVersion(index) {
   }
 }
 
-// Make function globally accessible for onclick handlers
-window.restorePromptVersion = restorePromptVersion;
+// Function is now called via event listeners instead of onclick
 
 // ============================================================================
 // WORD EXPORT FUNCTIONALITY
@@ -3897,15 +3905,21 @@ async function renderCategoryGrid() {
     const categories = categoryManager.getAllCategories();
   
   if (categories.length === 0) {
-    categoryGrid.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon">🗂️</div>
-        <p>No categories found</p>
-        <button class="btn btn-primary btn-sm" onclick="openCategoryManagementModal()">
-          ➕ Add Category
-        </button>
-      </div>
-    `;
+         categoryGrid.innerHTML = `
+       <div class="empty-state">
+         <div class="empty-state-icon">🗂️</div>
+         <p>No categories found</p>
+         <button class="btn btn-primary btn-sm" data-action="add-category">
+           ➕ Add Category
+         </button>
+       </div>
+     `;
+     
+     // Add event listener for the add category button
+     const addCategoryBtn = categoryGrid.querySelector('[data-action="add-category"]');
+     if (addCategoryBtn) {
+       addCategoryBtn.addEventListener('click', openCategoryManagementModal);
+     }
     return;
   }
   
@@ -3914,7 +3928,7 @@ async function renderCategoryGrid() {
     const propertyCount = properties.length;
     
     return `
-      <div class="category-card" onclick="openCategoryView('${category.id}')" style="border-color: ${category.color}20;">
+      <div class="category-card" data-action="open-category" data-category-id="${category.id}" style="border-color: ${category.color}20;">
         <div class="category-header">
           <div style="display: flex; align-items: center;">
             <span class="category-icon">${category.icon}</span>
@@ -3924,11 +3938,11 @@ async function renderCategoryGrid() {
         </div>
         <p class="category-description">${category.description}</p>
         <div class="category-actions">
-          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); editCategory('${category.id}')" title="Edit">
+          <button class="btn btn-ghost btn-sm" data-action="edit-category" data-category-id="${category.id}" title="Edit">
             ✏️
           </button>
           ${category.id !== 'uncategorized' ? `
-            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteCategory('${category.id}')" title="Delete">
+            <button class="btn btn-ghost btn-sm" data-action="delete-category" data-category-id="${category.id}" title="Delete">
               🗑️
             </button>
           ` : ''}
@@ -3938,18 +3952,54 @@ async function renderCategoryGrid() {
   }).join('');
   
   categoryGrid.innerHTML = categoryHTML;
+  
+  // Add event listeners for category cards
+  setupCategoryCardEventListeners();
   } catch (error) {
     console.error('Failed to render category grid:', error);
     categoryGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">⚠️</div>
         <p>Failed to load categories</p>
-        <button class="btn btn-primary btn-sm" onclick="renderCategoryGrid()">
+        <button class="btn btn-primary btn-sm" data-action="retry-categories">
           🔄 Retry
         </button>
       </div>
     `;
+    
+    // Add event listener for retry button
+    const retryBtn = categoryGrid.querySelector('[data-action="retry-categories"]');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', renderCategoryGrid);
+    }
   }
+}
+
+function setupCategoryCardEventListeners() {
+  const categoryGrid = document.getElementById('categoryGrid');
+  if (!categoryGrid) return;
+  
+  // Use event delegation for better performance
+  categoryGrid.addEventListener('click', (event) => {
+    const target = event.target;
+    const action = target.dataset.action;
+    const categoryId = target.dataset.categoryId;
+    
+    // Handle category card actions
+    if (action === 'open-category' || target.closest('[data-action="open-category"]')) {
+      const cardElement = target.closest('[data-action="open-category"]');
+      if (cardElement) {
+        const cardCategoryId = cardElement.dataset.categoryId;
+        openCategoryView(cardCategoryId);
+      }
+    } else if (action === 'edit-category') {
+      event.stopPropagation();
+      editCategory(categoryId);
+    } else if (action === 'delete-category') {
+      event.stopPropagation();
+      deleteCategory(categoryId);
+    }
+  });
 }
 
 function openCategoryView(categoryId) {
@@ -4006,8 +4056,9 @@ function setupCategoryModal() {
   const closeBtn = document.getElementById('categoryModalClose');
   const addBtn = document.getElementById('addCategoryBtn');
   
-  // Close modal
+  // Close modal (remove existing listeners first to avoid duplicates)
   if (closeBtn) {
+    closeBtn.removeEventListener('click', closeCategoryManagementModal);
     closeBtn.addEventListener('click', closeCategoryManagementModal);
   }
   
@@ -4034,8 +4085,9 @@ function setupCategoryModal() {
     });
   });
   
-  // Add category button
+  // Add category button (remove existing listeners first)
   if (addBtn) {
+    addBtn.removeEventListener('click', addNewCategory);
     addBtn.addEventListener('click', addNewCategory);
   }
 }
@@ -4100,11 +4152,11 @@ async function populateExistingCategories() {
         </div>
       </div>
       <div class="existing-category-actions">
-        <button class="btn btn-ghost btn-sm" onclick="editCategory('${category.id}')" title="Edit">
+        <button class="btn btn-ghost btn-sm" data-action="edit-category" data-category-id="${category.id}" title="Edit">
           ✏️
         </button>
         ${category.id !== 'uncategorized' ? `
-          <button class="btn btn-ghost btn-sm" onclick="deleteCategory('${category.id}')" title="Delete">
+          <button class="btn btn-ghost btn-sm" data-action="delete-category" data-category-id="${category.id}" title="Delete">
             🗑️
           </button>
         ` : ''}
@@ -4113,6 +4165,27 @@ async function populateExistingCategories() {
   `).join('');
   
   container.innerHTML = categoriesHTML;
+  
+  // Add event listeners for existing category actions
+  setupExistingCategoriesEventListeners();
+}
+
+function setupExistingCategoriesEventListeners() {
+  const container = document.getElementById('existingCategoriesList');
+  if (!container) return;
+  
+  // Use event delegation
+  container.addEventListener('click', (event) => {
+    const target = event.target;
+    const action = target.dataset.action;
+    const categoryId = target.dataset.categoryId;
+    
+    if (action === 'edit-category') {
+      editCategory(categoryId);
+    } else if (action === 'delete-category') {
+      deleteCategory(categoryId);
+    }
+  });
 }
 
 async function editCategory(categoryId) {
@@ -4283,11 +4356,7 @@ async function processPropertyAnalysis(propertyUrl, analysis) {
   }
 }
 
-// Make functions available globally for onclick handlers
-window.openCategoryView = openCategoryView;
-window.editCategory = editCategory;
-window.deleteCategory = deleteCategory;
-window.openCategoryManagementModal = openCategoryManagementModal;
+// Make functions available globally for other modules
 window.processPropertyAnalysis = processPropertyAnalysis;
 
 // Initialize Word export module when popup loads
