@@ -60,6 +60,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   if (exportHistoryBtn) exportHistoryBtn.addEventListener('click', exportPropertyHistory);
+  
+  // Word export button event listener
+  const exportWordBtn = document.getElementById('exportWordBtn');
+  if (exportWordBtn) exportWordBtn.addEventListener('click', async function() {
+    try {
+      const result = await chrome.storage.local.get(['propertyHistory']);
+      const history = result.propertyHistory || [];
+      const analyzedProperties = history.filter(item => item.analysis && item.analysis.fullResponse);
+      
+      if (analyzedProperties.length === 0) {
+        showError('No analyzed properties available for Word export');
+        return;
+      }
+      
+      if (window.WordExportModule) {
+        window.WordExportModule.showExportOptionsModal(analyzedProperties);
+      } else {
+        showError('Word export module not loaded. Please refresh the extension.');
+      }
+    } catch (error) {
+      console.error('Error initiating Word export:', error);
+      showError('Failed to initiate Word export');
+    }
+  });
   if (analyzeBtn) analyzeBtn.addEventListener('click', handleAnalyzeClick);
   if (pasteBtn) pasteBtn.addEventListener('click', async function() {
     try {
@@ -332,6 +356,7 @@ function displayPropertyHistory(history) {
         ` : ''}
         <div class="history-actions">
           ${hasAnalysis ? `<button class="btn btn-ghost btn-sm view-analysis-btn" data-index="${index}">👁️ View Full Response</button>` : ''}
+          ${hasAnalysis ? `<button class="btn btn-ghost btn-sm export-word-btn" data-index="${index}">📄 Export Word</button>` : ''}
           <button class="btn btn-ghost btn-sm history-item-remove" data-index="${index}">🗑️ Remove</button>
         </div>
         <button class="history-remove" data-index="${index}">×</button>
@@ -354,6 +379,18 @@ function displayPropertyHistory(history) {
     btn.addEventListener('click', (e) => {
       const index = parseInt(e.target.getAttribute('data-index'));
       showFullResponse(history[index]);
+    });
+  });
+  
+  // Add event listeners for individual Word export buttons
+  document.querySelectorAll('.export-word-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.getAttribute('data-index'));
+      if (window.WordExportModule) {
+        window.WordExportModule.showExportOptionsModal(history[index]);
+      } else {
+        showError('Word export module not loaded. Please refresh the extension.');
+      }
     });
   });
 }
@@ -2405,4 +2442,767 @@ async function restorePromptVersion(index) {
 
 // Make function globally accessible for onclick handlers
 window.restorePromptVersion = restorePromptVersion;
+
+// ============================================================================
+// WORD EXPORT FUNCTIONALITY
+// ============================================================================
+
+// Word Export Module
+const WordExportModule = {
+  // Initialize Word export functionality
+  async init() {
+    try {
+      // Load docx library dynamically
+      await this.loadDocxLibrary();
+      console.log('✅ Word export module initialized');
+    } catch (error) {
+      console.error('❌ Failed to initialize Word export module:', error);
+    }
+  },
+
+  // Dynamically load docx.js library
+  async loadDocxLibrary() {
+    return new Promise((resolve, reject) => {
+      if (window.docx) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('docx.min.js');
+      script.onload = () => {
+        console.log('✅ Docx library loaded');
+        resolve();
+      };
+      script.onerror = (error) => {
+        console.error('❌ Failed to load docx library:', error);
+        reject(error);
+      };
+      document.head.appendChild(script);
+    });
+  },
+
+  // Extract ChatGPT conversation content with formatting
+  extractConversationContent(propertyItem) {
+    const analysis = propertyItem.analysis;
+    if (!analysis || !analysis.fullResponse) {
+      throw new Error('No analysis data available for export');
+    }
+
+    // Parse the response for structured content
+    const content = {
+      propertyUrl: propertyItem.url,
+      domain: propertyItem.domain,
+      analysisDate: propertyItem.date,
+      fullResponse: analysis.fullResponse,
+      extractedData: analysis.extractedData || {},
+      structured: this.parseStructuredResponse(analysis.fullResponse)
+    };
+
+    return content;
+  },
+
+  // Parse structured response sections
+  parseStructuredResponse(responseText) {
+    const sections = {};
+    
+    // Common section patterns
+    const sectionPatterns = [
+      { key: 'propertyDetails', patterns: [/\*\*PROPERTY\s+DETAILS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i] },
+      { key: 'locationAnalysis', patterns: [/\*\*LOCATION\s+.*?ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i] },
+      { key: 'rentalAnalysis', patterns: [/\*\*RENTAL\s+.*?ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i] },
+      { key: 'investmentSummary', patterns: [/\*\*INVESTMENT\s+SUMMARY:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i] },
+      { key: 'financialAnalysis', patterns: [/\*\*FINANCIAL\s+ANALYSIS:\*\*([\s\S]*?)(?=\*\*[A-Z\s&]+:|$)/i] }
+    ];
+
+    sectionPatterns.forEach(({ key, patterns }) => {
+      for (const pattern of patterns) {
+        const match = responseText.match(pattern);
+        if (match && match[1]) {
+          sections[key] = match[1].trim();
+          break;
+        }
+      }
+    });
+
+    return sections;
+  },
+
+  // Generate Word document from conversation content
+  async generateWordDocument(content, options = {}) {
+    if (!window.docx) {
+      await this.loadDocxLibrary();
+    }
+
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
+
+    // Document sections
+    const children = [];
+
+    // Title
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "ChatGPT Property Analysis Export",
+            bold: true,
+            size: 32,
+          }),
+        ],
+        heading: HeadingLevel.TITLE,
+        alignment: AlignmentType.CENTER,
+      })
+    );
+
+    // Property Information Header
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Property Information",
+            bold: true,
+            size: 24,
+          }),
+        ],
+        heading: HeadingLevel.HEADING_1,
+      })
+    );
+
+    // Property URL
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Property URL: ",
+            bold: true,
+          }),
+          new TextRun({
+            text: content.propertyUrl,
+            color: "0066CC",
+          }),
+        ],
+      })
+    );
+
+    // Source and Date
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Source: ",
+            bold: true,
+          }),
+          new TextRun({
+            text: content.domain,
+          }),
+          new TextRun({
+            text: " | Analysis Date: ",
+            bold: true,
+          }),
+          new TextRun({
+            text: content.analysisDate,
+          }),
+        ],
+      })
+    );
+
+    // Add space
+    children.push(new Paragraph({ text: "" }));
+
+    // Key Property Data (if available)
+    if (content.extractedData && Object.keys(content.extractedData).length > 0) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "Key Property Data",
+              bold: true,
+              size: 20,
+            }),
+          ],
+          heading: HeadingLevel.HEADING_2,
+        })
+      );
+
+      const keyData = content.extractedData;
+      const dataFields = [
+        { key: 'price', label: 'Price' },
+        { key: 'bedrooms', label: 'Bedrooms' },
+        { key: 'bathrooms', label: 'Bathrooms' },
+        { key: 'squareFeet', label: 'Square Feet' },
+        { key: 'propertyType', label: 'Property Type' },
+        { key: 'yearBuilt', label: 'Year Built' },
+        { key: 'locationScore', label: 'Location Score' },
+        { key: 'estimatedRentalIncome', label: 'Est. Monthly Rental Income' },
+        { key: 'rentalGrowthPotential', label: 'Rental Growth Potential' }
+      ];
+
+      dataFields.forEach(({ key, label }) => {
+        if (keyData[key]) {
+          let value = keyData[key];
+          if (key === 'price' && !value.includes('$')) {
+            value = '$' + parseFloat(value).toLocaleString();
+          }
+          
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${label}: `,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: value.toString(),
+                }),
+              ],
+            })
+          );
+        }
+      });
+
+      children.push(new Paragraph({ text: "" }));
+    }
+
+    // Full ChatGPT Analysis
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Complete ChatGPT Analysis",
+            bold: true,
+            size: 20,
+          }),
+        ],
+        heading: HeadingLevel.HEADING_2,
+      })
+    );
+
+    // Process and add the full response with basic formatting preservation
+    const responseLines = content.fullResponse.split('\n');
+    for (const line of responseLines) {
+      if (line.trim() === '') {
+        children.push(new Paragraph({ text: "" }));
+        continue;
+      }
+
+      // Check for headers (lines with ** around them)
+      const headerMatch = line.match(/^\*\*(.+?)\*\*$/);
+      if (headerMatch) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: headerMatch[1],
+                bold: true,
+                size: 18,
+              }),
+            ],
+            heading: HeadingLevel.HEADING_3,
+          })
+        );
+        continue;
+      }
+
+      // Check for bold text within lines
+      const textRuns = [];
+      let remainingText = line;
+      let match;
+      
+      // Process bold text (**text**)
+      while ((match = remainingText.match(/^(.*?)\*\*(.+?)\*\*(.*)/))) {
+        // Add text before bold
+        if (match[1]) {
+          textRuns.push(new TextRun({ text: match[1] }));
+        }
+        // Add bold text
+        textRuns.push(new TextRun({ text: match[2], bold: true }));
+        // Continue with remaining text
+        remainingText = match[3];
+      }
+      
+      // Add any remaining text
+      if (remainingText) {
+        textRuns.push(new TextRun({ text: remainingText }));
+      }
+
+      // If no formatting was found, just add the plain text
+      if (textRuns.length === 0) {
+        textRuns.push(new TextRun({ text: line }));
+      }
+
+      children.push(new Paragraph({ children: textRuns }));
+    }
+
+    // Footer
+    children.push(new Paragraph({ text: "" }));
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `Generated by ChatGPT Helper Extension on ${new Date().toLocaleString()}`,
+            italics: true,
+            size: 16,
+            color: "666666",
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+      })
+    );
+
+    // Create document
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: children,
+        },
+      ],
+    });
+
+    return doc;
+  },
+
+  // Export single property to Word
+  async exportSingleProperty(propertyItem, options = {}) {
+    try {
+      showProgress('Preparing Word document...', 0);
+      
+      const content = this.extractConversationContent(propertyItem);
+      showProgress('Generating document structure...', 30);
+      
+      const doc = await this.generateWordDocument(content, options);
+      showProgress('Converting to Word format...', 70);
+      
+      const buffer = await window.docx.Packer.toBlob(doc);
+      showProgress('Downloading file...', 90);
+      
+      // Generate filename
+      const domain = propertyItem.domain.replace(/[^a-zA-Z0-9]/g, '-');
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `ChatGPT-Analysis-${domain}-${date}.docx`;
+      
+      // Download file
+      this.downloadBlob(buffer, filename);
+      
+      showProgress('Export complete!', 100);
+      setTimeout(() => hideProgress(), 2000);
+      
+      showSuccess(`Word document exported: ${filename}`);
+      
+    } catch (error) {
+      hideProgress();
+      console.error('Error exporting to Word:', error);
+      showError(`Failed to export Word document: ${error.message}`);
+    }
+  },
+
+  // Export multiple properties to Word (batch export)
+  async exportMultipleProperties(propertyItems, options = {}) {
+    try {
+      if (propertyItems.length === 0) {
+        showError('No properties selected for export');
+        return;
+      }
+
+      showProgress(`Preparing batch export of ${propertyItems.length} properties...`, 0);
+
+      if (!window.docx) {
+        await this.loadDocxLibrary();
+      }
+
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak } = window.docx;
+      
+      const children = [];
+
+      // Document title
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "ChatGPT Property Analysis - Batch Export",
+              bold: true,
+              size: 32,
+            }),
+          ],
+          heading: HeadingLevel.TITLE,
+          alignment: AlignmentType.CENTER,
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `${propertyItems.length} Properties Analyzed`,
+              size: 20,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+        })
+      );
+
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Generated on ${new Date().toLocaleString()}`,
+              italics: true,
+              size: 16,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+        })
+      );
+
+      children.push(new Paragraph({ text: "" }));
+
+      // Process each property
+      for (let i = 0; i < propertyItems.length; i++) {
+        const propertyItem = propertyItems[i];
+        const progress = Math.round((i / propertyItems.length) * 80) + 10;
+        showProgress(`Processing property ${i + 1} of ${propertyItems.length}...`, progress);
+
+        try {
+          const content = this.extractConversationContent(propertyItem);
+
+          // Add page break for properties after the first
+          if (i > 0) {
+            children.push(new Paragraph({
+              children: [new PageBreak()],
+            }));
+          }
+
+          // Property header
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Property ${i + 1}: ${content.domain}`,
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              heading: HeadingLevel.HEADING_1,
+            })
+          );
+
+          // Property URL and details
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "URL: ",
+                  bold: true,
+                }),
+                new TextRun({
+                  text: content.propertyUrl,
+                  color: "0066CC",
+                }),
+              ],
+            })
+          );
+
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Analysis Date: ",
+                  bold: true,
+                }),
+                new TextRun({
+                  text: content.analysisDate,
+                }),
+              ],
+            })
+          );
+
+          children.push(new Paragraph({ text: "" }));
+
+          // Add abbreviated analysis (first 500 characters to keep document manageable)
+          const shortAnalysis = content.fullResponse.length > 1000 
+            ? content.fullResponse.substring(0, 1000) + "..."
+            : content.fullResponse;
+
+          const analysisLines = shortAnalysis.split('\n');
+          for (const line of analysisLines) {
+            if (line.trim() === '') {
+              children.push(new Paragraph({ text: "" }));
+              continue;
+            }
+
+            const headerMatch = line.match(/^\*\*(.+?)\*\*$/);
+            if (headerMatch) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: headerMatch[1],
+                      bold: true,
+                      size: 16,
+                    }),
+                  ],
+                  heading: HeadingLevel.HEADING_3,
+                })
+              );
+            } else {
+              children.push(new Paragraph({
+                children: [new TextRun({ text: line })],
+              }));
+            }
+          }
+
+        } catch (error) {
+          console.error(`Error processing property ${i + 1}:`, error);
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Error processing property: ${error.message}`,
+                  color: "FF0000",
+                  italics: true,
+                }),
+              ],
+            })
+          );
+        }
+      }
+
+      showProgress('Generating Word document...', 90);
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: children,
+          },
+        ],
+      });
+
+      const buffer = await window.docx.Packer.toBlob(doc);
+      
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `ChatGPT-Batch-Analysis-${propertyItems.length}-properties-${date}.docx`;
+      
+      this.downloadBlob(buffer, filename);
+      
+      showProgress('Batch export complete!', 100);
+      setTimeout(() => hideProgress(), 2000);
+      
+      showSuccess(`Batch Word document exported: ${filename}`);
+      
+    } catch (error) {
+      hideProgress();
+      console.error('Error in batch export:', error);
+      showError(`Failed to export batch Word document: ${error.message}`);
+    }
+  },
+
+  // Download blob as file
+  downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  // Show export options modal
+  showExportOptionsModal(propertyItems) {
+    const isMultiple = Array.isArray(propertyItems) && propertyItems.length > 1;
+    const title = isMultiple ? `Export ${propertyItems.length} Properties to Word` : 'Export to Word Document';
+    
+    const modal = document.createElement('div');
+    modal.id = 'wordExportModal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-lg);
+    `;
+
+    modal.innerHTML = `
+      <div style="
+        background: var(--background);
+        border-radius: var(--radius-md);
+        max-width: 500px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: var(--shadow-md);
+      ">
+        <div style="
+          padding: var(--space-lg);
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+          <h3 style="margin: 0; font-size: var(--font-size-xl);">📄 ${title}</h3>
+          <button class="close-btn" style="
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+          ">✕</button>
+        </div>
+        
+        <div style="padding: var(--space-lg);">
+          <div style="margin-bottom: var(--space-lg);">
+            <h4 style="margin: 0 0 var(--space-md) 0;">Export Options</h4>
+            
+            <label style="display: block; margin-bottom: var(--space-md);">
+              <input type="checkbox" id="includeFormatting" checked style="margin-right: var(--space-sm);">
+              Preserve text formatting (bold, headers)
+            </label>
+            
+            <label style="display: block; margin-bottom: var(--space-md);">
+              <input type="checkbox" id="includePropertyData" checked style="margin-right: var(--space-sm);">
+              Include extracted property data summary
+            </label>
+            
+            <label style="display: block; margin-bottom: var(--space-md);">
+              <input type="checkbox" id="includeTimestamp" checked style="margin-right: var(--space-sm);">
+              Include export timestamp
+            </label>
+
+            ${isMultiple ? `
+              <label style="display: block; margin-bottom: var(--space-md);">
+                <input type="checkbox" id="separatePages" checked style="margin-right: var(--space-sm);">
+                Separate each property on new page
+              </label>
+            ` : ''}
+          </div>
+
+          <div style="
+            background: #f0f9ff;
+            padding: var(--space-md);
+            border-radius: var(--radius-sm);
+            margin-bottom: var(--space-lg);
+            border-left: 4px solid var(--primary);
+          ">
+            <strong>Export Preview:</strong><br>
+            ${isMultiple ? 
+              `${propertyItems.length} properties will be exported to a single Word document.` :
+              `Property from ${propertyItems.domain} will be exported with full ChatGPT analysis.`
+            }
+          </div>
+        </div>
+        
+        <div style="
+          padding: var(--space-lg);
+          border-top: 1px solid var(--border);
+          display: flex;
+          gap: var(--space-md);
+          justify-content: flex-end;
+        ">
+          <button class="cancel-btn btn btn-secondary btn-sm">❌ Cancel</button>
+          <button class="export-btn btn btn-primary btn-sm">📄 Export to Word</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event handlers
+    const closeBtn = modal.querySelector('.close-btn');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+    const exportBtn = modal.querySelector('.export-btn');
+
+    const closeModal = () => modal.remove();
+
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    exportBtn.addEventListener('click', async () => {
+      const options = {
+        includeFormatting: modal.querySelector('#includeFormatting').checked,
+        includePropertyData: modal.querySelector('#includePropertyData').checked,
+        includeTimestamp: modal.querySelector('#includeTimestamp').checked,
+        separatePages: modal.querySelector('#separatePages')?.checked ?? true
+      };
+
+      closeModal();
+
+      if (isMultiple) {
+        await this.exportMultipleProperties(propertyItems, options);
+      } else {
+        await this.exportSingleProperty(propertyItems, options);
+      }
+    });
+  }
+};
+
+// Progress indicator functions
+function showProgress(message, percentage) {
+  let progressModal = document.getElementById('progressModal');
+  
+  if (!progressModal) {
+    progressModal = document.createElement('div');
+    progressModal.id = 'progressModal';
+    progressModal.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--background);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-md);
+      z-index: 10001;
+      min-width: 300px;
+      text-align: center;
+    `;
+    
+    progressModal.innerHTML = `
+      <div style="margin-bottom: var(--space-md);">
+        <div style="font-weight: var(--font-weight-medium); margin-bottom: var(--space-sm);" id="progressMessage">Processing...</div>
+        <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+          <div id="progressBar" style="height: 100%; background: var(--primary); transition: width 0.3s ease; width: 0%;"></div>
+        </div>
+        <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-sm);" id="progressPercent">0%</div>
+      </div>
+    `;
+    
+    document.body.appendChild(progressModal);
+  }
+  
+  const messageEl = progressModal.querySelector('#progressMessage');
+  const barEl = progressModal.querySelector('#progressBar');
+  const percentEl = progressModal.querySelector('#progressPercent');
+  
+  if (messageEl) messageEl.textContent = message;
+  if (barEl) barEl.style.width = percentage + '%';
+  if (percentEl) percentEl.textContent = Math.round(percentage) + '%';
+}
+
+function hideProgress() {
+  const progressModal = document.getElementById('progressModal');
+  if (progressModal) {
+    progressModal.remove();
+  }
+}
+
+// Initialize Word export module when popup loads
+document.addEventListener('DOMContentLoaded', () => {
+  WordExportModule.init();
+});
+
+// Export functions to global scope for UI handlers
+window.WordExportModule = WordExportModule;
+window.showProgress = showProgress;
+window.hideProgress = hideProgress;
 

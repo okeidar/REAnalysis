@@ -9,6 +9,9 @@ A Chrome extension that works exclusively on ChatGPT (chatgpt.com and chat.opena
 - **Status Popup**: Click the extension icon to see current status and site information
 - **Smart Icon**: Extension icon changes based on whether you're on ChatGPT or not
 - **Property Link Analyzer**: Paste property links (Zillow, Realtor.com, etc.) and get comprehensive analysis from ChatGPT
+- **Word Export**: Export ChatGPT property analyses to Microsoft Word documents (.docx) with preserved formatting
+- **Batch Export**: Export multiple property analyses to Word or CSV formats
+- **Analysis History**: Track and manage all your property analyses with timestamps
 
 ## Installation
 
@@ -43,6 +46,22 @@ This extension will be available on the Chrome Web Store once published.
    - Click the "📋 Paste" button to paste from clipboard
 4. **Click "🔍 Analyze"**: The extension will insert a comprehensive analysis prompt into ChatGPT
 5. **Review Results**: ChatGPT will analyze the property and provide detailed insights
+
+### Word Export Feature (New!)
+1. **Navigate to Properties Tab**: Click "📊 Properties" in the extension popup
+2. **Export Options**: 
+   - **Single Property**: Click "📄 Export Word" on any analyzed property
+   - **Batch Export**: Click "📄 Export to Word" to export all properties
+3. **Configure Export**: Choose formatting options and what to include
+4. **Download**: Word document (.docx) automatically downloads to your device
+
+**Export Features:**
+- Preserves ChatGPT text formatting (bold, headers, structure)
+- Includes property details and analysis data
+- Professional document layout optimized for sharing
+- Batch export for comparing multiple properties
+
+For detailed instructions, see [WORD_EXPORT_USER_GUIDE.md](WORD_EXPORT_USER_GUIDE.md)
 
 #### Supported Property Websites
 - Zillow.com

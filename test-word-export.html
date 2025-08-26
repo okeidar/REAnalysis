@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Word Export Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Word Export Module Test</h1>
+    
+    <div class="test-section">
+        <h3>Library Loading Test</h3>
+        <div id="libraryTest" class="test-result">Testing...</div>
+        <button onclick="testLibraryLoading()">Test docx.js Loading</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Sample Export Test</h3>
+        <div id="exportTest" class="test-result">Ready to test</div>
+        <button onclick="testWordExport()">Generate Sample Word Document</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Property Data</h3>
+        <pre id="testData"></pre>
+    </div>
+
+    <script src="docx.min.js"></script>
+    <script>
+        // Sample test data that mimics the extension's property data structure
+        const samplePropertyData = {
+            url: "https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/",
+            domain: "zillow.com",
+            date: "1/26/2025",
+            analysis: {
+                fullResponse: `**PROPERTY DETAILS:**
+- **Price**: $485,000
+- **Bedrooms**: 3
+- **Bathrooms**: 2
+- **Square Footage**: 1,200 sq ft
+- **Property Type**: Single Family Home
+- **Year Built**: 1985
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Location Score: 8/10
+- This property is located in a highly desirable area with excellent schools nearby
+- Walking distance to shopping centers and public transportation
+- Safe neighborhood with low crime rates
+
+**RENTAL INCOME ANALYSIS:**
+- **Estimated Monthly Rental Income**: $2,800
+- Based on comparable properties in the area
+- **Rental Growth Potential**: Growth: Strong
+- Area shows consistent rental demand
+
+**INVESTMENT SUMMARY:**
+- **Overall Grade**: B+
+- **Top 3 Advantages**:
+  1. Great location with high walkability score
+  2. Strong rental demand in the area
+  3. Property is move-in ready
+
+- **Top 3 Concerns**:
+  1. Price is slightly above market average
+  2. Older construction may require maintenance
+  3. Limited parking options
+
+**RECOMMENDATION:**
+This property represents a solid investment opportunity with good rental potential and strong location fundamentals.`,
+                extractedData: {
+                    price: "485000",
+                    bedrooms: "3",
+                    bathrooms: "2",
+                    squareFeet: "1200",
+                    propertyType: "Single Family Home",
+                    yearBuilt: "1985",
+                    locationScore: "8/10",
+                    estimatedRentalIncome: "2800",
+                    rentalGrowthPotential: "Growth: Strong"
+                }
+            }
+        };
+
+        // Display test data
+        document.getElementById('testData').textContent = JSON.stringify(samplePropertyData, null, 2);
+
+        async function testLibraryLoading() {
+            const resultDiv = document.getElementById('libraryTest');
+            
+            try {
+                if (typeof docx !== 'undefined') {
+                    resultDiv.className = 'test-result success';
+                    resultDiv.textContent = '✅ Success: docx.js library loaded successfully!';
+                    
+                    // Test if we can access the required classes
+                    const { Document, Packer, Paragraph, TextRun } = docx;
+                    if (Document && Packer && Paragraph && TextRun) {
+                        resultDiv.textContent += ' All required classes available.';
+                    } else {
+                        throw new Error('Required classes not available');
+                    }
+                } else {
+                    throw new Error('docx library not found');
+                }
+            } catch (error) {
+                resultDiv.className = 'test-result error';
+                resultDiv.textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        async function testWordExport() {
+            const resultDiv = document.getElementById('exportTest');
+            
+            try {
+                resultDiv.className = 'test-result';
+                resultDiv.textContent = '⏳ Generating Word document...';
+                
+                if (typeof docx === 'undefined') {
+                    throw new Error('docx library not loaded');
+                }
+
+                const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+
+                // Create a simple test document
+                const children = [];
+
+                // Title
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "ChatGPT Property Analysis Test Export",
+                                bold: true,
+                                size: 32,
+                            }),
+                        ],
+                        heading: HeadingLevel.TITLE,
+                        alignment: AlignmentType.CENTER,
+                    })
+                );
+
+                // Property Information
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "Property Information",
+                                bold: true,
+                                size: 24,
+                            }),
+                        ],
+                        heading: HeadingLevel.HEADING_1,
+                    })
+                );
+
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "Property URL: ",
+                                bold: true,
+                            }),
+                            new TextRun({
+                                text: samplePropertyData.url,
+                                color: "0066CC",
+                            }),
+                        ],
+                    })
+                );
+
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "Source: ",
+                                bold: true,
+                            }),
+                            new TextRun({
+                                text: samplePropertyData.domain,
+                            }),
+                            new TextRun({
+                                text: " | Analysis Date: ",
+                                bold: true,
+                            }),
+                            new TextRun({
+                                text: samplePropertyData.date,
+                            }),
+                        ],
+                    })
+                );
+
+                // Add space
+                children.push(new Paragraph({ text: "" }));
+
+                // Add sample analysis content
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: "Test Analysis Content",
+                                bold: true,
+                                size: 20,
+                            }),
+                        ],
+                        heading: HeadingLevel.HEADING_2,
+                    })
+                );
+
+                const responseLines = samplePropertyData.analysis.fullResponse.split('\n');
+                for (const line of responseLines) {
+                    if (line.trim() === '') {
+                        children.push(new Paragraph({ text: "" }));
+                        continue;
+                    }
+
+                    // Check for headers
+                    const headerMatch = line.match(/^\*\*(.+?)\*\*$/);
+                    if (headerMatch) {
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: headerMatch[1],
+                                        bold: true,
+                                        size: 18,
+                                    }),
+                                ],
+                                heading: HeadingLevel.HEADING_3,
+                            })
+                        );
+                        continue;
+                    }
+
+                    children.push(new Paragraph({
+                        children: [new TextRun({ text: line })],
+                    }));
+                }
+
+                // Footer
+                children.push(new Paragraph({ text: "" }));
+                children.push(
+                    new Paragraph({
+                        children: [
+                            new TextRun({
+                                text: `Generated by Word Export Test on ${new Date().toLocaleString()}`,
+                                italics: true,
+                                size: 16,
+                                color: "666666",
+                            }),
+                        ],
+                        alignment: AlignmentType.CENTER,
+                    })
+                );
+
+                // Create document
+                const doc = new Document({
+                    sections: [
+                        {
+                            properties: {},
+                            children: children,
+                        },
+                    ],
+                });
+
+                const buffer = await Packer.toBlob(doc);
+                
+                // Download the document
+                const url = URL.createObjectURL(buffer);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Word-Export-Test-${new Date().toISOString().split('T')[0]}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                resultDiv.className = 'test-result success';
+                resultDiv.textContent = '✅ Success: Test Word document generated and downloaded!';
+
+            } catch (error) {
+                resultDiv.className = 'test-result error';
+                resultDiv.textContent = '❌ Error: ' + error.message;
+                console.error('Word export test error:', error);
+            }
+        }
+
+        // Auto-test library loading on page load
+        window.addEventListener('load', () => {
+            setTimeout(testLibraryLoading, 500);
+        });
+    </script>
+</body>
+</html>
