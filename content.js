@@ -2970,7 +2970,42 @@ function setupResponseMonitor() {
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
         console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
-        // Note: Prompt splitting logic moved to priority position above
+        // FALLBACK: If we're in prompt splitting mode, this could be the analysis response
+        // NOTE: This should normally not be needed anymore since currentPropertyAnalysis 
+        // is now set consistently when the property link is sent
+        if (promptSplittingState.currentPhase === 'complete' || 
+            promptSplittingState.currentPhase === 'sending_link') {
+          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
+              promptSplittingState.pendingPropertyLink) {
+            
+            console.log('✅ Successfully extracted analysis data from split prompt response');
+            
+            // Send the analysis data with the pending property link
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `split_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response) {
+                console.log('✅ Split prompt analysis data sent successfully:', response);
+                if (response.success) {
+                  console.log('🎉 Split prompt property analysis saved!');
+                }
+              }
+            }).catch(err => {
+              console.error('❌ Failed to send split prompt analysis data:', err);
+            });
+            
+            // Reset prompt splitting state
+            resetPromptSplittingState();
+          }
+        }
         return;
       }
       
@@ -3145,52 +3180,10 @@ function setupResponseMonitor() {
         return; // Don't process as regular property analysis
       }
       
-      // PRIORITY: Check if we're in prompt splitting mode and should save the response to the property link
-      if (promptSplittingState.currentPhase === 'complete' || promptSplittingState.currentPhase === 'sending_link') {
-        console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE RESPONSE TO SAVE!)...');
-        
-        const analysisData = extractPropertyAnalysisData(messageText);
-        if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
-            promptSplittingState.pendingPropertyLink) {
-          
-          console.log('✅ Successfully extracted analysis data from split prompt response');
-          
-          // Send the analysis data with the pending property link
-          safeChromeFall(() => {
-            return chrome.runtime.sendMessage({
-              action: 'savePropertyAnalysis',
-              propertyUrl: promptSplittingState.pendingPropertyLink,
-              sessionId: `split_${Date.now()}`,
-              analysisData: analysisData
-            });
-          }).then(response => {
-            if (response) {
-              console.log('✅ Split prompt analysis data sent successfully:', response);
-              if (response.success) {
-                console.log('🎉 Split prompt property analysis saved!');
-              }
-            }
-          }).catch(err => {
-            console.error('❌ Failed to send split prompt analysis data:', err);
-          });
-          
-          // Reset prompt splitting state and clear current property analysis to prevent conflicts
-          resetPromptSplittingState();
-          currentPropertyAnalysis = null;
-        }
-        return; // Don't process as regular property analysis
-      }
-      
       // Only process if we have an active property analysis session
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
         console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
         console.log('📊 Current response length:', messageText.length);
-        
-        // Skip if this looks like a confirmation response (to prevent saving wrong response)
-        if (detectConfirmation(messageText) && messageText.length < 500) {
-          console.log('🔍 Skipping short confirmation-like response, waiting for actual analysis...');
-          return;
-        }
         
         // Check if analysis session has timed out (10 minutes)
         const sessionAge = Date.now() - currentPropertyAnalysis.timestamp;
