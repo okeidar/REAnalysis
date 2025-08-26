@@ -8,6 +8,9 @@ let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, an
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
     togglePromptBtn, promptContent, propertyCount;
 
+// Tab system elements
+let tabButtons, tabContents, activeTab = 'analyzer';
+
 // Global variables
 let currentTab = null;
 let contentScriptReady = false;
@@ -15,6 +18,9 @@ let contentScriptReady = false;
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 RE Analyzer popup loaded');
+  
+  // Initialize tab system first
+  initializeTabSystem();
   
   // Get DOM elements with correct IDs from HTML
   propertyHistoryList = document.getElementById('propertyHistoryList');
@@ -36,9 +42,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   propertyCount = document.getElementById('propertyCount');
   
   // Settings elements
-  settingsSection = document.getElementById('settingsCollapsible');
-  settingsToggle = document.getElementById('settingsToggle');
-  settingsContent = document.getElementById('settingsContent');
   customPromptTextarea = document.getElementById('customPrompt');
   savePromptBtn = document.getElementById('savePromptBtn');
   resetPromptBtn = document.getElementById('resetPromptBtn');
@@ -90,8 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initializePromptSplittingSettings();
   await initializePopup();
   
-  // Set up collapsibles and prompt splitting listeners
-  setupCollapsibles();
+  // Set up prompt splitting listeners
   addPromptSplittingEventListeners();
   
   // Set up periodic refresh for pending analyses
@@ -100,25 +102,119 @@ document.addEventListener('DOMContentLoaded', async () => {
   }, 5000); // Refresh every 5 seconds to catch pending -> analyzed transitions
 });
 
+// Tab System Functions
+function initializeTabSystem() {
+  tabButtons = document.querySelectorAll('.tab-button');
+  tabContents = document.querySelectorAll('.tab-content');
+  
+  // Add click listeners to tab buttons
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabId = button.getAttribute('data-tab');
+      switchToTab(tabId);
+    });
+  });
+  
+  // Set initial active tab
+  switchToTab('analyzer');
+}
+
+function switchToTab(tabId) {
+  // Update active tab variable
+  activeTab = tabId;
+  
+  // Update tab buttons
+  tabButtons.forEach(button => {
+    if (button.getAttribute('data-tab') === tabId) {
+      button.classList.add('active');
+    } else {
+      button.classList.remove('active');
+    }
+  });
+  
+  // Update tab contents
+  tabContents.forEach(content => {
+    if (content.id === `${tabId}Tab`) {
+      content.classList.add('active');
+    } else {
+      content.classList.remove('active');
+    }
+  });
+  
+  // Handle tab-specific logic
+  handleTabSwitch(tabId);
+}
+
+function handleTabSwitch(tabId) {
+  // Setup collapsibles for any tab that might have them
+  setTimeout(() => {
+    setupCollapsibles();
+  }, 50);
+  
+  switch (tabId) {
+    case 'analyzer':
+      // Refresh connection status when switching to analyzer tab
+      if (statusElement) {
+        initializePopup();
+      }
+      break;
+      
+    case 'properties':
+      // Refresh property history when switching to properties tab
+      loadPropertyHistory();
+      break;
+      
+    case 'settings':
+      // Load settings when switching to settings tab
+      loadCustomPrompt();
+      initializePromptSplittingSettings();
+      initializeAdvancedSettings();
+      updateDebugInfo();
+      break;
+  }
+}
+
+// Get current active tab
+function getCurrentTab() {
+  return activeTab;
+}
+
+// Switch to specific tab (public function for external use)
+function showTab(tabId) {
+  switchToTab(tabId);
+}
+
 // Collapsible functionality
 function setupCollapsibles() {
   const collapsibles = document.querySelectorAll('.collapsible');
   
-  collapsibles.forEach(collapsible => {
+  collapsibles.forEach((collapsible, index) => {
     const header = collapsible.querySelector('.collapsible-header');
     const content = collapsible.querySelector('.collapsible-content');
-    const icon = collapsible.querySelector('.collapsible-icon');
     
     if (header && content) {
-      header.addEventListener('click', () => {
+      // Skip if already has our event listener
+      if (header.hasAttribute('data-collapsible-setup')) {
+        return;
+      }
+      
+      header.setAttribute('data-collapsible-setup', 'true');
+      const icon = header.querySelector('.collapsible-icon');
+      
+      header.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const isExpanded = !content.classList.contains('hidden');
         
         if (isExpanded) {
           content.classList.add('hidden');
           collapsible.classList.remove('expanded');
+          if (icon) icon.textContent = '▼';
         } else {
           content.classList.remove('hidden');
           collapsible.classList.add('expanded');
+          if (icon) icon.textContent = '▲';
         }
       });
     }
@@ -778,19 +874,43 @@ async function loadCustomPrompt() {
   }
 }
 
-async function saveCustomPrompt() {
+async function saveCustomPrompt(silent = false) {
   try {
     const customPrompt = customPromptTextarea.value.trim();
     if (!customPrompt) {
-      showError('Prompt cannot be empty');
+      if (!silent) showError('Prompt cannot be empty');
       return;
     }
     
+    // Save current prompt
     await chrome.storage.local.set({ customPrompt: customPrompt });
-    showSuccess('Custom prompt saved successfully!');
+    
+    // Save to prompt history
+    const result = await chrome.storage.local.get(['promptHistory']);
+    const history = result.promptHistory || [];
+    
+    // Only save if different from last version
+    if (history.length === 0 || history[0].prompt !== customPrompt) {
+      history.unshift({
+        prompt: customPrompt,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Keep only last 10 versions
+      if (history.length > 10) {
+        history.splice(10);
+      }
+      
+      await chrome.storage.local.set({ promptHistory: history });
+    }
+    
+    if (!silent) {
+      showSuccess('Custom prompt saved successfully!');
+      loadPromptHistory(); // Refresh history display
+    }
   } catch (error) {
     console.error('Error saving custom prompt:', error);
-    showError('Failed to save custom prompt');
+    if (!silent) showError('Failed to save custom prompt');
   }
 }
 
@@ -809,39 +929,7 @@ async function resetToDefaultPrompt() {
   }
 }
 
-function toggleSettings() {
-  if (settingsSection) {
-    const isVisible = settingsSection.style.display !== 'none';
-    settingsSection.style.display = isVisible ? 'none' : 'block';
-    
-    if (!isVisible) {
-      // Show settings section and load current configurations
-      loadCustomPrompt();
-      loadColumnConfiguration();
-    }
-  }
-}
-
-function toggleSettingsContent() {
-  if (settingsContent && settingsToggle) {
-    const isVisible = settingsContent.style.display !== 'none';
-    settingsContent.style.display = isVisible ? 'none' : 'block';
-    settingsToggle.textContent = isVisible ? '▼' : '▲';
-  }
-}
-
-function togglePromptSection() {
-  if (promptContent && togglePromptBtn) {
-    const isVisible = promptContent.style.display !== 'none';
-    promptContent.style.display = isVisible ? 'none' : 'block';
-    togglePromptBtn.textContent = isVisible ? '▼' : '▲';
-    
-    if (!isVisible) {
-      // Load prompt when expanding
-      loadCustomPrompt();
-    }
-  }
-}
+// Note: Settings toggle functions removed - now handled by tab system
 
 function toggleDefaultPrompt() {
   if (defaultPromptDisplay && showDefaultBtn) {
@@ -1699,20 +1787,6 @@ function showPromptSplittingMessage(message, type = 'success') {
 
 // Add prompt splitting settings event listeners
 function addPromptSplittingEventListeners() {
-  // Collapsible toggle
-  const toggleBtn = document.getElementById('togglePromptSplittingBtn');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      const content = document.getElementById('promptSplittingContent');
-      const icon = toggleBtn.querySelector('.collapsible-icon');
-      
-      if (content && icon) {
-        content.classList.toggle('hidden');
-        icon.textContent = content.classList.contains('hidden') ? '▼' : '▲';
-      }
-    });
-  }
-  
   // Save settings button
   const saveBtn = document.getElementById('saveSplittingSettingsBtn');
   if (saveBtn) {
@@ -1729,4 +1803,606 @@ function addPromptSplittingEventListeners() {
     });
   }
 }
+
+// Enhanced Settings Variables
+let autoSaveTimeout = null;
+let promptValidationEnabled = true;
+let autoSaveEnabled = true;
+let debugModeEnabled = false;
+let promptPreviewEnabled = false;
+
+// Prompt Templates
+const PROMPT_TEMPLATES = {
+  basic: `Please analyze this property listing and provide a brief overview including:
+
+1. Property details (price, bedrooms, bathrooms, size)
+2. Location assessment
+3. Key pros and cons
+4. Investment potential rating
+
+Property Link: {PROPERTY_URL}`,
+
+  detailed: `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+
+**REQUIRED DATA EXTRACTION:**
+1. **Price**: Exact asking price (include currency symbol)
+2. **Bedrooms**: Number of bedrooms (numeric)
+3. **Bathrooms**: Number of bathrooms (numeric, include half baths as .5)
+4. **Square Footage**: Total square footage (numeric)
+5. **Year Built**: Construction year (4-digit year)
+6. **Property Type**: Specific type (Single Family Home, Condo, Townhouse, Apartment, etc.)
+7. **Estimated Monthly Rental Income**: Your professional estimate based on local market rates
+8. **Location & Neighborhood Scoring**: Rate the location quality as X/10 (e.g., 7/10, 9/10) considering schools, safety, amenities, transportation
+9. **Rental Growth Potential**: Assess as "Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited" based on area development and market trends
+
+**ANALYSIS STRUCTURE:**
+Please organize your response with clear sections:
+
+**PROPERTY DETAILS:**
+- List all the required data points above in a clear format
+- Include any additional relevant specifications (lot size, parking, etc.)
+
+**LOCATION & NEIGHBORHOOD ANALYSIS:**
+- Provide your location score (X/10) with detailed justification
+- Analyze proximity to schools, shopping, transportation, employment centers
+- Assess neighborhood safety, walkability, and future development plans
+- Comment on property taxes, HOA fees, and local regulations
+
+**RENTAL INCOME ANALYSIS:**
+- Provide your estimated monthly rental income with reasoning
+- Compare to local rental comps if possible
+- Assess rental growth potential with specific factors
+
+**INVESTMENT SUMMARY:**
+- Overall investment grade and reasoning
+- Top 3 advantages (pros)
+- Top 3 concerns or limitations (cons)
+- Any red flags or warning signs
+- Price comparison to market value
+- Recommendation for this property as a rental investment
+
+Property Link: {PROPERTY_URL}`,
+
+  investment: `As an investment analyst, evaluate this property for investment potential. Focus on:
+
+**FINANCIAL ANALYSIS:**
+- Purchase price and financing options
+- Estimated rental income and cap rate
+- Cash flow projections
+- Market appreciation potential
+- Investment return timeline
+
+**RISK ASSESSMENT:**
+- Market conditions and trends
+- Property condition concerns
+- Location risks and opportunities
+- Competition analysis
+
+**RECOMMENDATION:**
+- Investment grade (A, B, C, D)
+- Expected ROI and timeline
+- Action recommendation (Buy, Pass, Watch)
+
+Property Link: {PROPERTY_URL}`,
+
+  rental: `Analyze this property specifically for rental investment potential:
+
+**RENTAL MARKET ANALYSIS:**
+- Comparable rental rates in area
+- Tenant demand and vacancy rates
+- Seasonal rental patterns
+- Target tenant demographics
+
+**PROPERTY SUITABILITY:**
+- Rental-friendly features and layout
+- Maintenance requirements and costs
+- Property management considerations
+- Parking and amenities
+
+**FINANCIAL PROJECTIONS:**
+- Monthly rental income estimate
+- Operating expenses breakdown
+- Cash flow after expenses
+- Break-even analysis
+
+**RENTAL STRATEGY RECOMMENDATIONS:**
+- Optimal rental approach (long-term, short-term, etc.)
+- Suggested improvements for rental appeal
+- Marketing and tenant screening advice
+
+Property Link: {PROPERTY_URL}`
+};
+
+// Enhanced Settings Functions
+async function initializeAdvancedSettings() {
+  try {
+    // Load advanced settings from storage
+    const result = await chrome.storage.local.get(['advancedSettings']);
+    const settings = result.advancedSettings || {
+      autoSaveEnabled: true,
+      promptValidationEnabled: true,
+      debugModeEnabled: false,
+      promptPreviewEnabled: false,
+      maxPromptLength: 2000
+    };
+    
+    // Update global variables
+    autoSaveEnabled = settings.autoSaveEnabled;
+    promptValidationEnabled = settings.promptValidationEnabled;
+    debugModeEnabled = settings.debugModeEnabled;
+    promptPreviewEnabled = settings.promptPreviewEnabled;
+    
+    // Update UI elements
+    const autoSaveCheckbox = document.getElementById('enableAutoSave');
+    const validationCheckbox = document.getElementById('enablePromptValidation');
+    const debugCheckbox = document.getElementById('enableDebugMode');
+    const previewCheckbox = document.getElementById('enablePromptPreview');
+    const maxLengthSlider = document.getElementById('maxPromptLength');
+    const maxLengthValue = document.getElementById('maxLengthValue');
+    
+    if (autoSaveCheckbox) autoSaveCheckbox.checked = settings.autoSaveEnabled;
+    if (validationCheckbox) validationCheckbox.checked = settings.promptValidationEnabled;
+    if (debugCheckbox) debugCheckbox.checked = settings.debugModeEnabled;
+    if (previewCheckbox) previewCheckbox.checked = settings.promptPreviewEnabled;
+    if (maxLengthSlider) maxLengthSlider.value = settings.maxPromptLength;
+    if (maxLengthValue) maxLengthValue.textContent = settings.maxPromptLength;
+    
+    // Add event listeners for new elements
+    setupAdvancedSettingsListeners();
+    
+    // Initialize prompt character counter
+    updatePromptCharCount();
+    
+    // Load prompt history
+    loadPromptHistory();
+    
+  } catch (error) {
+    console.error('Error initializing advanced settings:', error);
+  }
+}
+
+function setupAdvancedSettingsListeners() {
+  // Character counter for prompt
+  const customPrompt = document.getElementById('customPrompt');
+  if (customPrompt) {
+    customPrompt.addEventListener('input', () => {
+      updatePromptCharCount();
+      handleAutoSave();
+      if (promptValidationEnabled) {
+        validatePrompt();
+      }
+    });
+  }
+  
+  // Template buttons
+  const templateButtons = {
+    'templateBasicBtn': 'basic',
+    'templateDetailedBtn': 'detailed', 
+    'templateInvestmentBtn': 'investment',
+    'templateRentalBtn': 'rental'
+  };
+  
+  Object.entries(templateButtons).forEach(([buttonId, templateKey]) => {
+    const button = document.getElementById(buttonId);
+    if (button) {
+      button.addEventListener('click', () => loadTemplate(templateKey));
+    }
+  });
+  
+  // Validation button
+  const validateBtn = document.getElementById('validatePromptBtn');
+  if (validateBtn) {
+    validateBtn.addEventListener('click', validatePrompt);
+  }
+  
+  // Advanced settings sliders
+  const maxLengthSlider = document.getElementById('maxPromptLength');
+  if (maxLengthSlider) {
+    maxLengthSlider.addEventListener('input', (e) => {
+      const maxLengthValue = document.getElementById('maxLengthValue');
+      if (maxLengthValue) {
+        maxLengthValue.textContent = e.target.value;
+      }
+    });
+  }
+  
+  // Import/Export buttons
+  const exportPromptBtn = document.getElementById('exportPromptBtn');
+  const importPromptBtn = document.getElementById('importPromptBtn');
+  const promptFileInput = document.getElementById('promptFileInput');
+  
+  if (exportPromptBtn) {
+    exportPromptBtn.addEventListener('click', exportPrompt);
+  }
+  
+  if (importPromptBtn) {
+    importPromptBtn.addEventListener('click', () => {
+      if (promptFileInput) promptFileInput.click();
+    });
+  }
+  
+  if (promptFileInput) {
+    promptFileInput.addEventListener('change', importPrompt);
+  }
+  
+  // Save buttons
+  const saveAdvancedBtn = document.getElementById('saveAdvancedSettingsBtn');
+  const saveDebugBtn = document.getElementById('saveDebugSettingsBtn');
+  
+  if (saveAdvancedBtn) {
+    saveAdvancedBtn.addEventListener('click', saveAdvancedSettings);
+  }
+  
+  if (saveDebugBtn) {
+    saveDebugBtn.addEventListener('click', saveDebugSettings);
+  }
+  
+  // Debug buttons
+  const clearDebugBtn = document.getElementById('clearDebugBtn');
+  const exportDebugBtn = document.getElementById('exportDebugBtn');
+  
+  if (clearDebugBtn) {
+    clearDebugBtn.addEventListener('click', () => {
+      console.clear();
+      showSuccess('Console cleared');
+    });
+  }
+  
+  if (exportDebugBtn) {
+    exportDebugBtn.addEventListener('click', exportDebugInfo);
+  }
+}
+
+function updatePromptCharCount() {
+  const customPrompt = document.getElementById('customPrompt');
+  const charCount = document.getElementById('promptCharCount');
+  
+  if (customPrompt && charCount) {
+    const count = customPrompt.value.length;
+    charCount.textContent = `${count} characters`;
+    
+    // Color coding based on length
+    if (count > 2500) {
+      charCount.style.color = '#dc2626'; // Red
+    } else if (count > 2000) {
+      charCount.style.color = '#f59e0b'; // Orange
+    } else {
+      charCount.style.color = 'var(--text-secondary)'; // Normal
+    }
+  }
+}
+
+function handleAutoSave() {
+  if (!autoSaveEnabled) return;
+  
+  // Clear existing timeout
+  if (autoSaveTimeout) {
+    clearTimeout(autoSaveTimeout);
+  }
+  
+  // Set new timeout for auto-save
+  autoSaveTimeout = setTimeout(async () => {
+    await saveCustomPrompt(true); // true = silent save
+    showAutoSaveIndicator();
+  }, 3000);
+}
+
+function showAutoSaveIndicator() {
+  const indicator = document.getElementById('autoSaveIndicator');
+  if (indicator) {
+    indicator.classList.remove('hidden');
+    setTimeout(() => {
+      indicator.classList.add('hidden');
+    }, 2000);
+  }
+}
+
+function loadTemplate(templateKey) {
+  const customPrompt = document.getElementById('customPrompt');
+  if (customPrompt && PROMPT_TEMPLATES[templateKey]) {
+    if (customPrompt.value.trim() && !confirm('This will replace your current prompt. Continue?')) {
+      return;
+    }
+    
+    customPrompt.value = PROMPT_TEMPLATES[templateKey];
+    updatePromptCharCount();
+    
+    if (promptValidationEnabled) {
+      validatePrompt();
+    }
+    
+    showSuccess(`${templateKey.charAt(0).toUpperCase() + templateKey.slice(1)} template loaded`);
+  }
+}
+
+function validatePrompt() {
+  const customPrompt = document.getElementById('customPrompt');
+  const validationDiv = document.getElementById('promptValidation');
+  const validationMessages = document.getElementById('validationMessages');
+  
+  if (!customPrompt || !validationDiv || !validationMessages) return;
+  
+  const prompt = customPrompt.value.trim();
+  const issues = [];
+  
+  // Validation checks
+  if (prompt.length === 0) {
+    issues.push('Prompt is empty');
+  }
+  
+  if (prompt.length < 50) {
+    issues.push('Prompt is very short (less than 50 characters)');
+  }
+  
+  if (prompt.length > 3000) {
+    issues.push('Prompt is very long (over 3000 characters) - may cause issues');
+  }
+  
+  if (!prompt.includes('{PROPERTY_URL}')) {
+    issues.push('Missing {PROPERTY_URL} placeholder');
+  }
+  
+  if (prompt.includes('http://') || prompt.includes('https://')) {
+    issues.push('Contains hard-coded URLs - use {PROPERTY_URL} placeholder instead');
+  }
+  
+  // Word count check
+  const wordCount = prompt.split(/\s+/).length;
+  if (wordCount > 500) {
+    issues.push(`Very long prompt (${wordCount} words) - consider shortening for better performance`);
+  }
+  
+  // Update validation display
+  if (issues.length > 0) {
+    validationMessages.innerHTML = issues.map(issue => `<li>${issue}</li>`).join('');
+    validationDiv.classList.remove('hidden');
+  } else {
+    validationDiv.classList.add('hidden');
+    showSuccess('Prompt validation passed ✅');
+  }
+}
+
+async function exportPrompt() {
+  try {
+    const customPrompt = document.getElementById('customPrompt');
+    if (!customPrompt) return;
+    
+    const promptData = {
+      prompt: customPrompt.value,
+      timestamp: new Date().toISOString(),
+                     version: "v1.1.1",
+        type: "RE Analyzer Custom Prompt"
+    };
+    
+    const blob = new Blob([JSON.stringify(promptData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `re-analyzer-prompt-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showSuccess('Prompt exported successfully!');
+  } catch (error) {
+    console.error('Error exporting prompt:', error);
+    showError('Failed to export prompt');
+  }
+}
+
+async function importPrompt(event) {
+  try {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const text = await file.text();
+    let promptData;
+    
+    if (file.name.endsWith('.json')) {
+      promptData = JSON.parse(text);
+      if (promptData.prompt) {
+        loadImportedPrompt(promptData.prompt);
+      } else {
+        throw new Error('Invalid JSON format');
+      }
+    } else {
+      // Plain text file
+      loadImportedPrompt(text);
+    }
+    
+    event.target.value = ''; // Clear file input
+    
+  } catch (error) {
+    console.error('Error importing prompt:', error);
+    showError('Failed to import prompt - check file format');
+  }
+}
+
+function loadImportedPrompt(promptText) {
+  const customPrompt = document.getElementById('customPrompt');
+  if (!customPrompt) return;
+  
+  if (customPrompt.value.trim() && !confirm('This will replace your current prompt. Continue?')) {
+    return;
+  }
+  
+  customPrompt.value = promptText;
+  updatePromptCharCount();
+  
+  if (promptValidationEnabled) {
+    validatePrompt();
+  }
+  
+  showSuccess('Prompt imported successfully!');
+}
+
+async function saveAdvancedSettings() {
+  try {
+    const settings = {
+      autoSaveEnabled: document.getElementById('enableAutoSave')?.checked ?? true,
+      promptValidationEnabled: document.getElementById('enablePromptValidation')?.checked ?? true,
+      debugModeEnabled: document.getElementById('enableDebugMode')?.checked ?? false,
+      promptPreviewEnabled: document.getElementById('enablePromptPreview')?.checked ?? false,
+      maxPromptLength: parseInt(document.getElementById('maxPromptLength')?.value ?? 2000)
+    };
+    
+    // Update global variables
+    autoSaveEnabled = settings.autoSaveEnabled;
+    promptValidationEnabled = settings.promptValidationEnabled;
+    debugModeEnabled = settings.debugModeEnabled;
+    promptPreviewEnabled = settings.promptPreviewEnabled;
+    
+    await chrome.storage.local.set({ advancedSettings: settings });
+    showSuccess('Advanced settings saved successfully!');
+    
+  } catch (error) {
+    console.error('Error saving advanced settings:', error);
+    showError('Failed to save advanced settings');
+  }
+}
+
+async function saveDebugSettings() {
+  try {
+    const settings = {
+      debugModeEnabled: document.getElementById('enableDebugMode')?.checked ?? false,
+      promptPreviewEnabled: document.getElementById('enablePromptPreview')?.checked ?? false
+    };
+    
+    debugModeEnabled = settings.debugModeEnabled;
+    promptPreviewEnabled = settings.promptPreviewEnabled;
+    
+    const result = await chrome.storage.local.get(['advancedSettings']);
+    const advancedSettings = result.advancedSettings || {};
+    
+    await chrome.storage.local.set({ 
+      advancedSettings: { ...advancedSettings, ...settings }
+    });
+    
+    showSuccess('Debug settings saved successfully!');
+    updateDebugInfo();
+    
+  } catch (error) {
+    console.error('Error saving debug settings:', error);
+    showError('Failed to save debug settings');
+  }
+}
+
+function updateDebugInfo() {
+  const debugActiveTab = document.getElementById('debugActiveTab');
+  const debugTime = document.getElementById('debugTime');
+  
+  if (debugActiveTab) {
+    debugActiveTab.textContent = `Active Tab: ${activeTab}`;
+  }
+  
+  if (debugTime) {
+    debugTime.textContent = new Date().toLocaleTimeString();
+  }
+}
+
+async function exportDebugInfo() {
+  try {
+    const debugData = {
+      timestamp: new Date().toISOString(),
+      activeTab: activeTab,
+      userAgent: navigator.userAgent,
+              extension: {
+          version: "v1.1.1",
+          tabSystem: "active",
+          settingsTab: "loaded"
+        },
+      settings: {
+        autoSaveEnabled,
+        promptValidationEnabled,
+        debugModeEnabled,
+        promptPreviewEnabled
+      },
+      storage: await chrome.storage.local.get()
+    };
+    
+    const blob = new Blob([JSON.stringify(debugData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `re-analyzer-debug-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showSuccess('Debug info exported successfully!');
+  } catch (error) {
+    console.error('Error exporting debug info:', error);
+    showError('Failed to export debug info');
+  }
+}
+
+async function loadPromptHistory() {
+  try {
+    const result = await chrome.storage.local.get(['promptHistory']);
+    const history = result.promptHistory || [];
+    
+    const historyDiv = document.getElementById('promptHistory');
+    if (!historyDiv) return;
+    
+    if (history.length === 0) {
+      historyDiv.innerHTML = `
+        <div class="empty-state" style="padding: var(--space-md);">
+          <p style="font-size: var(--font-size-sm); color: var(--text-secondary);">No previous versions saved</p>
+        </div>
+      `;
+      return;
+    }
+    
+    const historyHTML = history.slice(0, 5).map((item, index) => `
+      <div style="padding: var(--space-sm); border-bottom: 1px solid var(--border); cursor: pointer;" onclick="restorePromptVersion(${index})">
+        <div style="font-size: var(--font-size-sm); font-weight: var(--font-weight-medium);">
+          ${new Date(item.timestamp).toLocaleDateString()} ${new Date(item.timestamp).toLocaleTimeString()}
+        </div>
+        <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-xs);">
+          ${item.prompt.substring(0, 100)}${item.prompt.length > 100 ? '...' : ''}
+        </div>
+      </div>
+    `).join('');
+    
+    historyDiv.innerHTML = historyHTML;
+    
+  } catch (error) {
+    console.error('Error loading prompt history:', error);
+  }
+}
+
+async function restorePromptVersion(index) {
+  try {
+    const result = await chrome.storage.local.get(['promptHistory']);
+    const history = result.promptHistory || [];
+    
+    if (history[index]) {
+      const customPrompt = document.getElementById('customPrompt');
+      if (customPrompt) {
+        if (customPrompt.value.trim() && !confirm('This will replace your current prompt. Continue?')) {
+          return;
+        }
+        
+        customPrompt.value = history[index].prompt;
+        updatePromptCharCount();
+        
+        if (promptValidationEnabled) {
+          validatePrompt();
+        }
+        
+        showSuccess('Prompt version restored successfully!');
+      }
+    }
+  } catch (error) {
+    console.error('Error restoring prompt version:', error);
+    showError('Failed to restore prompt version');
+  }
+}
+
+// Make function globally accessible for onclick handlers
+window.restorePromptVersion = restorePromptVersion;
 

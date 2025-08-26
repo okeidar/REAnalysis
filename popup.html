@@ -59,6 +59,65 @@
       line-height: 1.5;
     }
     
+    /* Tab Navigation System */
+    .tab-navigation {
+      display: flex;
+      background: var(--secondary-background);
+      border-bottom: 1px solid var(--border);
+      margin: 0;
+      padding: 0;
+    }
+    
+    .tab-button {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: var(--space-md);
+      font-family: inherit;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+    }
+    
+    .tab-button:hover {
+      background: var(--background);
+      color: var(--text-primary);
+    }
+    
+    .tab-button.active {
+      background: var(--background);
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+    }
+    
+    .tab-button.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+    
+    /* Tab Content */
+    .tab-content {
+      display: none;
+      padding: var(--space-md);
+      min-height: 400px;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+
     /* Header */
     .header {
       padding: var(--space-lg) var(--space-md);
@@ -86,7 +145,7 @@
     
     /* Main Content */
     .main-content {
-      padding: var(--space-md);
+      padding: 0;
     }
     
     /* Sections */
@@ -1004,284 +1063,484 @@
       <p class="subtitle">AI-powered property analysis</p>
     </header>
     
+    <!-- Tab Navigation -->
+    <nav class="tab-navigation">
+      <button class="tab-button active" data-tab="analyzer">
+        🔍 Analyzer
+      </button>
+      <button class="tab-button" data-tab="properties">
+        📊 Properties
+      </button>
+      <button class="tab-button" data-tab="settings">
+        ⚙️ Settings
+      </button>
+    </nav>
+    
     <!-- Main Content -->
     <main class="main-content">
       
-      <!-- Status Section -->
-      <section class="section">
-        <div id="status" class="status loading">
-          <div class="spinner"></div>
-          Checking status...
-        </div>
-      </section>
-      
-      <!-- Property Analysis Section -->
-      <section class="section" id="propertyLinkSection" style="display: none;">
-        <div class="section-header">
-          <h2 class="section-title">
-            <span>🔍</span>
-            Analyze Property
-          </h2>
-        </div>
+      <!-- Analyzer Tab -->
+      <div id="analyzerTab" class="tab-content active">
         
-        <div class="card">
-          <div class="form-group">
-            <label for="propertyLinkInput" class="form-label">Property URL</label>
-            <textarea 
-              id="propertyLinkInput" 
-              class="form-input" 
-              placeholder="Paste a property link (Zillow, Realtor.com, etc.)"
-              rows="2"
-            ></textarea>
+        <!-- Status Section -->
+        <section class="section">
+          <div id="status" class="status loading">
+            <div class="spinner"></div>
+            Checking status...
+          </div>
+        </section>
+        
+        <!-- Property Analysis Section -->
+        <section class="section" id="propertyLinkSection" style="display: none;">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span>🔍</span>
+              Analyze Property
+            </h2>
           </div>
           
-          <div class="btn-group">
-            <button id="pasteBtn" class="btn btn-secondary btn-sm">
-              📋 Paste
-            </button>
-            <button id="analyzeBtn" class="btn btn-primary">
-              🔍 Analyze Property
-            </button>
-          </div>
-          
-          <div id="successMessage" class="message success"></div>
-          <div id="errorMessage" class="message error"></div>
-        </div>
-      </section>
-      
-      <!-- Property History Section -->
-      <section class="section" id="propertyHistorySection" style="display: none;">
-        <div class="section-header">
-          <h2 class="section-title">
-            <span>📊</span>
-            Properties Dashboard
-            <span id="propertyCount" class="section-badge">0</span>
-          </h2>
-          <div class="section-controls">
-            <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-              🗑️
-            </button>
-          </div>
-        </div>
-        
-
-        
-        <div class="card">
-          <!-- Simple List View -->
-          <div id="propertyHistoryList" class="history-list">
-            <div class="empty-state">
-              <div class="empty-state-icon">📄</div>
-              <p>No properties analyzed yet</p>
+          <div class="card">
+            <div class="form-group">
+              <label for="propertyLinkInput" class="form-label">Property URL</label>
+              <textarea 
+                id="propertyLinkInput" 
+                class="form-input" 
+                placeholder="Paste a property link (Zillow, Realtor.com, etc.)"
+                rows="2"
+              ></textarea>
             </div>
-          </div>
-          
-          <!-- Action Buttons -->
-          <div class="property-actions" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border);">
-            <div class="btn-group">
-              <button id="exportHistoryBtn" class="btn btn-secondary btn-sm">
-                📊 Export All Responses
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      <!-- Settings Section -->
-      <section class="section">
-        <div class="collapsible" id="settingsCollapsible">
-          <button class="collapsible-header" id="settingsToggle">
-            <span>⚙️ Settings</span>
-            <span class="collapsible-icon">▼</span>
-          </button>
-          
-          <div class="collapsible-content hidden" id="settingsContent">
             
-            <!-- Custom Prompt Settings -->
-            <div class="collapsible" style="margin-bottom: var(--space-md);">
-              <button class="collapsible-header" id="togglePromptBtn">
-                <span>🤖 Custom Analysis Prompt</span>
-                <span class="collapsible-icon">▼</span>
+            <div class="btn-group">
+              <button id="pasteBtn" class="btn btn-secondary btn-sm">
+                📋 Paste
               </button>
-              
-              <div class="collapsible-content hidden" id="promptContent">
-                <div class="form-group">
-                  <label for="customPrompt" class="form-label">Analysis Prompt</label>
-                  <textarea 
-                    id="customPrompt" 
-                    class="form-input" 
-                    rows="6"
-                    placeholder="Enter your custom analysis prompt..."
-                  ></textarea>
+              <button id="analyzeBtn" class="btn btn-primary">
+                🔍 Analyze Property
+              </button>
+            </div>
+            
+            <div id="successMessage" class="message success"></div>
+            <div id="errorMessage" class="message error"></div>
+          </div>
+        </section>
+        
+        <!-- Site Information Section -->
+        <section class="section" id="info" style="display: none;">
+          <div class="collapsible">
+            <button class="collapsible-header">
+              <span>📍 Site Information</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Current Site</div>
+                  <div class="info-value" id="site">-</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">URL</div>
+                  <div class="info-value" id="url">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+      
+      <!-- Properties Tab -->
+      <div id="propertiesTab" class="tab-content">
+        
+        <!-- Property History Section -->
+        <section class="section" id="propertyHistorySection">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span>📊</span>
+              Properties Dashboard
+              <span id="propertyCount" class="section-badge">0</span>
+            </h2>
+            <div class="section-controls">
+              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
+                🗑️
+              </button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <!-- Simple List View -->
+            <div id="propertyHistoryList" class="history-list">
+              <div class="empty-state">
+                <div class="empty-state-icon">📄</div>
+                <p>No properties analyzed yet</p>
+              </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="property-actions" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border);">
+              <div class="btn-group">
+                <button id="exportHistoryBtn" class="btn btn-secondary btn-sm">
+                  📊 Export All Responses
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+      
+      <!-- Settings Tab -->
+      <div id="settingsTab" class="tab-content">
+        
+        <!-- Custom Prompt Settings -->
+        <section class="section">
+          <div class="collapsible" style="margin-bottom: var(--space-md);">
+            <button class="collapsible-header" id="togglePromptBtn">
+              <span>🤖 Custom Analysis Prompt</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content hidden" id="promptContent">
+              <div class="form-group">
+                <label for="customPrompt" class="form-label">
+                  Analysis Prompt
+                  <span style="color: var(--text-secondary); font-weight: var(--font-weight-normal); font-size: var(--font-size-sm);">
+                    (First prompt sent to ChatGPT)
+                  </span>
+                </label>
+                <textarea 
+                  id="customPrompt" 
+                  class="form-input" 
+                  rows="8"
+                  placeholder="Enter your custom analysis prompt..."
+                ></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xs);">
                   <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
                     Use {PROPERTY_URL} as placeholder for the property link
                   </small>
-                </div>
-                
-                <div class="btn-group">
-                  <button id="showDefaultBtn" class="btn btn-ghost btn-sm">
-                    📄 View Default
-                  </button>
-                  <button id="resetPromptBtn" class="btn btn-secondary btn-sm">
-                    🔄 Reset
-                  </button>
-                  <button id="savePromptBtn" class="btn btn-primary btn-sm">
-                    💾 Save
-                  </button>
-                </div>
-                
-                <div id="defaultPromptDisplay" class="card hidden" style="margin-top: var(--space-md); background: var(--secondary-background);">
-                  <!-- Default prompt will be shown here -->
+                  <small id="promptCharCount" style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                    0 characters
+                  </small>
                 </div>
               </div>
-            </div>
-            
-            <!-- Prompt Splitting Settings -->
-            <div class="collapsible" style="margin-bottom: var(--space-md);">
-              <button class="collapsible-header" id="togglePromptSplittingBtn">
-                <span>🔀 Prompt Splitting</span>
-                <span class="collapsible-icon">▼</span>
-              </button>
               
-              <div class="collapsible-content hidden" id="promptSplittingContent">
-                <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
-                  Improve link processing by splitting long prompts into instructions and property link phases.
-                </p>
-                
-                <div class="form-group">
-                  <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                    <input type="checkbox" id="enablePromptSplitting" checked>
-                    Enable Prompt Splitting
-                  </label>
-                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                    Automatically split prompts longer than the threshold for better link fetching
-                  </small>
-                </div>
-                
-                <div class="form-group">
-                  <label for="promptLengthThreshold" class="form-label">
-                    Length Threshold: <span id="thresholdValue">200</span> characters
-                  </label>
-                  <input 
-                    type="range" 
-                    id="promptLengthThreshold" 
-                    min="50" 
-                    max="1000" 
-                    value="200" 
-                    step="25"
-                    style="width: 100%;"
-                  >
-                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                    Prompts longer than this will be split into two phases
-                  </small>
-                </div>
-                
-                <div class="form-group">
-                  <label for="confirmationTimeout" class="form-label">
-                    Confirmation Timeout: <span id="timeoutValue">15</span> seconds
-                  </label>
-                  <input 
-                    type="range" 
-                    id="confirmationTimeout" 
-                    min="5" 
-                    max="60" 
-                    value="15" 
-                    step="5"
-                    style="width: 100%;"
-                  >
-                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                    How long to wait for ChatGPT's confirmation before falling back
-                  </small>
-                </div>
-                
-                <div class="info-grid" style="margin: var(--space-md) 0;">
-                  <div class="info-item">
-                    <div class="info-label">Success Rate</div>
-                    <div class="info-value" id="splittingSuccessRate">No data yet</div>
-                  </div>
-                  <div class="info-item">
-                    <div class="info-label">Total Attempts</div>
-                    <div class="info-value" id="splittingAttempts">0</div>
-                  </div>
-                </div>
-                
-                <div class="btn-group">
-                  <button id="resetSplittingStatsBtn" class="btn btn-ghost btn-sm">
-                    📊 Reset Stats
+              <!-- Prompt Templates -->
+              <div class="form-group">
+                <label class="form-label">Quick Templates</label>
+                <div class="btn-group" style="flex-wrap: wrap;">
+                  <button id="templateBasicBtn" class="btn btn-ghost btn-sm">
+                    📝 Basic Analysis
                   </button>
-                  <button id="saveSplittingSettingsBtn" class="btn btn-primary btn-sm">
-                    💾 Save Settings
+                  <button id="templateDetailedBtn" class="btn btn-ghost btn-sm">
+                    📊 Detailed Report
+                  </button>
+                  <button id="templateInvestmentBtn" class="btn btn-ghost btn-sm">
+                    💰 Investment Focus
+                  </button>
+                  <button id="templateRentalBtn" class="btn btn-ghost btn-sm">
+                    🏠 Rental Analysis
                   </button>
                 </div>
-                
-                <div id="splittingMessage" class="message"></div>
               </div>
-            </div>
-            
-            <!-- Export Information -->
-            <div class="collapsible">
-              <button class="collapsible-header" id="toggleExportInfoBtn">
-                <span>📊 Export Information</span>
-                <span class="collapsible-icon">▼</span>
-              </button>
               
-              <div class="collapsible-content hidden" id="exportInfoContent">
-                <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
-                  The export will include:
-                </p>
-                
-                <div class="info-grid">
-                  <div class="info-item">
-                    <div class="info-label">Property URL</div>
-                    <div class="info-value">Full property listing link</div>
-                  </div>
-                  <div class="info-item">
-                    <div class="info-label">Source</div>
-                    <div class="info-value">Website domain (Zillow, Realtor.com, etc.)</div>
-                  </div>
-                  <div class="info-item">
-                    <div class="info-label">Analysis Date</div>
-                    <div class="info-value">When the analysis was performed</div>
-                  </div>
-                  <div class="info-item">
-                    <div class="info-label">ChatGPT Response</div>
-                    <div class="info-value">Complete unprocessed AI analysis</div>
-                  </div>
+              <!-- Prompt Validation -->
+              <div id="promptValidation" class="card hidden" style="background: #fef3c7; border-left: 4px solid #f59e0b; margin: var(--space-md) 0;">
+                <div style="font-weight: var(--font-weight-medium); color: #92400e; margin-bottom: var(--space-xs);">
+                  ⚠️ Prompt Validation
                 </div>
+                <ul id="validationMessages" style="margin: 0; padding-left: var(--space-lg); color: #92400e; font-size: var(--font-size-sm);">
+                </ul>
               </div>
-            </div>
-            
-          </div>
-        </div>
-      </section>
-      
-      <!-- Site Information Section -->
-      <section class="section" id="info" style="display: none;">
-        <div class="collapsible">
-          <button class="collapsible-header">
-            <span>📍 Site Information</span>
-            <span class="collapsible-icon">▼</span>
-          </button>
-          
-          <div class="collapsible-content">
-            <div class="info-grid">
-              <div class="info-item">
-                <div class="info-label">Current Site</div>
-                <div class="info-value" id="site">-</div>
+              
+              <div class="btn-group">
+                <button id="showDefaultBtn" class="btn btn-ghost btn-sm">
+                  📄 View Default
+                </button>
+                <button id="validatePromptBtn" class="btn btn-secondary btn-sm">
+                  ✅ Validate
+                </button>
+                <button id="resetPromptBtn" class="btn btn-secondary btn-sm">
+                  🔄 Reset
+                </button>
+                <button id="savePromptBtn" class="btn btn-primary btn-sm">
+                  💾 Save
+                </button>
               </div>
-              <div class="info-item">
-                <div class="info-label">URL</div>
-                <div class="info-value" id="url">-</div>
+              
+              <div id="defaultPromptDisplay" class="card hidden" style="margin-top: var(--space-md); background: var(--secondary-background);">
+                <!-- Default prompt will be shown here -->
+              </div>
+              
+              <!-- Auto-save indicator -->
+              <div id="autoSaveIndicator" class="hidden" style="margin-top: var(--space-sm); padding: var(--space-sm); background: #dcfce7; border-radius: var(--radius-sm); color: #166534; font-size: var(--font-size-sm);">
+                ✅ Auto-saved
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+        
+        <!-- Advanced Prompt Settings -->
+        <section class="section">
+          <div class="collapsible" style="margin-bottom: var(--space-md);">
+            <button class="collapsible-header" id="toggleAdvancedPromptBtn">
+              <span>⚙️ Advanced Prompt Settings</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content hidden" id="advancedPromptContent">
+              <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                  <input type="checkbox" id="enableAutoSave" checked>
+                  Enable Auto-save
+                </label>
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Automatically save prompt changes after 3 seconds of inactivity
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                  <input type="checkbox" id="enablePromptValidation" checked>
+                  Enable Prompt Validation
+                </label>
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Check for common issues and provide suggestions
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <label for="maxPromptLength" class="form-label">
+                  Maximum Prompt Length: <span id="maxLengthValue">2000</span> characters
+                </label>
+                <input 
+                  type="range" 
+                  id="maxPromptLength" 
+                  min="500" 
+                  max="4000" 
+                  value="2000" 
+                  step="100"
+                  style="width: 100%;"
+                >
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Recommended: 1500-2500 characters for optimal performance
+                </small>
+              </div>
+              
+              <!-- Prompt History -->
+              <div class="form-group">
+                <label class="form-label">Recent Prompt Versions</label>
+                <div id="promptHistory" class="card" style="max-height: 150px; overflow-y: auto; background: var(--secondary-background);">
+                  <div class="empty-state" style="padding: var(--space-md);">
+                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary);">No previous versions saved</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="btn-group">
+                <button id="exportPromptBtn" class="btn btn-ghost btn-sm">
+                  📤 Export Prompt
+                </button>
+                <button id="importPromptBtn" class="btn btn-ghost btn-sm">
+                  📥 Import Prompt
+                </button>
+                <button id="saveAdvancedSettingsBtn" class="btn btn-primary btn-sm">
+                  💾 Save Settings
+                </button>
+              </div>
+              
+              <input type="file" id="promptFileInput" accept=".txt,.json" style="display: none;">
+            </div>
+          </div>
+        </section>
+        
+        <!-- Prompt Splitting Settings -->
+        <section class="section">
+          <div class="collapsible" style="margin-bottom: var(--space-md);">
+            <button class="collapsible-header" id="togglePromptSplittingBtn">
+              <span>🔀 Prompt Splitting</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content hidden" id="promptSplittingContent">
+              <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
+                Improve link processing by splitting long prompts into instructions and property link phases.
+              </p>
+              
+              <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                  <input type="checkbox" id="enablePromptSplitting" checked>
+                  Enable Prompt Splitting
+                </label>
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Automatically split prompts longer than the threshold for better link fetching
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <label for="promptLengthThreshold" class="form-label">
+                  Length Threshold: <span id="thresholdValue">200</span> characters
+                </label>
+                <input 
+                  type="range" 
+                  id="promptLengthThreshold" 
+                  min="50" 
+                  max="1000" 
+                  value="200" 
+                  step="25"
+                  style="width: 100%;"
+                >
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Prompts longer than this will be split into two phases
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <label for="confirmationTimeout" class="form-label">
+                  Confirmation Timeout: <span id="timeoutValue">15</span> seconds
+                </label>
+                <input 
+                  type="range" 
+                  id="confirmationTimeout" 
+                  min="5" 
+                  max="60" 
+                  value="15" 
+                  step="5"
+                  style="width: 100%;"
+                >
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  How long to wait for ChatGPT's confirmation before falling back
+                </small>
+              </div>
+              
+              <div class="info-grid" style="margin: var(--space-md) 0;">
+                <div class="info-item">
+                  <div class="info-label">Success Rate</div>
+                  <div class="info-value" id="splittingSuccessRate">No data yet</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Total Attempts</div>
+                  <div class="info-value" id="splittingAttempts">0</div>
+                </div>
+              </div>
+              
+              <div class="btn-group">
+                <button id="resetSplittingStatsBtn" class="btn btn-ghost btn-sm">
+                  📊 Reset Stats
+                </button>
+                <button id="saveSplittingSettingsBtn" class="btn btn-primary btn-sm">
+                  💾 Save Settings
+                </button>
+              </div>
+              
+              <div id="splittingMessage" class="message"></div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Debug Mode -->
+        <section class="section">
+          <div class="collapsible" style="margin-bottom: var(--space-md);">
+            <button class="collapsible-header" id="toggleDebugBtn">
+              <span>🐛 Debug Mode</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content hidden" id="debugContent">
+              <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                  <input type="checkbox" id="enableDebugMode">
+                  Enable Debug Mode
+                </label>
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Show detailed logs and debugging information in console
+                </small>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                  <input type="checkbox" id="enablePromptPreview">
+                  Show Prompt Preview
+                </label>
+                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                  Display the final prompt before sending to ChatGPT
+                </small>
+              </div>
+              
+              <div id="debugInfo" class="card" style="background: var(--secondary-background); font-family: monospace; font-size: var(--font-size-sm); margin: var(--space-md) 0;">
+                <div style="font-weight: var(--font-weight-medium); margin-bottom: var(--space-sm);">Extension Info:</div>
+                                 <div>Version: v1.1.1</div>
+                <div>Tab System: ✅ Active</div>
+                <div>Settings Tab: ✅ Loaded</div>
+                <div id="debugActiveTab">Active Tab: settings</div>
+                <div id="debugTimestamp">Last Updated: <span id="debugTime">--</span></div>
+              </div>
+              
+              <div class="btn-group">
+                <button id="clearDebugBtn" class="btn btn-ghost btn-sm">
+                  🗑️ Clear Console
+                </button>
+                <button id="exportDebugBtn" class="btn btn-ghost btn-sm">
+                  📤 Export Debug Info
+                </button>
+                <button id="saveDebugSettingsBtn" class="btn btn-primary btn-sm">
+                  💾 Save Debug Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Export Information -->
+        <section class="section">
+          <div class="collapsible">
+            <button class="collapsible-header" id="toggleExportInfoBtn">
+              <span>📊 Export Information</span>
+              <span class="collapsible-icon">▼</span>
+            </button>
+            
+            <div class="collapsible-content hidden" id="exportInfoContent">
+              <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
+                The export will include:
+              </p>
+              
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Property URL</div>
+                  <div class="info-value">Full property listing link</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Source</div>
+                  <div class="info-value">Website domain (Zillow, Realtor.com, etc.)</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Analysis Date</div>
+                  <div class="info-value">When the analysis was performed</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">ChatGPT Response</div>
+                  <div class="info-value">Complete unprocessed AI analysis</div>
+                </div>
+              </div>
+              
+              <div class="btn-group" style="margin-top: var(--space-md);">
+                <button id="previewExportBtn" class="btn btn-ghost btn-sm">
+                  👁️ Preview Export
+                </button>
+                <button id="customizeExportBtn" class="btn btn-secondary btn-sm">
+                  ⚙️ Customize Format
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+      </div>
       
     </main>
     
     <!-- Footer -->
     <footer class="footer">
-      <span class="version">v1.0.2</span>
+      <span class="version">v1.1.1</span>
       <span style="color: var(--text-secondary); font-size: var(--font-size-sm);">Made with ❤️</span>
     </footer>
     
