@@ -106,6 +106,34 @@
       height: 2px;
       background: var(--primary);
     }
+
+    /* Tab notification badge */
+    .tab-button {
+      position: relative;
+    }
+
+    .tab-button .notification-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      background: #EF4444;
+      border: 2px solid var(--background);
+      border-radius: 50%;
+      animation: pulse-notification 2s infinite;
+    }
+
+    @keyframes pulse-notification {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+      }
+    }
     
     /* Tab Content */
     .tab-content {
@@ -1052,6 +1080,493 @@
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
+
+    /* Category Management Styles */
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .category-card {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      position: relative;
+      min-height: 120px;
+    }
+
+    .category-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary);
+    }
+
+    .category-card.selected {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-sm);
+    }
+
+    .category-icon {
+      font-size: 24px;
+      margin-right: var(--space-sm);
+    }
+
+    .category-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      margin: 0;
+      flex: 1;
+    }
+
+    .category-count {
+      background: var(--secondary-background);
+      color: var(--text-secondary);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .category-description {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--space-md);
+      line-height: 1.4;
+    }
+
+    .category-actions {
+      display: flex;
+      gap: var(--space-xs);
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    .category-card:hover .category-actions {
+      opacity: 1;
+    }
+
+    /* Icon and Color Selectors */
+    .icon-selector, .color-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      margin-top: var(--space-xs);
+    }
+
+    .icon-option, .color-option {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--background);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .icon-option:hover, .color-option:hover {
+      transform: scale(1.1);
+      border-color: var(--primary);
+    }
+
+    .icon-option.selected, .color-option.selected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+    }
+
+    .color-option {
+      border-radius: 50%;
+    }
+
+    /* Category Management Modal */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--background);
+      border-radius: var(--radius-lg);
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-md);
+      margin: var(--space-md);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-lg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-body {
+      padding: var(--space-lg);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease-in-out;
+    }
+
+    .modal-close:hover {
+      background: var(--secondary-background);
+      color: var(--text-primary);
+    }
+
+    /* Existing Category Item */
+    .existing-category-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+    }
+
+    .existing-category-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .existing-category-info {
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+
+    .existing-category-icon {
+      font-size: 20px;
+      margin-right: var(--space-md);
+    }
+
+    .existing-category-details h5 {
+      margin: 0 0 4px 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .existing-category-details p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .existing-category-actions {
+      display: flex;
+      gap: var(--space-xs);
+    }
+
+    /* View Toggle Buttons */
+    .btn-group .btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Property Category Display */
+    .history-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .property-category {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 6px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+    }
+
+    /* Bulk Selection Features */
+    .bulk-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .history-item.select-mode {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .history-item.select-mode::before {
+      content: '';
+      position: absolute;
+      top: var(--space-xs);
+      left: var(--space-xs);
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 3px;
+      background: var(--background);
+      z-index: 1;
+    }
+
+    .history-item.select-mode.selected::before {
+      background: var(--primary);
+      border-color: var(--primary);
+      background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='m13.854 3.646-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 9.586l6.646-6.64a.5.5 0 0 1 .708.708z'/%3e%3c/svg%3e");
+    }
+
+    .history-item.select-mode {
+      padding-left: calc(var(--space-lg) + 18px);
+      position: relative;
+    }
+
+    /* Keyboard shortcuts tooltip */
+    .shortcuts-tooltip {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      z-index: 1001;
+      max-width: 200px;
+    }
+
+    .shortcuts-tooltip h4 {
+      margin: 0 0 var(--space-sm) 0;
+      font-size: var(--font-size-base);
+    }
+
+    .shortcuts-tooltip .shortcut {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .shortcuts-tooltip .key {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* Latest Analysis Section */
+    .latest-analysis-card {
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.05) 0%, rgba(16, 163, 127, 0.02) 100%);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius-lg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .latest-analysis-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary), #0d8a69, var(--primary));
+      animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .latest-analysis-content {
+      padding: var(--space-md);
+    }
+
+    .latest-property-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+      padding-bottom: var(--space-sm);
+      border-bottom: 1px solid rgba(16, 163, 127, 0.2);
+    }
+
+    .latest-property-info {
+      flex: 1;
+    }
+
+    .latest-property-url {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--font-size-lg);
+      margin-bottom: var(--space-xs);
+      display: block;
+      word-break: break-all;
+    }
+
+    .latest-property-url:hover {
+      text-decoration: underline;
+    }
+
+    .latest-property-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .latest-property-timestamp {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .latest-analysis-preview {
+      background: rgba(255, 255, 255, 0.8);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      margin: var(--space-md) 0;
+      border-left: 4px solid var(--primary);
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .latest-analysis-text {
+      font-size: var(--font-size-sm);
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .latest-categorization-section {
+      background: rgba(255, 255, 255, 0.9);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(16, 163, 127, 0.3);
+    }
+
+    .categorization-header {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .quick-categorization {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-md);
+    }
+
+    .quick-category-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--background);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .quick-category-btn:hover {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .quick-category-btn.suggested {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.1);
+      color: var(--primary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .quick-category-btn.suggested::after {
+      content: '✨';
+      margin-left: var(--space-xs);
+    }
+
+    .custom-categorization {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .category-select-latest {
+      flex: 1;
+      padding: var(--space-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      background: var(--background);
+    }
+
+    .category-select-latest:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+    }
+
+    .latest-actions {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-md);
+      padding-top: var(--space-md);
+      border-top: 1px solid rgba(16, 163, 127, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -1152,8 +1667,8 @@
       <!-- Properties Tab -->
       <div id="propertiesTab" class="tab-content">
         
-        <!-- Property History Section -->
-        <section class="section" id="propertyHistorySection">
+        <!-- View Toggle and Category Management -->
+        <section class="section">
           <div class="section-header">
             <h2 class="section-title">
               <span>📊</span>
@@ -1161,9 +1676,73 @@
               <span id="propertyCount" class="section-badge">0</span>
             </h2>
             <div class="section-controls">
+              <div class="btn-group">
+                <button id="categoryViewBtn" class="btn btn-ghost btn-sm active" title="Category View">
+                  🗂️
+                </button>
+                <button id="listViewBtn" class="btn btn-ghost btn-sm" title="List View">
+                  📋
+                </button>
+              </div>
+              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm" title="Manage Categories">
+                ⚙️ Categories
+              </button>
               <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
                 🗑️
               </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Latest Analysis Section -->
+        <section class="section" id="latestAnalysisSection" style="display: none;">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span>⚡</span>
+              Latest Analysis
+              <span class="section-badge pulse">New</span>
+            </h2>
+            <div class="section-controls">
+              <button id="dismissLatestBtn" class="btn btn-ghost btn-sm" title="Dismiss">
+                ✖️
+              </button>
+            </div>
+          </div>
+          
+          <div class="card latest-analysis-card">
+            <div id="latestAnalysisContent">
+              <!-- Latest analysis content will be populated here -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Category Grid View -->
+        <section class="section" id="categoryGridSection">
+          <div id="categoryGrid" class="category-grid">
+            <!-- Categories will be populated here -->
+          </div>
+        </section>
+        
+        <!-- Property History Section -->
+        <section class="section" id="propertyHistorySection" style="display: none;">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span>📋</span>
+              Property List
+            </h2>
+            <div class="section-controls">
+              <div class="bulk-actions" style="display: none; margin-right: 8px;">
+                <span id="selectedCount" class="text-sm">0 selected</span>
+                <select id="bulkCategoryAction" class="btn btn-sm" style="margin: 0 4px;">
+                  <option value="">Move to...</option>
+                </select>
+                <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm" title="Delete selected">🗑️</button>
+                <button id="bulkDeselectBtn" class="btn btn-ghost btn-sm" title="Deselect all">✖️</button>
+              </div>
+              <button id="selectModeBtn" class="btn btn-ghost btn-sm" title="Select multiple (S)">☑️</button>
+              <select id="categoryFilter" class="btn btn-sm" style="margin-right: 8px;">
+                <option value="all">All Categories</option>
+              </select>
             </div>
           </div>
           
@@ -1537,6 +2116,65 @@
       </div>
       
     </main>
+
+    <!-- Category Management Modal -->
+    <div id="categoryManagementModal" class="modal" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🗂️ Manage Categories</h3>
+          <button class="modal-close" id="categoryModalClose" aria-label="Close modal">×</button>
+        </div>
+        <div class="modal-body">
+          <!-- Add New Category -->
+          <div class="card" style="margin-bottom: var(--space-md);">
+            <h4 style="margin-bottom: var(--space-md);">Add New Category</h4>
+            <div class="form-group">
+              <input type="text" id="newCategoryName" class="form-input" placeholder="Category name" maxlength="30">
+            </div>
+            <div class="form-group">
+              <input type="text" id="newCategoryDescription" class="form-input" placeholder="Description (optional)" maxlength="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Icon</label>
+              <div class="icon-selector">
+                <button type="button" class="icon-option selected" data-icon="📁">📁</button>
+                <button type="button" class="icon-option" data-icon="🏠">🏠</button>
+                <button type="button" class="icon-option" data-icon="💰">💰</button>
+                <button type="button" class="icon-option" data-icon="🏨">🏨</button>
+                <button type="button" class="icon-option" data-icon="⭐">⭐</button>
+                <button type="button" class="icon-option" data-icon="🎯">🎯</button>
+                <button type="button" class="icon-option" data-icon="🔥">🔥</button>
+                <button type="button" class="icon-option" data-icon="💎">💎</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Color</label>
+              <div class="color-selector">
+                <button type="button" class="color-option selected" data-color="#6B7280" style="background-color: #6B7280;"></button>
+                <button type="button" class="color-option" data-color="#10B981" style="background-color: #10B981;"></button>
+                <button type="button" class="color-option" data-color="#3B82F6" style="background-color: #3B82F6;"></button>
+                <button type="button" class="color-option" data-color="#8B5CF6" style="background-color: #8B5CF6;"></button>
+                <button type="button" class="color-option" data-color="#F59E0B" style="background-color: #F59E0B;"></button>
+                <button type="button" class="color-option" data-color="#EF4444" style="background-color: #EF4444;"></button>
+                <button type="button" class="color-option" data-color="#EC4899" style="background-color: #EC4899;"></button>
+                <button type="button" class="color-option" data-color="#06B6D4" style="background-color: #06B6D4;"></button>
+              </div>
+            </div>
+            <button id="addCategoryBtn" class="btn btn-primary btn-sm">
+              ➕ Add Category
+            </button>
+          </div>
+          
+          <!-- Existing Categories -->
+          <div class="card">
+            <h4 style="margin-bottom: var(--space-md);">Existing Categories</h4>
+            <div id="existingCategoriesList">
+              <!-- Categories will be populated here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     
     <!-- Footer -->
     <footer class="footer">
