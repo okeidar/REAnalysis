@@ -2597,6 +2597,18 @@
       font-weight: var(--font-weight-medium);
     }
 
+    .property-domain-clickable {
+      color: var(--primary);
+      font-weight: var(--font-weight-medium);
+      cursor: pointer;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .property-domain-clickable:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
     /* Properties List View */
     .properties-list-container {
       background: var(--background);
@@ -2713,6 +2725,25 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .property-url:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
+    .property-address-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: var(--font-weight-semibold);
+      transition: color 0.2s ease-in-out;
+      word-break: break-word;
+    }
+
+    .property-address-link:hover {
+      color: #0d8a69;
+      text-decoration: underline;
     }
 
     .property-meta {

@@ -5169,14 +5169,16 @@ async function renderEnhancedCategoryGrid() {
         <div class="category-properties">
           ${properties.length > 0 ? `
             <div class="category-properties-list">
-              ${properties.slice(0, 4).map(property => `
-                <div class="category-property-item" data-property-id="${property.id || property.url}">
-                  <span class="property-status-icon ${property.analysis ? 'analyzed' : 'pending'}">
-                    ${property.analysis ? '●' : '○'}
-                  </span>
-                  <span class="property-domain">${property.domain || new URL(property.url).hostname}</span>
-                </div>
-              `).join('')}
+                             ${properties.slice(0, 4).map(property => `
+                 <div class="category-property-item" data-property-id="${property.id || property.url}" title="${property.url}">
+                   <span class="property-status-icon ${property.analysis ? 'analyzed' : 'pending'}">
+                     ${property.analysis ? '●' : '○'}
+                   </span>
+                   <span class="property-domain-clickable" onclick="window.open('${property.url}', '_blank')">
+                     ${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}
+                   </span>
+                 </div>
+               `).join('')}
               ${properties.length > 4 ? `
                 <div class="category-property-item">
                   <span style="color: var(--text-secondary); font-style: italic;">
@@ -5261,7 +5263,7 @@ async function renderPropertiesList() {
         
         <div class="property-info">
           <a href="${property.url}" target="_blank" class="property-url" title="${property.url}">
-            ${property.domain || new URL(property.url).hostname}
+            ${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}
           </a>
           <div class="property-meta">
             ${property.date || new Date(property.timestamp).toLocaleDateString()} • 
@@ -5381,11 +5383,14 @@ function openCategorizationModal(propertyId) {
   
   if (!property) return;
   
-  // Populate property preview
+    // Populate property preview
   const propertyPreview = document.getElementById('categorizationPropertyPreview');
   if (propertyPreview) {
+    const address = extractAddressFromUrl(property.url) || property.address || property.url;
     propertyPreview.innerHTML = `
-      <div class="preview-url">${property.url}</div>
+      <div class="preview-url">
+        <a href="${property.url}" target="_blank" class="property-address-link">${address}</a>
+      </div>
       <div class="preview-meta">
         ${property.domain || new URL(property.url).hostname} • 
         ${property.date || new Date(property.timestamp).toLocaleDateString()}
@@ -5393,9 +5398,81 @@ function openCategorizationModal(propertyId) {
       </div>
     `;
   }
-  
-  // Populate category options
-  populateCategoryOptions();
+   
+   // Populate category options
+   populateCategoryOptions();
+ }
+ 
+ // Function to extract address from property URL
+ function extractAddressFromUrl(url) {
+   if (!url) return null;
+   
+   try {
+     const urlObj = new URL(url);
+     const pathname = urlObj.pathname;
+     const hostname = urlObj.hostname.toLowerCase();
+     
+     // Zillow URL patterns
+     if (hostname.includes('zillow.com')) {
+       // Pattern: /homedetails/123-Main-St-City-State-12345/zpid_123456789/
+       const zillowMatch = pathname.match(/\/homedetails\/([^\/]+)\//);
+       if (zillowMatch) {
+         return decodeURIComponent(zillowMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Realtor.com URL patterns
+     if (hostname.includes('realtor.com')) {
+       // Pattern: /realestateandhomes-detail/123-Main-St_City_State_12345_M12345-12345
+       const realtorMatch = pathname.match(/\/realestateandhomes-detail\/([^_]+)/);
+       if (realtorMatch) {
+         return decodeURIComponent(realtorMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Redfin URL patterns
+     if (hostname.includes('redfin.com')) {
+       // Pattern: /city/state/12345/123-Main-St-12345
+       const redfinMatch = pathname.match(/\/[^\/]+\/[^\/]+\/\d+\/([^\/]+)/);
+       if (redfinMatch) {
+         return decodeURIComponent(redfinMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Trulia URL patterns
+     if (hostname.includes('trulia.com')) {
+       // Pattern: /p/state/city/123-main-st-city-state-12345--2123456789
+       const truliaMatch = pathname.match(/\/p\/[^\/]+\/[^\/]+\/([^-]+(?:-[^-]+)*)/);
+       if (truliaMatch) {
+         return decodeURIComponent(truliaMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Homes.com URL patterns
+     if (hostname.includes('homes.com')) {
+       // Pattern: /123-main-st-city-state-12345/
+       const homesMatch = pathname.match(/\/([^\/]+)\//);
+       if (homesMatch) {
+         const address = homesMatch[1].replace(/-/g, ' ');
+         if (address.match(/\d+\s+\w+/)) { // Check if it looks like an address
+           return decodeURIComponent(address);
+         }
+       }
+     }
+     
+     // Generic pattern: look for address-like strings in the URL
+     const addressMatch = pathname.match(/\/([^\/]*\d+[^\/]*(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pl|place|way|blvd|boulevard)[^\/]*)/i);
+     if (addressMatch) {
+       return decodeURIComponent(addressMatch[1].replace(/[-_]/g, ' '));
+     }
+     
+     // If no specific pattern matches, return null to fall back to other options
+     return null;
+     
+   } catch (error) {
+     console.warn('Error extracting address from URL:', error);
+     return null;
+   }
   
   // Show modal
   const modal = document.getElementById('categorizationModal');
@@ -5567,13 +5644,14 @@ function showPropertyDetails(propertyId) {
   const modalAnalysisContent = document.getElementById('modalAnalysisContent');
 
   if (modalPropertyUrl) {
-    modalPropertyUrl.textContent = property.url;
+    const address = extractAddressFromUrl(property.url) || property.address || property.url;
+    modalPropertyUrl.innerHTML = `<a href="${property.url}" target="_blank" class="property-address-link">${address}</a>`;
   }
 
   if (modalPropertyMeta) {
     const category = categoryManager.getCategory(property.categoryId || 'uncategorized');
     modalPropertyMeta.innerHTML = `
-      <span>${property.domain || new URL(property.url).hostname}</span>
+             <span>${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}</span>
       <span>${property.date || new Date(property.timestamp).toLocaleDateString()}</span>
       <span style="background-color: ${category?.color}22; padding: 4px 8px; border-radius: 4px;">
         ${category?.icon || '📋'} ${category?.name || 'Uncategorized'}
