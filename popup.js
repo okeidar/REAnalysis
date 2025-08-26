@@ -93,8 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await initializePromptSplittingSettings();
   await initializePopup();
   
-  // Set up collapsibles and prompt splitting listeners
-  setupCollapsibles();
+  // Set up prompt splitting listeners
   addPromptSplittingEventListeners();
   
   // Set up periodic refresh for pending analyses
@@ -147,6 +146,11 @@ function switchToTab(tabId) {
 }
 
 function handleTabSwitch(tabId) {
+  // Setup collapsibles for any tab that might have them
+  setTimeout(() => {
+    setupCollapsibles();
+  }, 50);
+  
   switch (tabId) {
     case 'analyzer':
       // Refresh connection status when switching to analyzer tab
@@ -184,21 +188,33 @@ function showTab(tabId) {
 function setupCollapsibles() {
   const collapsibles = document.querySelectorAll('.collapsible');
   
-  collapsibles.forEach(collapsible => {
+  collapsibles.forEach((collapsible, index) => {
     const header = collapsible.querySelector('.collapsible-header');
     const content = collapsible.querySelector('.collapsible-content');
-    const icon = collapsible.querySelector('.collapsible-icon');
     
     if (header && content) {
-      header.addEventListener('click', () => {
+      // Skip if already has our event listener
+      if (header.hasAttribute('data-collapsible-setup')) {
+        return;
+      }
+      
+      header.setAttribute('data-collapsible-setup', 'true');
+      const icon = header.querySelector('.collapsible-icon');
+      
+      header.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const isExpanded = !content.classList.contains('hidden');
         
         if (isExpanded) {
           content.classList.add('hidden');
           collapsible.classList.remove('expanded');
+          if (icon) icon.textContent = '▼';
         } else {
           content.classList.remove('hidden');
           collapsible.classList.add('expanded');
+          if (icon) icon.textContent = '▲';
         }
       });
     }
@@ -1771,20 +1787,6 @@ function showPromptSplittingMessage(message, type = 'success') {
 
 // Add prompt splitting settings event listeners
 function addPromptSplittingEventListeners() {
-  // Collapsible toggle
-  const toggleBtn = document.getElementById('togglePromptSplittingBtn');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      const content = document.getElementById('promptSplittingContent');
-      const icon = toggleBtn.querySelector('.collapsible-icon');
-      
-      if (content && icon) {
-        content.classList.toggle('hidden');
-        icon.textContent = content.classList.contains('hidden') ? '▼' : '▲';
-      }
-    });
-  }
-  
   // Save settings button
   const saveBtn = document.getElementById('saveSplittingSettingsBtn');
   if (saveBtn) {
