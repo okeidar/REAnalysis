@@ -2742,9 +2742,113 @@
 
     /* Modals */
     .property-modal {
-      max-width: 800px;
+      max-width: 900px;
       max-height: 90vh;
       overflow-y: auto;
+    }
+
+    .property-analysis-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .property-header {
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .property-url-display {
+      font-weight: var(--font-weight-semibold);
+      color: var(--primary);
+      font-size: var(--font-size-lg);
+      word-break: break-all;
+      margin-bottom: var(--space-sm);
+    }
+
+    .property-meta-display {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .analysis-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .analysis-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .analysis-header h4 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .analysis-status {
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .analysis-status.analyzed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .analysis-status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .analysis-content {
+      padding: var(--space-lg);
+      max-height: 400px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .analysis-content pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: inherit;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .analysis-empty {
+      text-align: center;
+      padding: var(--space-xl);
+      color: var(--text-secondary);
+    }
+
+    .analysis-empty-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-md);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border);
+      gap: var(--space-md);
+      flex-wrap: wrap;
     }
 
     .categorization-modal {
@@ -3510,6 +3614,28 @@
           </div>
         </section>
 
+        <!-- Latest Analysis Section -->
+        <section class="section" id="latestAnalysisSection" style="display: none;">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span>⚡</span>
+              Latest Analysis
+              <span class="section-badge pulse">New</span>
+            </h2>
+            <div class="section-controls">
+              <button id="dismissLatestBtn" class="btn btn-ghost btn-sm" title="Dismiss">
+                ✖️
+              </button>
+            </div>
+          </div>
+          
+          <div class="card latest-analysis-card">
+            <div id="latestAnalysisContent">
+              <!-- Latest analysis content will be populated here -->
+            </div>
+          </div>
+        </section>
+
         <!-- Uncategorized Properties Alert -->
         <section class="section" id="uncategorizedAlert" style="display: none;">
           <div class="alert-card uncategorized-alert">
@@ -3557,9 +3683,13 @@
                 <span class="btn-icon">⚙️</span>
                 Manage Categories
               </button>
-              <button id="exportBtn" class="btn btn-primary btn-sm">
+              <button id="exportWordBtn" class="btn btn-primary btn-sm">
                 <span class="btn-icon">📄</span>
-                Export
+                Export to Word
+              </button>
+              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
+                <span class="btn-icon">🗑️</span>
+                Clear All
               </button>
             </div>
           </div>
@@ -3606,11 +3736,39 @@
         <div id="propertyDetailsModal" class="modal" style="display: none;">
           <div class="modal-content property-modal">
             <div class="modal-header">
-              <h3 class="modal-title">Property Details</h3>
+              <h3 class="modal-title">Property Analysis</h3>
               <button class="modal-close" id="propertyModalClose">×</button>
             </div>
             <div class="modal-body" id="propertyModalBody">
               <!-- Property details will be populated here -->
+              <div class="property-analysis-content">
+                <div class="property-header">
+                  <div class="property-url-display" id="modalPropertyUrl"></div>
+                  <div class="property-meta-display" id="modalPropertyMeta"></div>
+                </div>
+                
+                <div class="analysis-section" id="modalAnalysisSection">
+                  <div class="analysis-header">
+                    <h4>📊 Analysis Results</h4>
+                    <div class="analysis-status" id="modalAnalysisStatus"></div>
+                  </div>
+                  <div class="analysis-content" id="modalAnalysisContent">
+                    <!-- Analysis content will be populated here -->
+                  </div>
+                </div>
+                
+                <div class="modal-actions">
+                  <button id="recategorizePropertyBtn" class="btn btn-secondary btn-sm">
+                    📁 Recategorize
+                  </button>
+                  <button id="exportSinglePropertyBtn" class="btn btn-primary btn-sm">
+                    📄 Export This Property
+                  </button>
+                  <button id="deletePropertyModalBtn" class="btn btn-ghost btn-sm">
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

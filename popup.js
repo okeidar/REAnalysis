@@ -5072,10 +5072,16 @@ function setupPropertiesEventListeners() {
     dismissAlertBtn.addEventListener('click', dismissUncategorizedAlert);
   }
   
-  // Export button
-  const exportBtn = document.getElementById('exportBtn');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', handleExport);
+  // Clear history button
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', handleClearHistory);
+  }
+  
+  // Latest analysis dismiss button
+  const dismissLatestBtn = document.getElementById('dismissLatestBtn');
+  if (dismissLatestBtn) {
+    dismissLatestBtn.addEventListener('click', dismissLatestAnalysis);
   }
   
   // Categorization modal events
@@ -5509,17 +5515,156 @@ function dismissUncategorizedAlert() {
   }
 }
 
-function handleExport() {
-  // Trigger existing export functionality
+function handleClearHistory() {
+  if (confirm('Are you sure you want to clear all property history? This action cannot be undone.')) {
+    categoryManager.properties.clear();
+    categoryManager.saveProperties();
+    updatePropertiesStats();
+    updateViewDisplay();
+    showSuccess('Property history cleared successfully');
+  }
+}
+
+function exportSingleProperty(propertyId) {
+  const property = categoryManager.properties.get(propertyId);
+  if (!property || !property.analysis) {
+    showError('No analysis data available for export');
+    return;
+  }
+
+  // Create a temporary array with just this property for export
+  const tempProperties = [property];
+  const originalProperties = Array.from(categoryManager.properties.values());
+  
+  // Temporarily replace the properties for export
+  categoryManager.properties.clear();
+  tempProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
+  
+  // Trigger export
   const exportWordBtn = document.getElementById('exportWordBtn');
   if (exportWordBtn) {
     exportWordBtn.click();
   }
+  
+  // Restore original properties
+  setTimeout(() => {
+    categoryManager.properties.clear();
+    originalProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
+  }, 1000);
 }
 
 function showPropertyDetails(propertyId) {
-  // Show property details modal (to be implemented)
-  console.log('Show property details for:', propertyId);
+  const property = categoryManager.properties.get(propertyId);
+  if (!property) {
+    showError('Property not found');
+    return;
+  }
+
+  // Populate modal content
+  const modalPropertyUrl = document.getElementById('modalPropertyUrl');
+  const modalPropertyMeta = document.getElementById('modalPropertyMeta');
+  const modalAnalysisStatus = document.getElementById('modalAnalysisStatus');
+  const modalAnalysisContent = document.getElementById('modalAnalysisContent');
+
+  if (modalPropertyUrl) {
+    modalPropertyUrl.textContent = property.url;
+  }
+
+  if (modalPropertyMeta) {
+    const category = categoryManager.getCategory(property.categoryId || 'uncategorized');
+    modalPropertyMeta.innerHTML = `
+      <span>${property.domain || new URL(property.url).hostname}</span>
+      <span>${property.date || new Date(property.timestamp).toLocaleDateString()}</span>
+      <span style="background-color: ${category?.color}22; padding: 4px 8px; border-radius: 4px;">
+        ${category?.icon || '📋'} ${category?.name || 'Uncategorized'}
+      </span>
+    `;
+  }
+
+  // Handle analysis content
+  const hasAnalysis = property.analysis && property.analysis.fullResponse;
+  
+  if (modalAnalysisStatus) {
+    modalAnalysisStatus.className = `analysis-status ${hasAnalysis ? 'analyzed' : 'pending'}`;
+    modalAnalysisStatus.textContent = hasAnalysis ? 'Analyzed' : 'Pending Analysis';
+  }
+
+  if (modalAnalysisContent) {
+    if (hasAnalysis) {
+      modalAnalysisContent.innerHTML = `
+        <pre>${property.analysis.fullResponse}</pre>
+      `;
+    } else {
+      modalAnalysisContent.innerHTML = `
+        <div class="analysis-empty">
+          <div class="analysis-empty-icon">⏳</div>
+          <p><strong>Analysis Pending</strong></p>
+          <p>This property hasn't been analyzed yet or the analysis is still processing.</p>
+        </div>
+      `;
+    }
+  }
+
+  // Setup modal action buttons
+  setupPropertyModalActions(propertyId);
+
+  // Show modal
+  const modal = document.getElementById('propertyDetailsModal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+function setupPropertyModalActions(propertyId) {
+  // Recategorize button
+  const recategorizeBtn = document.getElementById('recategorizePropertyBtn');
+  if (recategorizeBtn) {
+    recategorizeBtn.onclick = () => {
+      // Close details modal and open categorization modal
+      document.getElementById('propertyDetailsModal').style.display = 'none';
+      openCategorizationModal(propertyId);
+    };
+  }
+
+  // Export single property button
+  const exportSingleBtn = document.getElementById('exportSinglePropertyBtn');
+  if (exportSingleBtn) {
+    exportSingleBtn.onclick = () => {
+      exportSingleProperty(propertyId);
+    };
+  }
+
+  // Delete property button
+  const deleteModalBtn = document.getElementById('deletePropertyModalBtn');
+  if (deleteModalBtn) {
+    deleteModalBtn.onclick = () => {
+      if (confirm('Are you sure you want to delete this property?')) {
+        categoryManager.removeProperty(propertyId);
+        document.getElementById('propertyDetailsModal').style.display = 'none';
+        updatePropertiesStats();
+        updateViewDisplay();
+        showSuccess('Property deleted successfully');
+      }
+    };
+  }
+
+  // Close modal button
+  const closeBtn = document.getElementById('propertyModalClose');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      document.getElementById('propertyDetailsModal').style.display = 'none';
+    };
+  }
+
+  // Close modal when clicking outside
+  const modal = document.getElementById('propertyDetailsModal');
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    };
+  }
 }
 
 function showCategoryDetails(categoryId) {
