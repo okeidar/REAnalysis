@@ -53,10 +53,36 @@ function isChatGPTSite() {
          window.location.hostname === 'chat.openai.com';
 }
 
+// Initialize settings on load
+if (isChatGPTSite()) {
+  updatePromptSplittingSettings();
+}
+
 // Prompt splitting utility functions
 function shouldSplitPrompt(prompt) {
   return promptSplittingState.enabled && 
          prompt.length > promptSplittingState.lengthThreshold;
+}
+
+// Update prompt splitting settings from storage
+async function updatePromptSplittingSettings() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['promptSplittingSettings']),
+      { promptSplittingSettings: null }
+    );
+    
+    if (result.promptSplittingSettings) {
+      const settings = result.promptSplittingSettings;
+      promptSplittingState.enabled = settings.enabled !== false;
+      promptSplittingState.lengthThreshold = settings.lengthThreshold || 200;
+      promptSplittingState.confirmationTimeout = settings.confirmationTimeout || 15000;
+      
+      console.log('🔄 Prompt splitting settings updated:', promptSplittingState);
+    }
+  } catch (error) {
+    console.error('Error updating prompt splitting settings:', error);
+  }
 }
 
 function splitPromptContent(promptTemplate, propertyLink) {
@@ -3691,6 +3717,11 @@ if (isChatGPTSite()) {
         site: window.location.hostname,
         url: window.location.href
       });
+      
+    } else if (request.action === 'updatePromptSplittingSettings') {
+      console.log('Updating prompt splitting settings:', request.settings);
+      updatePromptSplittingSettings();
+      sendResponse({ success: true });
       
     } else if (request.action === 'analyzeProperty') {
       console.log('Received property analysis request:', request.link);
