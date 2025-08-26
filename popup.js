@@ -4555,9 +4555,10 @@ async function showLatestAnalysis(property) {
       <div class="latest-categorization-section">
         <div class="categorization-header">
           <span>🏷️</span>
-          Quick Categorization
+          Organize This Property
+          <div class="categorization-subtitle">Take your time to choose the right category</div>
           ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? 
-            `<span style="font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: normal;">AI suggests: ${suggestedCategoryObj?.icon} ${suggestedCategoryObj?.name}</span>` : ''}
+            `<div class="ai-suggestion">💡 AI suggests: ${suggestedCategoryObj?.icon} ${suggestedCategoryObj?.name}</div>` : ''}
         </div>
         
         <div class="quick-categorization">
@@ -4684,10 +4685,22 @@ async function handleQuickCategorization(propertyId, categoryId) {
     await renderCategoryGrid();
     await loadPropertyHistory();
     
-    // Auto-dismiss after successful categorization
-    setTimeout(() => {
-      dismissLatestAnalysis();
-    }, 1500);
+    // Update the latest analysis display to show new category without dismissing
+    const property = categoryManager.properties.get(propertyId);
+    if (property && property.analysis) {
+      await showLatestAnalysis(property);
+    }
+    
+    // Show a subtle confirmation that categorization was successful
+    const latestSection = document.getElementById('latestAnalysisSection');
+    if (latestSection) {
+      latestSection.classList.add('success-highlight');
+      
+      // Reset highlight after a few seconds
+      setTimeout(() => {
+        latestSection.classList.remove('success-highlight');
+      }, 3000);
+    }
     
   } catch (error) {
     console.error('Failed to categorize property:', error);

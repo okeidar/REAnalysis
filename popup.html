@@ -1568,6 +1568,35 @@
       border-top: 1px solid rgba(16, 163, 127, 0.2);
     }
 
+    /* Enhanced Categorization Section */
+    .categorization-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      font-weight: normal;
+      margin-top: var(--space-xs);
+    }
+
+    .ai-suggestion {
+      font-size: var(--font-size-sm);
+      color: var(--primary);
+      font-weight: var(--font-weight-medium);
+      margin-top: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+      background: rgba(16, 163, 127, 0.1);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--primary);
+    }
+
+    /* Make latest analysis section more prominent when visible */
+    #latestAnalysisSection {
+      transition: border-color 0.3s ease-in-out;
+    }
+
+    #latestAnalysisSection.success-highlight {
+      border-color: #10B981 !important;
+      border-width: 2px !important;
+    }
+
     /* =============================================== */
     /* ENHANCED UX COMPONENTS */
     /* =============================================== */
