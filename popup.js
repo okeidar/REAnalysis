@@ -498,10 +498,12 @@ function switchToTab(tabId) {
   });
   
   // Handle tab-specific logic
-  handleTabSwitch(tabId);
+  handleTabSwitch(tabId).catch(error => {
+    console.error('Error in tab switch:', error);
+  });
 }
 
-function handleTabSwitch(tabId) {
+async function handleTabSwitch(tabId) {
   // Setup collapsibles for any tab that might have them
   setTimeout(() => {
     setupCollapsibles();
