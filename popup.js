@@ -3,10 +3,10 @@
 // DOM elements
 let propertyHistoryList, clearHistoryBtn, propertyUrlInput, analyzeBtn, 
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
-    successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
+    successMessage, errorMessage, warningMessage, propertyLinkSection, infoElement, siteElement, urlElement,
     propertyHistorySection, settingsSection, settingsToggle, settingsContent,
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
-    togglePromptBtn, promptContent, propertyCount;
+    togglePromptBtn, promptContent, propertyCount, clearInputBtn;
 
 // Tab system elements
 let tabButtons, tabContents, activeTab = 'analyzer';
@@ -14,6 +14,29 @@ let tabButtons, tabContents, activeTab = 'analyzer';
 // Global variables
 let currentTab = null;
 let contentScriptReady = false;
+
+// UX Enhancement Variables
+let analysisTimer = null;
+let analysisStartTime = 0;
+let workflowSteps = {
+  1: { id: 'step1Status', completed: false },
+  2: { id: 'step2Status', completed: false },
+  3: { id: 'step3Status', completed: false }
+};
+
+// Enhanced validation and progress tracking
+let validationState = {
+  isValid: false,
+  message: '',
+  type: 'none' // 'valid', 'invalid', 'warning', 'none'
+};
+
+// Progress tracking for analysis
+let analysisProgress = {
+  currentStep: 0,
+  steps: ['validate', 'send', 'analyze', 'save'],
+  stepStatus: {}
+};
 
 // Property Category Manager Class
 class PropertyCategoryManager {
@@ -293,6 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   statusElement = document.getElementById('status');
   successMessage = document.getElementById('successMessage');
   errorMessage = document.getElementById('errorMessage');
+  warningMessage = document.getElementById('warningMessage');
   propertyLinkSection = document.getElementById('propertyLinkSection');
   propertyHistorySection = document.getElementById('propertyHistorySection');
   infoElement = document.getElementById('info');
@@ -310,7 +334,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
   togglePromptBtn = document.getElementById('togglePromptBtn');
   promptContent = document.getElementById('promptContent');
-
+  
+  // Clear input button
+  clearInputBtn = document.getElementById('clearInputBtn');
+  
   // Set up collapsible functionality
   setupCollapsibles();
 
@@ -350,12 +377,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = await navigator.clipboard.readText();
       if (propertyUrlInput) {
         propertyUrlInput.value = text;
+        validatePropertyInput();
+        updateWorkflowStep(2, true);
         showSuccess('Link pasted successfully!');
       }
     } catch (err) {
       showError('Unable to paste from clipboard. Please paste manually.');
     }
   });
+
+  // Clear input button
+  if (clearInputBtn) clearInputBtn.addEventListener('click', function() {
+    if (propertyUrlInput) {
+      propertyUrlInput.value = '';
+      clearValidation();
+      updateWorkflowStep(2, false);
+      updateWorkflowStep(3, false);
+    }
+  });
+
+  // Property input validation on change
+  if (propertyUrlInput) {
+    propertyUrlInput.addEventListener('input', validatePropertyInput);
+    propertyUrlInput.addEventListener('paste', function() {
+      // Validate after paste event completes
+      setTimeout(validatePropertyInput, 100);
+    });
+  }
 
   // Settings event listeners
   if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
@@ -376,6 +424,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize latest analysis section
   initializeLatestAnalysisSection();
+
+  // Initialize UX enhancements
+  initializeUXEnhancements();
 
   // Load initial data and check site status
   await loadPropertyHistory();
@@ -1051,18 +1102,29 @@ async function handleAnalyzeClick() {
     return;
   }
   
-  if (!isValidPropertyLink(link)) {
-    showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
+  if (!validationState.isValid) {
+    showError('Please enter a valid property link from a supported real estate website.');
     return;
   }
+  
+  // Start enhanced analysis progress
+  startAnalysisProgress();
   
   // Disable button while processing
   if (analyzeBtn) {
     analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
+    analyzeBtn.classList.add('loading');
+    const btnText = analyzeBtn.querySelector('.btn-text');
+    if (btnText) {
+      btnText.innerHTML = '<div class="spinner"></div> Analyzing...';
+    }
   }
   
   try {
+    // Update progress - validating
+    updateAnalysisStep('validate', 'completed');
+    updateAnalysisStep('send', 'active');
+    
     // First ensure content script is ready
     if (!contentScriptReady) {
       console.log('Content script not ready, attempting to inject...');
@@ -1077,21 +1139,49 @@ async function handleAnalyzeClick() {
     });
     
     if (response && response.success) {
+      // Update progress - analyzing
+      updateAnalysisStep('send', 'completed');
+      updateAnalysisStep('analyze', 'active');
+      
       // Save property to history
+      updateAnalysisStep('save', 'active');
       await savePropertyToHistory(link);
-      showSuccess('Property link sent to ChatGPT for analysis!');
-      if (propertyUrlInput) propertyUrlInput.value = ''; // Clear the input
+      updateAnalysisStep('save', 'completed');
+      
+      // Complete analysis
+      completeAnalysisProgress();
+      
+      showSuccess('Property sent to ChatGPT for analysis! Check the Properties tab to see results.');
+      
+      // Clear the input and reset validation
+      if (propertyUrlInput) {
+        propertyUrlInput.value = '';
+        clearValidation();
+        updateWorkflowStep(2, false);
+        updateWorkflowStep(3, false);
+      }
+      
+      // Auto-switch to properties tab after a delay
+      setTimeout(() => {
+        switchToTab('properties');
+      }, 2000);
+      
     } else {
       throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
     }
     
   } catch (error) {
     console.error('Analysis failed:', error);
+    hideAnalysisProgress();
     showError(`Unable to communicate with ChatGPT: ${error.message}`);
   } finally {
     if (analyzeBtn) {
       analyzeBtn.disabled = false;
-      analyzeBtn.innerHTML = '🔍 Analyze Property';
+      analyzeBtn.classList.remove('loading');
+      const btnText = analyzeBtn.querySelector('.btn-text');
+      if (btnText) {
+        btnText.innerHTML = 'Analyze Property';
+      }
     }
   }
 }
@@ -1126,8 +1216,9 @@ async function initializePopup() {
         if (response && response.active) {
           // Content script is active
           statusElement.className = 'status active';
-          statusElement.innerHTML = '✅ Connected to ChatGPT';
+          updateStatusWithProgress('Connected to ChatGPT', 'Ready to analyze properties', 100);
           contentScriptReady = true;
+          updateWorkflowStep(1, true);
           
           // Show site info
           if (infoElement) infoElement.style.display = 'block';
@@ -1149,7 +1240,8 @@ async function initializePopup() {
         
         // Content script might not be loaded, show as active anyway since we're on ChatGPT
         statusElement.className = 'status active';
-        statusElement.innerHTML = '✅ Ready on ChatGPT';
+        updateStatusWithProgress('Ready on ChatGPT', 'Loading extension features...', 75);
+        updateWorkflowStep(1, true);
         
         // Show site info
         if (infoElement) infoElement.style.display = 'block';
@@ -1163,19 +1255,20 @@ async function initializePopup() {
         if (propertyHistorySection) propertyHistorySection.style.display = 'block';
         
         // Try to inject content script
-        try {
-          await injectContentScript();
-          contentScriptReady = true;
-          statusElement.innerHTML = '✅ Connected to ChatGPT';
-        } catch (injectError) {
-          console.error('Failed to inject content script:', injectError);
-        }
+                  try {
+            await injectContentScript();
+            contentScriptReady = true;
+            updateStatusWithProgress('Connected to ChatGPT', 'Ready to analyze properties', 100);
+          } catch (injectError) {
+            console.error('Failed to inject content script:', injectError);
+            updateStatusWithProgress('Ready on ChatGPT', 'Some features may be limited', 75);
+          }
       }
       
     } else {
       // Not on ChatGPT
       statusElement.className = 'status inactive';
-      statusElement.innerHTML = '❌ Please open ChatGPT to use this extension';
+      updateStatusWithProgress('Not Connected', 'Please open ChatGPT to use this extension', 0);
       
       // Show site info
       if (infoElement) infoElement.style.display = 'block';
@@ -1186,7 +1279,7 @@ async function initializePopup() {
   } catch (error) {
     console.error('Failed to initialize popup:', error);
     statusElement.className = 'status inactive';
-    statusElement.innerHTML = '⚠️ Unable to check status';
+    updateStatusWithProgress('Connection Error', 'Unable to check status', 0);
   }
 }
 
@@ -4645,4 +4738,305 @@ document.addEventListener('DOMContentLoaded', () => {
 window.WordExportModule = WordExportModule;
 window.showProgress = showProgress;
 window.hideProgress = hideProgress;
+
+// ===============================================
+// ENHANCED UX FUNCTIONS
+// ===============================================
+
+// Enhanced message system
+function showMessage(message, type = 'success', duration = 3000) {
+  const messageElements = {
+    success: successMessage,
+    error: errorMessage,
+    warning: warningMessage
+  };
+
+  const messageElement = messageElements[type];
+  if (!messageElement) return;
+
+  // Hide all other messages first
+  Object.values(messageElements).forEach(el => {
+    if (el && el !== messageElement) {
+      el.classList.remove('show');
+      el.style.display = 'none';
+    }
+  });
+
+  // Show the message
+  const contentEl = messageElement.querySelector('.message-content');
+  if (contentEl) {
+    contentEl.textContent = message;
+  } else {
+    messageElement.textContent = message;
+  }
+  
+  messageElement.classList.add('show');
+  messageElement.style.display = 'flex';
+
+  // Auto-hide after duration
+  if (duration > 0) {
+    setTimeout(() => {
+      messageElement.classList.remove('show');
+      messageElement.style.display = 'none';
+    }, duration);
+  }
+}
+
+// Enhanced success/error/warning functions (override existing)
+function showSuccess(message, duration = 3000) {
+  showMessage(message, 'success', duration);
+}
+
+function showError(message, duration = 5000) {
+  showMessage(message, 'error', duration);
+}
+
+function showWarning(message, duration = 4000) {
+  showMessage(message, 'warning', duration);
+}
+
+// Workflow step management
+function updateWorkflowStep(stepNumber, completed) {
+  const step = workflowSteps[stepNumber];
+  if (!step) return;
+
+  step.completed = completed;
+  const stepElement = document.getElementById(step.id);
+  
+  if (stepElement) {
+    if (completed) {
+      stepElement.textContent = '✅';
+      stepElement.className = 'step-status completed';
+    } else {
+      stepElement.textContent = '⏳';
+      stepElement.className = 'step-status';
+    }
+  }
+
+  // Update analysis badge
+  updateAnalysisBadge();
+}
+
+function updateAnalysisBadge() {
+  const analysisBadge = document.getElementById('analysisBadge');
+  if (!analysisBadge) return;
+
+  const completedSteps = Object.values(workflowSteps).filter(step => step.completed).length;
+  const totalSteps = Object.keys(workflowSteps).length;
+
+  if (completedSteps === 0) {
+    analysisBadge.textContent = 'Ready';
+    analysisBadge.className = 'section-badge';
+  } else if (completedSteps === totalSteps) {
+    analysisBadge.textContent = 'Ready to Analyze';
+    analysisBadge.className = 'section-badge ready';
+    analysisBadge.style.background = 'var(--primary)';
+    analysisBadge.style.color = 'white';
+  } else {
+    analysisBadge.textContent = `${completedSteps}/${totalSteps} Steps`;
+    analysisBadge.className = 'section-badge progress';
+    analysisBadge.style.background = '#fef3c7';
+    analysisBadge.style.color = '#92400e';
+  }
+}
+
+// Property URL validation
+function validatePropertyInput() {
+  const input = propertyUrlInput?.value?.trim() || '';
+  const validationElement = document.getElementById('urlValidation');
+  
+  if (!validationElement) return;
+
+  if (input === '') {
+    clearValidation();
+    return;
+  }
+
+  // Check if it's a valid URL
+  let url;
+  try {
+    url = new URL(input);
+  } catch (e) {
+    setValidationState('invalid', 'Please enter a valid URL starting with http:// or https://');
+    return;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  
+  // Check for supported property sites
+  const supportedSites = [
+    'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+    'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com',
+    'yad2.co.il', 'madlan.co.il', 'spitogatos.gr', 'zoopla.co.uk', 'rightmove.co.uk',
+    'homestra.com', 'boligportal.dk', 'lejebolig.dk', 'zyprus.com', 'bazaraki.com'
+  ];
+
+  const isSupported = supportedSites.some(site => hostname.includes(site));
+  
+  if (isSupported) {
+    setValidationState('valid', `✓ Valid ${hostname} property link`);
+    updateWorkflowStep(2, true);
+  } else {
+    setValidationState('warning', `⚠ ${hostname} - may work but not fully tested`);
+    updateWorkflowStep(2, true);
+  }
+}
+
+function setValidationState(type, message) {
+  validationState.type = type;
+  validationState.message = message;
+  validationState.isValid = type === 'valid' || type === 'warning';
+
+  const validationElement = document.getElementById('urlValidation');
+  const inputElement = propertyUrlInput;
+
+  if (validationElement) {
+    validationElement.textContent = message;
+    validationElement.className = `input-validation ${type}`;
+  }
+
+  if (inputElement) {
+    inputElement.className = `form-input ${type}`;
+  }
+}
+
+function clearValidation() {
+  validationState = { isValid: false, message: '', type: 'none' };
+  
+  const validationElement = document.getElementById('urlValidation');
+  const inputElement = propertyUrlInput;
+
+  if (validationElement) {
+    validationElement.textContent = '';
+    validationElement.className = 'input-validation';
+  }
+
+  if (inputElement) {
+    inputElement.className = 'form-input';
+  }
+}
+
+// Enhanced analysis progress tracking
+function startAnalysisProgress() {
+  const tracker = document.getElementById('analysisTracker');
+  const timeElement = document.getElementById('analysisTime');
+  
+  if (tracker) {
+    tracker.style.display = 'block';
+  }
+
+  // Reset all steps
+  analysisProgress.currentStep = 0;
+  analysisProgress.stepStatus = {};
+  
+  analysisProgress.steps.forEach(step => {
+    const stepElement = document.querySelector(`.tracker-step[data-step="${step}"]`);
+    if (stepElement) {
+      stepElement.classList.remove('active', 'completed');
+    }
+  });
+
+  // Start timer
+  analysisStartTime = Date.now();
+  analysisTimer = setInterval(() => {
+    if (timeElement) {
+      const elapsed = Math.floor((Date.now() - analysisStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      timeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }, 1000);
+
+  // Start first step
+  updateAnalysisStep('validate', 'active');
+}
+
+function updateAnalysisStep(stepName, status) {
+  const stepElement = document.querySelector(`.tracker-step[data-step="${stepName}"]`);
+  const iconElement = document.getElementById(`${stepName}Icon`);
+  
+  if (!stepElement) return;
+
+  // Remove all status classes
+  stepElement.classList.remove('active', 'completed');
+  
+  if (status === 'active') {
+    stepElement.classList.add('active');
+    if (iconElement) iconElement.textContent = '⏳';
+  } else if (status === 'completed') {
+    stepElement.classList.add('completed');
+    if (iconElement) iconElement.textContent = '✅';
+  }
+
+  analysisProgress.stepStatus[stepName] = status;
+}
+
+function completeAnalysisProgress() {
+  // Complete all remaining steps
+  analysisProgress.steps.forEach(step => {
+    updateAnalysisStep(step, 'completed');
+  });
+
+  // Stop timer
+  if (analysisTimer) {
+    clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+
+  // Hide tracker after a delay
+  setTimeout(() => {
+    const tracker = document.getElementById('analysisTracker');
+    if (tracker) {
+      tracker.style.display = 'none';
+    }
+  }, 2000);
+
+  updateWorkflowStep(3, true);
+}
+
+function hideAnalysisProgress() {
+  const tracker = document.getElementById('analysisTracker');
+  if (tracker) {
+    tracker.style.display = 'none';
+  }
+
+  if (analysisTimer) {
+    clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+}
+
+// Enhanced status updates with progress
+function updateStatusWithProgress(title, subtitle, progress = 0) {
+  const statusTitle = document.querySelector('.status-title');
+  const statusSubtitle = document.querySelector('.status-subtitle');
+  const progressFill = document.getElementById('statusProgress');
+
+  if (statusTitle) statusTitle.textContent = title;
+  if (statusSubtitle) statusSubtitle.textContent = subtitle;
+  if (progressFill) progressFill.style.width = `${progress}%`;
+}
+
+// Initialize UX enhancements
+function initializeUXEnhancements() {
+  // Check initial workflow state
+  checkWorkflowSteps();
+  
+  // Initialize validation if input has content
+  if (propertyUrlInput && propertyUrlInput.value.trim()) {
+    validatePropertyInput();
+  }
+}
+
+function checkWorkflowSteps() {
+  // Check if we're on ChatGPT (step 1)
+  if (currentTab && (currentTab.url?.includes('chatgpt.com') || currentTab.url?.includes('chat.openai.com'))) {
+    updateWorkflowStep(1, true);
+  }
+
+  // Check if there's content in the input (step 2)
+  if (propertyUrlInput && propertyUrlInput.value.trim()) {
+    updateWorkflowStep(2, true);
+  }
+}
 
