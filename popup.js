@@ -373,6 +373,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize category UI
   initializeCategoryUI();
+  
+  // Initialize latest analysis section
+  initializeLatestAnalysisSection();
 
   // Load initial data and check site status
   await loadPropertyHistory();
@@ -447,8 +450,12 @@ function handleTabSwitch(tabId) {
       break;
       
     case 'properties':
+      // Remove notification badge when switching to properties tab
+      removePropertiesTabNotification();
       // Refresh property history when switching to properties tab
       loadPropertyHistory();
+      // Check for latest analysis to show at the top
+      checkForLatestAnalysis();
       break;
       
     case 'settings':
@@ -597,6 +604,9 @@ async function loadPropertyHistory() {
     const allProperties = Array.from(categoryManager.properties.values());
     
     displayPropertyHistory(allProperties);
+    
+    // Check for latest analysis when properties are loaded
+    await checkForLatestAnalysis();
   } catch (error) {
     console.error('Failed to load property history:', error);
   }
@@ -4356,8 +4366,275 @@ async function processPropertyAnalysis(propertyUrl, analysis) {
   }
 }
 
+// Latest Analysis Management
+let latestAnalyzedProperty = null;
+let latestAnalysisShown = false;
+
+function initializeLatestAnalysisSection() {
+  const dismissBtn = document.getElementById('dismissLatestBtn');
+  
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', dismissLatestAnalysis);
+  }
+}
+
+async function checkForLatestAnalysis() {
+  try {
+    await categoryManager.initialize();
+    const allProperties = Array.from(categoryManager.properties.values());
+    
+    // Find the most recently analyzed property
+    const analyzedProperties = allProperties
+      .filter(prop => prop.analysis && prop.analysis.fullResponse)
+      .sort((a, b) => {
+        const timeA = new Date(a.updatedAt || a.timestamp || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.timestamp || 0).getTime();
+        return timeB - timeA;
+      });
+    
+    if (analyzedProperties.length === 0) {
+      hideLatestAnalysis();
+      return;
+    }
+    
+    const mostRecent = analyzedProperties[0];
+    
+    // Check if this is a new analysis (within last 5 minutes and not dismissed)
+    const analysisTime = new Date(mostRecent.updatedAt || mostRecent.timestamp || 0);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    if (analysisTime > fiveMinutesAgo && !latestAnalysisShown) {
+      latestAnalyzedProperty = mostRecent;
+      await showLatestAnalysis(mostRecent);
+      latestAnalysisShown = true;
+    } else {
+      hideLatestAnalysis();
+    }
+  } catch (error) {
+    console.error('Failed to check for latest analysis:', error);
+  }
+}
+
+async function showLatestAnalysis(property) {
+  const latestSection = document.getElementById('latestAnalysisSection');
+  const latestContent = document.getElementById('latestAnalysisContent');
+  
+  if (!latestSection || !latestContent) return;
+  
+  await categoryManager.initialize();
+  const currentCategory = categoryManager.getCategory(property.categoryId || 'uncategorized');
+  const suggestedCategory = suggestCategoryBasedOnAnalysis(property);
+  const suggestedCategoryObj = categoryManager.getCategory(suggestedCategory);
+  
+  // Get all categories for quick selection
+  const allCategories = categoryManager.getAllCategories();
+  
+  latestContent.innerHTML = `
+    <div class="latest-analysis-content">
+      <div class="latest-property-header">
+        <div class="latest-property-info">
+          <a href="${property.url}" target="_blank" class="latest-property-url">
+            ${property.domain || new URL(property.url).hostname}
+          </a>
+          <div class="latest-property-meta">
+            <div class="latest-property-timestamp">
+              <span>🕒</span>
+              <span>Analyzed ${getTimeAgo(property.updatedAt || property.timestamp)}</span>
+            </div>
+            <div class="current-category" style="color: ${currentCategory?.color || '#6B7280'};">
+              ${currentCategory?.icon || '📋'} ${currentCategory?.name || 'Uncategorized'}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="latest-analysis-preview">
+        <div class="latest-analysis-text">
+          ${property.analysis.fullResponse.substring(0, 300)}${property.analysis.fullResponse.length > 300 ? '...' : ''}
+        </div>
+      </div>
+      
+      <div class="latest-categorization-section">
+        <div class="categorization-header">
+          <span>🏷️</span>
+          Quick Categorization
+          ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? 
+            `<span style="font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: normal;">AI suggests: ${suggestedCategoryObj?.icon} ${suggestedCategoryObj?.name}</span>` : ''}
+        </div>
+        
+        <div class="quick-categorization">
+          ${allCategories.map(category => `
+            <button class="quick-category-btn ${category.id === suggestedCategory && category.id !== property.categoryId ? 'suggested' : ''}" 
+                    data-action="quick-categorize" 
+                    data-property-id="${property.id || property.url}" 
+                    data-category-id="${category.id}"
+                    style="color: ${category.color};">
+              ${category.icon} ${category.name}
+            </button>
+          `).join('')}
+        </div>
+        
+        <div class="custom-categorization">
+          <select class="category-select-latest" id="latestCategorySelect">
+            ${allCategories.map(cat => 
+              `<option value="${cat.id}" ${property.categoryId === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
+            ).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm" data-action="apply-category" data-property-id="${property.id || property.url}">
+            Apply
+          </button>
+        </div>
+      </div>
+      
+      <div class="latest-actions">
+        <button class="btn btn-ghost btn-sm" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
+          👁️ View Full Analysis
+        </button>
+        <button class="btn btn-ghost btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
+          📄 Export to Word
+        </button>
+      </div>
+    </div>
+  `;
+  
+  // Show the section with smooth animation
+  latestSection.style.display = 'block';
+  
+  // Smooth scroll to the latest analysis section
+  setTimeout(() => {
+    latestSection.scrollIntoView({ 
+      behavior: 'smooth', 
+      block: 'start' 
+    });
+  }, 100);
+  
+  // Set up event listeners for the latest analysis section
+  setupLatestAnalysisEventListeners();
+}
+
+function hideLatestAnalysis() {
+  const latestSection = document.getElementById('latestAnalysisSection');
+  if (latestSection) {
+    latestSection.style.display = 'none';
+  }
+}
+
+function dismissLatestAnalysis() {
+  hideLatestAnalysis();
+  latestAnalysisShown = true; // Mark as shown to prevent re-showing
+  removePropertiesTabNotification();
+}
+
+function addPropertiesTabNotification() {
+  const propertiesTabBtn = document.querySelector('[data-tab="properties"]');
+  if (propertiesTabBtn && !propertiesTabBtn.querySelector('.notification-badge')) {
+    const badge = document.createElement('div');
+    badge.className = 'notification-badge';
+    propertiesTabBtn.appendChild(badge);
+  }
+}
+
+function removePropertiesTabNotification() {
+  const propertiesTabBtn = document.querySelector('[data-tab="properties"]');
+  if (propertiesTabBtn) {
+    const badge = propertiesTabBtn.querySelector('.notification-badge');
+    if (badge) {
+      badge.remove();
+    }
+  }
+}
+
+function setupLatestAnalysisEventListeners() {
+  const latestContent = document.getElementById('latestAnalysisContent');
+  if (!latestContent) return;
+  
+  // Use event delegation for all actions
+  latestContent.addEventListener('click', async (event) => {
+    const target = event.target;
+    const action = target.dataset.action;
+    const propertyId = target.dataset.propertyId;
+    
+    if (action === 'quick-categorize') {
+      const categoryId = target.dataset.categoryId;
+      await handleQuickCategorization(propertyId, categoryId);
+    } else if (action === 'apply-category') {
+      const categorySelect = document.getElementById('latestCategorySelect');
+      if (categorySelect) {
+        await handleQuickCategorization(propertyId, categorySelect.value);
+      }
+    } else if (action === 'view-full-analysis') {
+      const property = categoryManager.properties.get(propertyId);
+      if (property) {
+        showFullResponse(property);
+      }
+    } else if (action === 'export-property') {
+      const property = categoryManager.properties.get(propertyId);
+      if (property && window.WordExportModule) {
+        window.WordExportModule.showExportOptionsModal(property);
+      }
+    }
+  });
+}
+
+async function handleQuickCategorization(propertyId, categoryId) {
+  try {
+    await categoryManager.movePropertyToCategory(propertyId, categoryId);
+    const category = categoryManager.getCategory(categoryId);
+    showSuccess(`Property moved to ${category?.name || 'category'}!`);
+    
+    // Update the UI
+    await renderCategoryGrid();
+    await loadPropertyHistory();
+    
+    // Auto-dismiss after successful categorization
+    setTimeout(() => {
+      dismissLatestAnalysis();
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Failed to categorize property:', error);
+    showError('Failed to update property category');
+  }
+}
+
+function getTimeAgo(timestamp) {
+  if (!timestamp) return 'recently';
+  
+  const now = new Date();
+  const time = new Date(timestamp);
+  const diffMs = now - time;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  
+  return time.toLocaleDateString();
+}
+
+// Enhanced processPropertyAnalysis to show latest analysis
+async function processPropertyAnalysisEnhanced(propertyUrl, analysis) {
+  // Call the original function
+  await processPropertyAnalysis(propertyUrl, analysis);
+  
+  // Reset the latest analysis shown flag so new analysis appears
+  latestAnalysisShown = false;
+  
+  // If not on Properties tab, add notification badge
+  if (activeTab !== 'properties') {
+    addPropertiesTabNotification();
+    // Auto-switch to Properties tab to show the new analysis
+    switchToTab('properties');
+  }
+  
+  // Check if we should show this as the latest analysis
+  await checkForLatestAnalysis();
+}
+
 // Make functions available globally for other modules
-window.processPropertyAnalysis = processPropertyAnalysis;
+window.processPropertyAnalysis = processPropertyAnalysisEnhanced;
+window.checkForLatestAnalysis = checkForLatestAnalysis;
 
 // Initialize Word export module when popup loads
 document.addEventListener('DOMContentLoaded', () => {
