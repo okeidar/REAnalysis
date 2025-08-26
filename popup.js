@@ -1,7 +1,7 @@
 // Popup script for RE Analyzer Extension
 
 // DOM elements
-let propertyHistoryList, clearHistoryBtn, exportHistoryBtn, propertyUrlInput, analyzeBtn, 
+let propertyHistoryList, clearHistoryBtn, propertyUrlInput, analyzeBtn, 
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
     successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
     propertyHistorySection, settingsSection, settingsToggle, settingsContent,
@@ -25,7 +25,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Get DOM elements with correct IDs from HTML
   propertyHistoryList = document.getElementById('propertyHistoryList');
   clearHistoryBtn = document.getElementById('clearHistoryBtn');
-  exportHistoryBtn = document.getElementById('exportHistoryBtn');
   propertyUrlInput = document.getElementById('propertyLinkInput');
   analyzeBtn = document.getElementById('analyzeBtn');
   pasteBtn = document.getElementById('pasteBtn');
@@ -59,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       await clearPropertyHistory();
     }
   });
-  if (exportHistoryBtn) exportHistoryBtn.addEventListener('click', exportPropertyHistory);
   
   // Word export button event listener
   const exportWordBtn = document.getElementById('exportWordBtn');
