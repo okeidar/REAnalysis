@@ -1,0 +1,208 @@
+# Word Export Feature - User Guide
+
+## Overview
+The ChatGPT Helper Extension now includes a powerful Word export feature that allows you to export your ChatGPT property analysis conversations to Microsoft Word documents (.docx) while preserving text formatting including bold, headers, and structure.
+
+## Features
+
+### ✅ What's Included in Word Export
+- **Full ChatGPT Analysis**: Complete conversation responses with formatting preserved
+- **Property Information**: URL, source domain, and analysis date
+- **Extracted Data Summary**: Key property details when available (price, bedrooms, etc.)
+- **Professional Formatting**: Headers, bold text, and structured layout
+- **Export Timestamp**: Date and time when document was generated
+
+### 📄 Export Options
+- **Single Property Export**: Export individual property analysis to Word
+- **Batch Export**: Export multiple properties to a single Word document
+- **Customizable Options**: Choose what to include in your export
+- **Progress Tracking**: Real-time progress indicator for large exports
+
+## How to Use Word Export
+
+### Exporting a Single Property
+
+1. **Navigate to Properties Tab**
+   - Click on the "📊 Properties" tab in the extension popup
+   - You'll see all your analyzed properties listed
+
+2. **Select Property to Export**
+   - Find the property you want to export (must show "✅ Analyzed" status)
+   - Click the "📄 Export Word" button for that property
+
+3. **Configure Export Options**
+   - **Preserve text formatting**: Keep bold text and headers (recommended)
+   - **Include extracted property data**: Add key property details summary
+   - **Include export timestamp**: Add generation date to document
+
+4. **Download Document**
+   - Click "📄 Export to Word" to generate the document
+   - File will automatically download to your default Downloads folder
+   - Filename format: `ChatGPT-Analysis-[domain]-[date].docx`
+
+### Exporting Multiple Properties (Batch Export)
+
+1. **Navigate to Properties Tab**
+   - Click on the "📊 Properties" tab
+
+2. **Use Batch Export**
+   - Click the main "📄 Export to Word" button at the bottom
+   - This will export ALL analyzed properties to a single document
+
+3. **Configure Batch Options**
+   - Same options as single export, plus:
+   - **Separate each property on new page**: Each property starts on a new page
+
+4. **Download Batch Document**
+   - Click "📄 Export to Word"
+   - File format: `ChatGPT-Batch-Analysis-[count]-properties-[date].docx`
+
+## Export Options Explained
+
+### Format Preservation
+- **Preserve text formatting** ✅ (Recommended)
+  - Keeps bold text (**text**) from ChatGPT responses
+  - Preserves section headers and structure
+  - Maintains readability and professional appearance
+
+### Property Data Summary
+- **Include extracted property data** ✅ (Recommended)
+  - Adds a summary section with key details
+  - Includes price, bedrooms, bathrooms, property type
+  - Displays location scores and rental estimates when available
+
+### Timestamps
+- **Include export timestamp** ✅ (Recommended)
+  - Shows when the Word document was generated
+  - Helps track document versions and export dates
+
+### Batch Export Options
+- **Separate each property on new page** ✅ (Recommended)
+  - Each property analysis starts on a new page
+  - Makes printed documents easier to organize
+  - Better for sharing individual property analyses
+
+## File Naming Convention
+
+### Single Property Export
+```
+ChatGPT-Analysis-[domain]-[date].docx
+```
+Examples:
+- `ChatGPT-Analysis-zillow-com-2025-01-26.docx`
+- `ChatGPT-Analysis-realtor-com-2025-01-26.docx`
+
+### Batch Export
+```
+ChatGPT-Batch-Analysis-[count]-properties-[date].docx
+```
+Examples:
+- `ChatGPT-Batch-Analysis-5-properties-2025-01-26.docx`
+- `ChatGPT-Batch-Analysis-12-properties-2025-01-26.docx`
+
+## Word Document Structure
+
+### Document Header
+- **Title**: "ChatGPT Property Analysis Export"
+- **Export Type**: Single property or batch export information
+
+### Property Information Section
+- **Property URL**: Direct link to the property listing
+- **Source**: Website domain (Zillow, Realtor.com, etc.)
+- **Analysis Date**: When the ChatGPT analysis was performed
+
+### Key Property Data Section (if enabled)
+- **Price**: Property asking price with currency formatting
+- **Bedrooms**: Number of bedrooms
+- **Bathrooms**: Number of bathrooms (including half baths)
+- **Square Feet**: Total property size
+- **Property Type**: House, apartment, condo, etc.
+- **Location Score**: Rating out of 10 when available
+- **Rental Income**: Estimated monthly rental income
+- **Growth Potential**: Rental market growth assessment
+
+### Complete ChatGPT Analysis Section
+- **Full Response**: Complete ChatGPT conversation with formatting
+- **Section Headers**: Bold and properly formatted headers
+- **Text Formatting**: Preserved bold text and structure from ChatGPT
+
+### Document Footer
+- **Generation Info**: "Generated by ChatGPT Helper Extension on [timestamp]"
+
+## Troubleshooting
+
+### Common Issues
+
+**"Word export module not loaded" Error**
+- **Solution**: Refresh the extension by closing and reopening the popup
+- **Cause**: JavaScript module didn't load properly
+
+**"No analyzed properties available" Message**
+- **Solution**: Ensure properties have "✅ Analyzed" status, not "⏳ Pending"
+- **Cause**: Properties need complete ChatGPT responses to export
+
+**Download Doesn't Start**
+- **Solution**: Check browser popup blocker settings
+- **Solution**: Ensure Downloads permission is enabled for the extension
+
+**Empty or Malformed Word Document**
+- **Solution**: Try exporting a single property first to test
+- **Cause**: May be related to very large batch exports
+
+### Performance Notes
+
+- **Single Property**: Exports typically complete in 2-5 seconds
+- **Batch Export (5-10 properties)**: May take 10-30 seconds
+- **Large Batch (10+ properties)**: Progress indicator shows real-time status
+- **Very Large Responses**: Long ChatGPT analyses may take longer to process
+
+## Best Practices
+
+### For Best Results
+1. **Use descriptive prompts** for better ChatGPT analysis structure
+2. **Wait for complete analysis** before exporting (✅ Analyzed status)
+3. **Export regularly** to avoid losing data if browser history clears
+4. **Use batch export** for comparing multiple properties
+5. **Enable all formatting options** for professional documents
+
+### Document Management
+- **Organize by date**: Use the automatic date stamping in filenames
+- **Create project folders**: Group related property analyses
+- **Backup important exports**: Store copies of key investment analysis documents
+- **Print-friendly**: Exported documents are optimized for printing
+
+## Technical Details
+
+### Supported Browsers
+- **Chrome**: Full support (recommended)
+- **Edge**: Full support
+- **Brave**: Full support
+- **Other Chromium browsers**: Should work with Manifest V3 support
+
+### File Format
+- **Output**: Microsoft Word .docx format
+- **Compatibility**: Works with Microsoft Word 2010+, Google Docs, LibreOffice
+- **Size**: Typically 50-200 KB per property depending on analysis length
+
+### Security & Privacy
+- **Local Processing**: All export processing happens locally in your browser
+- **No Data Transmission**: No property data is sent to external servers
+- **File Storage**: Documents saved directly to your local Downloads folder
+
+## Feedback & Support
+
+### Found an Issue?
+- Report bugs or request features through the extension feedback system
+- Include specific error messages and browser information
+- Describe steps to reproduce any problems
+
+### Feature Requests
+- Suggest additional export formats
+- Request new formatting options
+- Propose workflow improvements
+
+---
+
+**Happy exporting!** 📄✨
+
+This Word export feature transforms your ChatGPT property analyses into professional, shareable documents perfect for investment research, client presentations, and property comparison workflows.
