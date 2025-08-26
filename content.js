@@ -2963,6 +2963,12 @@ function setupResponseMonitor() {
       messageText.toLowerCase().includes(keyword)
     ));
     
+    // Check if this is a confirmation response and skip it
+    if (detectConfirmation(messageText) && messageText.length < 500) {
+      console.log('🔍 Detected confirmation response, skipping save - waiting for actual analysis');
+      return;
+    }
+    
     if (keywordMatches >= 2) {
       // Add null check for currentPropertyAnalysis
       if (!currentPropertyAnalysis) {
@@ -2980,6 +2986,51 @@ function setupResponseMonitor() {
           const analysisData = extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
               promptSplittingState.pendingPropertyLink) {
+            
+            console.log('✅ Successfully extracted analysis data from split prompt response');
+            
+            // Send the analysis data with the pending property link
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `split_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response) {
+                console.log('✅ Split prompt analysis data sent successfully:', response);
+                if (response.success) {
+                  console.log('🎉 Split prompt property analysis saved!');
+                }
+              }
+            }).catch(err => {
+              console.error('❌ Failed to send split prompt analysis data:', err);
+            });
+            
+            // Reset prompt splitting state
+            resetPromptSplittingState();
+          }
+        }
+        return;
+      }
+      
+      // CRITICAL: If we're in prompt splitting mode, redirect to fallback logic
+      // to ensure we save with the correct property URL from promptSplittingState
+      if (promptSplittingState.currentPhase === 'complete' || 
+          promptSplittingState.currentPhase === 'sending_link') {
+        console.log('🔄 Redirecting to prompt splitting fallback logic for proper URL handling');
+        
+        // Trigger the fallback logic by temporarily clearing currentPropertyAnalysis
+        const tempCurrentPropertyAnalysis = currentPropertyAnalysis;
+        currentPropertyAnalysis = null;
+        
+        // This will trigger the fallback logic above
+        if (promptSplittingState.pendingPropertyLink) {
+          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE RESPONSE TO SAVE!)...');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
             
             console.log('✅ Successfully extracted analysis data from split prompt response');
             
