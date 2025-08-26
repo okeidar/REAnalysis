@@ -2170,8 +2170,8 @@ async function exportPrompt() {
     const promptData = {
       prompt: customPrompt.value,
       timestamp: new Date().toISOString(),
-             version: "v1.1.0",
-      type: "RE Analyzer Custom Prompt"
+                     version: "v1.1.1",
+        type: "RE Analyzer Custom Prompt"
     };
     
     const blob = new Blob([JSON.stringify(promptData, null, 2)], { type: 'application/json' });
@@ -2308,11 +2308,11 @@ async function exportDebugInfo() {
       timestamp: new Date().toISOString(),
       activeTab: activeTab,
       userAgent: navigator.userAgent,
-      extension: {
-        version: "v1.1.0",
-        tabSystem: "active",
-        settingsTab: "loaded"
-      },
+              extension: {
+          version: "v1.1.1",
+          tabSystem: "active",
+          settingsTab: "loaded"
+        },
       settings: {
         autoSaveEnabled,
         promptValidationEnabled,
