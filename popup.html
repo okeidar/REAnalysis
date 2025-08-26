@@ -2310,6 +2310,545 @@
       gap: var(--space-md);
     }
 
+    /* =============================================== */
+    /* ENHANCED PROPERTIES TAB STYLES */
+    /* =============================================== */
+
+    /* Properties Overview */
+    .properties-overview {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+      padding: var(--space-lg);
+      background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--primary);
+    }
+
+    .properties-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+    }
+
+    .properties-subtitle {
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+      margin: 0 0 var(--space-lg) 0;
+    }
+
+    .properties-stats {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-number {
+      display: block;
+      font-size: 32px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    /* Uncategorized Alert */
+    .alert-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .alert-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .alert-content {
+      flex: 1;
+    }
+
+    .alert-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: #92400e;
+      margin-bottom: var(--space-xs);
+    }
+
+    .alert-description {
+      font-size: var(--font-size-sm);
+      color: #92400e;
+    }
+
+    .alert-actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    /* Quick Actions Bar */
+    .quick-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-lg);
+      gap: var(--space-lg);
+    }
+
+    .view-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .view-toggle {
+      display: flex;
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .view-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      border-right: 1px solid var(--border);
+    }
+
+    .view-btn:last-child {
+      border-right: none;
+    }
+
+    .view-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .view-btn:hover:not(.active) {
+      background: var(--background);
+      color: var(--text-primary);
+    }
+
+    .view-icon {
+      font-size: 16px;
+    }
+
+    .filter-controls {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .filter-select {
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      background: var(--background);
+      color: var(--text-primary);
+      min-width: 120px;
+    }
+
+    .action-controls {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    /* Enhanced Category Grid */
+    .enhanced-category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-lg);
+    }
+
+    .category-card {
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      position: relative;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .category-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary);
+    }
+
+    .category-card.has-properties {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.05) 0%, rgba(16, 163, 127, 0.02) 100%);
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+
+    .category-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      flex: 1;
+    }
+
+    .category-icon {
+      font-size: 28px;
+    }
+
+    .category-details h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .category-details p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .category-count {
+      background: var(--primary);
+      color: white;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .category-properties {
+      flex: 1;
+      margin-top: var(--space-sm);
+    }
+
+    .category-properties-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .category-property-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-xs);
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+    }
+
+    .property-status-icon {
+      font-size: 12px;
+    }
+
+    .property-status-icon.analyzed {
+      color: #16a34a;
+    }
+
+    .property-status-icon.pending {
+      color: #f59e0b;
+    }
+
+    .property-domain {
+      color: var(--text-primary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    /* Properties List View */
+    .properties-list-container {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .list-title h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .list-count {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .list-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .bulk-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--primary);
+      color: white;
+      border-radius: var(--radius-md);
+    }
+
+    .selected-count {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .bulk-select {
+      padding: var(--space-xs) var(--space-sm);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      background: white;
+      color: var(--text-primary);
+    }
+
+    .properties-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .property-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--border);
+      transition: all 0.2s ease-in-out;
+      cursor: pointer;
+    }
+
+    .property-item:hover {
+      background: var(--secondary-background);
+    }
+
+    .property-item.selected {
+      background: rgba(16, 163, 127, 0.1);
+      border-color: var(--primary);
+    }
+
+    .property-checkbox {
+      margin: 0;
+    }
+
+    .property-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .property-status.analyzed {
+      background: #16a34a;
+    }
+
+    .property-status.pending {
+      background: #f59e0b;
+    }
+
+    .property-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .property-url {
+      font-weight: var(--font-weight-medium);
+      color: var(--primary);
+      text-decoration: none;
+      font-size: var(--font-size-sm);
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .property-meta {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .property-category {
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .property-actions {
+      display: flex;
+      gap: var(--space-xs);
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .property-item:hover .property-actions {
+      opacity: 1;
+    }
+
+    /* Modals */
+    .property-modal {
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .categorization-modal {
+      max-width: 500px;
+    }
+
+    .categorization-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .property-preview {
+      padding: var(--space-md);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .preview-url {
+      font-weight: var(--font-weight-medium);
+      color: var(--primary);
+      font-size: var(--font-size-sm);
+      word-break: break-all;
+    }
+
+    .preview-meta {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .category-selection {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .selection-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .category-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .category-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .category-option:hover {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+
+    .category-option.selected {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.1);
+    }
+
+    .category-option-icon {
+      font-size: 20px;
+    }
+
+    .category-option-info h5 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .category-option-info p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .create-new-category {
+      text-align: center;
+      padding: var(--space-md) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .categorization-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-md);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border);
+    }
+
     /* Responsive Adjustments */
     @media (max-width: 400px) {
       .workflow-guide {
@@ -2946,104 +3485,177 @@
       <!-- Properties Tab -->
       <div id="propertiesTab" class="tab-content">
         
-        <!-- View Toggle and Category Management -->
+        <!-- Properties Overview -->
         <section class="section">
-          <div class="section-header">
-            <h2 class="section-title">
-              <span>📊</span>
-              Properties Dashboard
-              <span id="propertyCount" class="section-badge">0</span>
+          <div class="properties-overview">
+            <h2 class="properties-title">
+              <span>🏠</span>
+              Property Portfolio
             </h2>
-            <div class="section-controls">
-              <div class="btn-group">
-                <button id="categoryViewBtn" class="btn btn-ghost btn-sm active" title="Category View">
-                  🗂️
+            <p class="properties-subtitle">Organize and manage your analyzed properties</p>
+            <div class="properties-stats">
+              <div class="stat-item">
+                <span class="stat-number" id="totalPropertiesCount">0</span>
+                <span class="stat-label">Total Properties</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number" id="analyzedPropertiesCount">0</span>
+                <span class="stat-label">Analyzed</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number" id="categoriesCount">0</span>
+                <span class="stat-label">Categories</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Uncategorized Properties Alert -->
+        <section class="section" id="uncategorizedAlert" style="display: none;">
+          <div class="alert-card uncategorized-alert">
+            <div class="alert-icon">📋</div>
+            <div class="alert-content">
+              <div class="alert-title">Properties Need Categorization</div>
+              <div class="alert-description">You have <span id="uncategorizedCount">0</span> properties that haven't been organized yet.</div>
+            </div>
+            <div class="alert-actions">
+              <button id="organizeNowBtn" class="btn btn-primary btn-sm">📁 Organize Now</button>
+              <button id="dismissAlertBtn" class="btn btn-ghost btn-sm">✕</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Actions Bar -->
+        <section class="section">
+          <div class="quick-actions-bar">
+            <div class="view-controls">
+              <div class="view-toggle">
+                <button id="categoryViewBtn" class="view-btn active" data-view="category" title="Category View">
+                  <span class="view-icon">🗂️</span>
+                  <span class="view-label">Categories</span>
                 </button>
-                <button id="listViewBtn" class="btn btn-ghost btn-sm" title="List View">
-                  📋
+                <button id="listViewBtn" class="view-btn" data-view="list" title="List View">
+                  <span class="view-icon">📋</span>
+                  <span class="view-label">List</span>
                 </button>
               </div>
-              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm" title="Manage Categories">
-                ⚙️ Categories
+              
+              <div class="filter-controls">
+                <select id="categoryFilter" class="filter-select">
+                  <option value="all">All Categories</option>
+                </select>
+                <select id="statusFilter" class="filter-select">
+                  <option value="all">All Status</option>
+                  <option value="analyzed">Analyzed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="action-controls">
+              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
+                <span class="btn-icon">⚙️</span>
+                Manage Categories
               </button>
-              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-                🗑️
+              <button id="exportBtn" class="btn btn-primary btn-sm">
+                <span class="btn-icon">📄</span>
+                Export
               </button>
             </div>
           </div>
         </section>
 
-        <!-- Latest Analysis Section -->
-        <section class="section" id="latestAnalysisSection" style="display: none;">
-          <div class="section-header">
-            <h2 class="section-title">
-              <span>⚡</span>
-              Latest Analysis
-              <span class="section-badge pulse">New</span>
-            </h2>
-            <div class="section-controls">
-              <button id="dismissLatestBtn" class="btn btn-ghost btn-sm" title="Dismiss">
-                ✖️
-              </button>
-            </div>
-          </div>
-          
-          <div class="card latest-analysis-card">
-            <div id="latestAnalysisContent">
-              <!-- Latest analysis content will be populated here -->
-            </div>
-          </div>
-        </section>
-
-        <!-- Category Grid View -->
-        <section class="section" id="categoryGridSection">
-          <div id="categoryGrid" class="category-grid">
+        <!-- Category View -->
+        <section class="section" id="categoryViewSection">
+          <div id="categoryGrid" class="enhanced-category-grid">
             <!-- Categories will be populated here -->
           </div>
         </section>
         
-        <!-- Property History Section -->
-        <section class="section" id="propertyHistorySection" style="display: none;">
-          <div class="section-header">
-            <h2 class="section-title">
-              <span>📋</span>
-              Property List
-            </h2>
-            <div class="section-controls">
-              <div class="bulk-actions" style="display: none; margin-right: 8px;">
-                <span id="selectedCount" class="text-sm">0 selected</span>
-                <select id="bulkCategoryAction" class="btn btn-sm" style="margin: 0 4px;">
-                  <option value="">Move to...</option>
-                </select>
-                <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm" title="Delete selected">🗑️</button>
-                <button id="bulkDeselectBtn" class="btn btn-ghost btn-sm" title="Deselect all">✖️</button>
+        <!-- List View -->
+        <section class="section" id="listViewSection" style="display: none;">
+          <div class="properties-list-container">
+            <div class="list-header">
+              <div class="list-title">
+                <h3>All Properties</h3>
+                <span class="list-count" id="filteredPropertiesCount">0 properties</span>
               </div>
-              <button id="selectModeBtn" class="btn btn-ghost btn-sm" title="Select multiple (S)">☑️</button>
-              <select id="categoryFilter" class="btn btn-sm" style="margin-right: 8px;">
-                <option value="all">All Categories</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="card">
-            <!-- Simple List View -->
-            <div id="propertyHistoryList" class="history-list">
-              <div class="empty-state">
-                <div class="empty-state-icon">📄</div>
-                <p>No properties analyzed yet</p>
+              <div class="list-actions">
+                <button id="selectModeBtn" class="btn btn-ghost btn-sm">
+                  <span class="btn-icon">☑️</span>
+                  Select
+                </button>
+                <div class="bulk-actions" id="bulkActionsBar" style="display: none;">
+                  <span class="selected-count">0 selected</span>
+                  <select id="bulkCategorySelect" class="bulk-select">
+                    <option value="">Move to category...</option>
+                  </select>
+                  <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm">🗑️</button>
+                  <button id="cancelSelectBtn" class="btn btn-ghost btn-sm">✕</button>
+                </div>
               </div>
             </div>
             
-            <!-- Action Buttons -->
-            <div class="property-actions" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border);">
-              <div class="btn-group">
-                <button id="exportWordBtn" class="btn btn-primary btn-sm">
-                  📄 Export to Word
-                </button>
-              </div>
+            <div id="propertiesList" class="properties-list">
+              <!-- Properties list will be populated here -->
             </div>
           </div>
         </section>
+
+        <!-- Property Details Modal -->
+        <div id="propertyDetailsModal" class="modal" style="display: none;">
+          <div class="modal-content property-modal">
+            <div class="modal-header">
+              <h3 class="modal-title">Property Details</h3>
+              <button class="modal-close" id="propertyModalClose">×</button>
+            </div>
+            <div class="modal-body" id="propertyModalBody">
+              <!-- Property details will be populated here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Categorization Modal -->
+        <div id="categorizationModal" class="modal" style="display: none;">
+          <div class="modal-content categorization-modal">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                <span class="modal-icon">📁</span>
+                Organize Property
+              </h3>
+              <button class="modal-close" id="categorizationModalClose">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="categorization-content">
+                <div class="property-preview" id="categorizationPropertyPreview">
+                  <!-- Property preview will be shown here -->
+                </div>
+                
+                <div class="category-selection">
+                  <h4 class="selection-title">Choose a Category</h4>
+                  <div class="category-options" id="categoryOptions">
+                    <!-- Category options will be populated here -->
+                  </div>
+                  
+                  <div class="create-new-category">
+                    <button id="createNewCategoryBtn" class="btn btn-ghost btn-sm">
+                      <span class="btn-icon">➕</span>
+                      Create New Category
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="categorization-actions">
+                  <button id="cancelCategorizationBtn" class="btn btn-secondary">Cancel</button>
+                  <button id="confirmCategorizationBtn" class="btn btn-primary" disabled>
+                    <span class="btn-icon">📁</span>
+                    Organize Property
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         
       </div>
       
