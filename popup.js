@@ -301,7 +301,6 @@ const categoryManager = new PropertyCategoryManager();
 
 // Bulk operations state
 let bulkSelectionMode = false;
-let selectedProperties = new Set();
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
