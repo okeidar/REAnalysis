@@ -71,7 +71,11 @@ class PropertyCategoryManager {
         if (!property.categoryId) {
           property.categoryId = 'uncategorized';
         }
-        this.properties.set(property.id || `property_${index}`, property);
+        // Use URL as the consistent identifier, fallback to property.id if it exists
+        const propertyId = property.id || property.url || `property_${index}`;
+        // Ensure the property has the ID set
+        property.id = propertyId;
+        this.properties.set(propertyId, property);
       });
       
       this.initialized = true;
@@ -435,6 +439,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Initialize enhanced Properties tab
   initializeEnhancedPropertiesTab();
+  
+  // Listen for storage changes to detect new analysis
+  setupStorageListener();
 
   // Load initial data and check site status
   await loadPropertyHistory();
@@ -516,6 +523,7 @@ function handleTabSwitch(tabId) {
       // Check for latest analysis to show at the top
       checkForLatestAnalysis();
       // Update enhanced Properties tab
+      await refreshPropertyData();
       updatePropertiesStats();
       updateViewDisplay();
       break;
@@ -618,6 +626,7 @@ async function savePropertyToHistory(url) {
     
     // Create new property entry
     const newProperty = {
+      id: url, // Use URL as consistent identifier
       url: url,
       timestamp: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -5044,6 +5053,15 @@ function initializeEnhancedPropertiesTab() {
   setupViewToggle();
   setupCategorization();
   updatePropertiesStats();
+  
+  // Set up periodic refresh to catch new analysis data
+  setInterval(async () => {
+    if (activeTab === 'properties') {
+      await refreshPropertyData();
+      updatePropertiesStats();
+      updateViewDisplay();
+    }
+  }, 5000); // Check every 5 seconds when on Properties tab
 }
 
 // Setup event listeners for Properties tab
@@ -5338,6 +5356,38 @@ async function renderPropertiesList() {
       });
     }
   });
+}
+
+// Refresh property data from storage to pick up any new analysis
+async function refreshPropertyData() {
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const properties = result.propertyHistory || [];
+    
+    // Update category manager properties with latest data
+    properties.forEach(property => {
+      const propertyId = property.id || property.url;
+      const existingProperty = categoryManager.properties.get(propertyId);
+      
+      if (existingProperty) {
+        // Update existing property with any new analysis data
+        existingProperty.analysis = property.analysis;
+        existingProperty.analysisTimestamp = property.analysisTimestamp;
+        existingProperty.sessionId = property.sessionId;
+      } else {
+        // Add new property if it doesn't exist
+        property.id = propertyId;
+        if (!property.categoryId) {
+          property.categoryId = 'uncategorized';
+        }
+        categoryManager.properties.set(propertyId, property);
+      }
+    });
+    
+    console.log('🔄 Property data refreshed from storage');
+  } catch (error) {
+    console.error('Failed to refresh property data:', error);
+  }
 }
 
 // Update properties statistics
@@ -5778,6 +5828,49 @@ function deleteProperty(propertyId) {
     updatePropertiesStats();
     updateViewDisplay();
     showSuccess('Property deleted successfully');
+  }
+}
+
+// Setup storage listener to detect analysis updates
+function setupStorageListener() {
+  // Listen for chrome storage changes
+  if (chrome && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(async (changes, namespace) => {
+      if (namespace === 'local' && changes.propertyHistory) {
+        console.log('🔄 Property history updated in storage, refreshing...');
+        await refreshPropertyData();
+        
+        // If on Properties tab, update the display
+        if (activeTab === 'properties') {
+          updatePropertiesStats();
+          updateViewDisplay();
+        }
+        
+        // Show notification if new analysis was added
+        checkForNewAnalysis(changes.propertyHistory.oldValue, changes.propertyHistory.newValue);
+      }
+    });
+  }
+}
+
+// Check if new analysis was added and show notification
+function checkForNewAnalysis(oldHistory, newHistory) {
+  if (!oldHistory || !newHistory) return;
+  
+  // Find properties with new analysis
+  const oldAnalyzed = oldHistory.filter(p => p.analysis && p.analysis.fullResponse).map(p => p.url);
+  const newAnalyzed = newHistory.filter(p => p.analysis && p.analysis.fullResponse).map(p => p.url);
+  
+  const newlyAnalyzed = newAnalyzed.filter(url => !oldAnalyzed.includes(url));
+  
+  if (newlyAnalyzed.length > 0) {
+    console.log('🎉 New analysis detected for:', newlyAnalyzed);
+    showSuccess(`Analysis completed for ${newlyAnalyzed.length} property${newlyAnalyzed.length > 1 ? 'ies' : ''}!`);
+    
+    // If not on Properties tab, add notification badge
+    if (activeTab !== 'properties') {
+      addPropertiesTabNotification();
+    }
   }
 }
 
