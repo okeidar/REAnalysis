@@ -1683,14 +1683,25 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, or 3):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, or 4):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
+4. Monitor ChatGPT responses (for debugging)
       
 Or enter your own property URL:`);
       
       let urlToTest;
+      
+      // Special debugging option
+      if (testUrl === '4') {
+        this.showChatGPTMessage('info', 'Now monitoring ChatGPT responses. Check console for detailed logs about what responses are being detected and saved.');
+        console.log('🔍 RESPONSE MONITORING ACTIVATED');
+        console.log('🔍 Send a property link to ChatGPT and watch the console for:');
+        console.log('🔍 - "FIRST response (confirmation)" - this should NOT be saved');
+        console.log('🔍 - "SECOND response (analysis)" - this SHOULD be saved');
+        return;
+      }
       if (testUrl === '1') {
         urlToTest = testUrls[0];
       } else if (testUrl === '2') {
@@ -5571,13 +5582,23 @@ function setupResponseMonitor() {
         // is now set consistently when the property link is sent
         if (promptSplittingState.currentPhase === 'complete' || 
             promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE SECOND RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
+          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+          console.log('📊 Response length:', messageText.length);
+          console.log('📄 Response preview:', messageText.substring(0, 300));
           
           const analysisData = extractPropertyAnalysisData(messageText);
+          console.log('🔍 Extracted analysis data preview:', {
+            extractedDataKeys: Object.keys(analysisData?.extractedData || {}),
+            hasFullResponse: !!(analysisData?.fullResponse),
+            fullResponseLength: analysisData?.fullResponse?.length || 0
+          });
+          
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
               promptSplittingState.pendingPropertyLink) {
             
-            console.log('✅ Successfully extracted analysis data from split prompt response');
+            console.log('✅ SECOND RESPONSE: Successfully extracted analysis data from split prompt response');
             
             // Send the analysis data with the pending property link
             safeChromeFall(() => {
@@ -5617,7 +5638,10 @@ function setupResponseMonitor() {
         
         // This will trigger the fallback logic above
         if (promptSplittingState.pendingPropertyLink) {
-          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE RESPONSE TO SAVE!)...');
+          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE SECOND RESPONSE TO SAVE!)...');
+          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
+          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+          console.log('📊 Response length:', messageText.length);
           
           const analysisData = extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
@@ -5814,7 +5838,8 @@ function setupResponseMonitor() {
       
       // Check for prompt splitting first, regardless of property analysis session
       if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
-        console.log('🔍 Found message while waiting for confirmation (NOT SAVING - waiting for property link response):', messageText.substring(0, 100));
+        console.log('🔍 Found FIRST response while waiting for confirmation (NOT SAVING - this is just the confirmation):', messageText.substring(0, 100));
+        console.log('⚠️ IMPORTANT: This is the FIRST response (confirmation). We will save the SECOND response (after property link).');
         // Don't save this response - we only want the response AFTER the property link is sent
         // Just continue to trigger sending the property link
         processCompletedResponse(messageText, currentUrl);
