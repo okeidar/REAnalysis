@@ -5,8 +5,14 @@ console.log('ChatGPT Helper Extension background script loaded');
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('ChatGPT Helper Extension installed:', details.reason);
   
-  // Set initial badge
-  chrome.action.setBadgeText({ text: '' });
+  // Set initial badge with error handling
+  try {
+    if (chrome.action && chrome.action.setBadgeText) {
+      chrome.action.setBadgeText({ text: '' });
+    }
+  } catch (error) {
+    console.log('Could not set initial badge text:', error.message);
+  }
 });
 
 // Handle tab updates to check if we're on ChatGPT
@@ -15,53 +21,96 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const isChatGPT = tab.url.includes('chatgpt.com') || tab.url.includes('chat.openai.com');
     
     // Update extension icon based on whether we're on ChatGPT
-    if (isChatGPT) {
-      // Set active icon for ChatGPT sites
-      chrome.action.setIcon({
-        tabId: tabId,
-        path: {
-          "16": "icons/icon16.png",
-          "48": "icons/icon48.png",
-          "128": "icons/icon128.png"
+    try {
+      if (isChatGPT) {
+        // Set active icon for ChatGPT sites
+        if (chrome.action && chrome.action.setIcon) {
+          chrome.action.setIcon({
+            tabId: tabId,
+            path: {
+              "16": "icons/icon16.png",
+              "48": "icons/icon48.png",
+              "128": "icons/icon128.png"
+            }
+          }).catch(() => {
+            // Fallback if custom icons aren't available
+            console.log('Custom icons not found, using default');
+          });
         }
-      }).catch(() => {
-        // Fallback if custom icons aren't available
-        console.log('Custom icons not found, using default');
-      });
-      
-      chrome.action.setBadgeText({
-        tabId: tabId,
-        text: ''
-      });
-      
-      chrome.action.setTitle({
-        tabId: tabId,
-        title: "ChatGPT Helper - Active"
-      });
-    } else {
-      // Set a grayed out icon for non-ChatGPT sites
-      chrome.action.setIcon({
-        tabId: tabId,
-        path: {
-          "16": "icons/icon16-inactive.png",
-          "48": "icons/icon48-inactive.png",
-          "128": "icons/icon128-inactive.png"
+        
+        if (chrome.action && chrome.action.setBadgeText) {
+          chrome.action.setBadgeText({
+            tabId: tabId,
+            text: ''
+          }).catch(() => {
+            console.log('Could not set badge text for tab', tabId);
+          });
         }
-      }).catch(() => {
-        // Fallback if custom icons aren't available
-        console.log('Custom inactive icons not found, using default');
-      });
-      
-      chrome.action.setBadgeText({
-        tabId: tabId,
-        text: ''
-      });
-      
-      chrome.action.setTitle({
-        tabId: tabId,
-        title: "ChatGPT Helper - Not available on this site"
-      });
+        
+        if (chrome.action && chrome.action.setTitle) {
+          chrome.action.setTitle({
+            tabId: tabId,
+            title: "RE Analyzer - Active"
+          }).catch(() => {
+            console.log('Could not set title for tab', tabId);
+          });
+        }
+      } else {
+        // Set a grayed out icon for non-ChatGPT sites
+        if (chrome.action && chrome.action.setIcon) {
+          chrome.action.setIcon({
+            tabId: tabId,
+            path: {
+              "16": "icons/icon16-inactive.png",
+              "48": "icons/icon48-inactive.png",
+              "128": "icons/icon128-inactive.png"
+            }
+          }).catch(() => {
+            // Fallback if custom icons aren't available
+            console.log('Custom inactive icons not found, using default');
+          });
+        }
+        
+        if (chrome.action && chrome.action.setBadgeText) {
+          chrome.action.setBadgeText({
+            tabId: tabId,
+            text: ''
+          }).catch(() => {
+            console.log('Could not set badge text for tab', tabId);
+          });
+        }
+        
+        if (chrome.action && chrome.action.setTitle) {
+          chrome.action.setTitle({
+            tabId: tabId,
+            title: "RE Analyzer - Not available on this site"
+          }).catch(() => {
+            console.log('Could not set title for tab', tabId);
+          });
+        }
+      }
+    } catch (error) {
+      console.log('Error updating extension UI:', error.message);
     }
+  }
+});
+
+// Handle extension icon clicks (since we don't have a popup)
+chrome.action.onClicked.addListener((tab) => {
+  console.log('Extension icon clicked');
+  
+  // Check if we're already on ChatGPT
+  const isChatGPT = tab.url && (tab.url.includes('chatgpt.com') || tab.url.includes('chat.openai.com'));
+  
+  if (isChatGPT) {
+    // If on ChatGPT, send message to content script to toggle the embedded UI
+    chrome.tabs.sendMessage(tab.id, { action: 'toggleEmbeddedUI' })
+      .catch(error => {
+        console.log('Could not communicate with content script:', error.message);
+      });
+  } else {
+    // If not on ChatGPT, open ChatGPT in a new tab
+    chrome.tabs.create({ url: 'https://chatgpt.com' });
   }
 });
 

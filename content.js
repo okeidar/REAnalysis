@@ -1769,6 +1769,21 @@ if (isChatGPTSite()) {
   }
 }
 
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'toggleEmbeddedUI') {
+    console.log('🎮 Toggle UI requested from background script');
+    if (embeddedUI && embeddedUI.togglePanel) {
+      embeddedUI.togglePanel();
+      sendResponse({ success: true });
+    } else {
+      console.warn('Embedded UI not yet initialized');
+      sendResponse({ success: false, error: 'UI not initialized' });
+    }
+    return true; // Keep message channel open for async response
+  }
+});
+
 // Initialize settings on load
 if (isChatGPTSite()) {
   updatePromptSplittingSettings();
