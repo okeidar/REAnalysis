@@ -469,6 +469,10 @@ class REAnalyzerEmbeddedUI {
               <div>📄</div>
               <span>Export All Properties</span>
             </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
+              <div>🧪</div>
+              <span>Test Analysis</span>
+            </button>
             <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
               <div>🗑️</div>
               <span>Clear All Data</span>
@@ -902,10 +906,15 @@ class REAnalyzerEmbeddedUI {
 
     // Action buttons
     const exportBtn = this.panel.querySelector('#re-export-all');
+    const testBtn = this.panel.querySelector('#re-test-analysis');
     const clearBtn = this.panel.querySelector('#re-clear-data');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.exportAllProperties());
+    }
+
+    if (testBtn) {
+      testBtn.addEventListener('click', () => this.testAnalysis());
     }
 
     if (clearBtn) {
@@ -1603,6 +1612,64 @@ class REAnalyzerEmbeddedUI {
     this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
   }
 
+  async testAnalysis() {
+    console.log('🧪 Testing analysis functionality...');
+    
+    const testUrls = [
+      'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/',
+      'https://www.realtor.com/realestateandhomes-detail/123-Main-St_Anytown_CA_12345',
+      'https://www.redfin.com/CA/Anytown/123-Main-St-12345/home/123456789'
+    ];
+    
+    try {
+      // First test if we can find the input field
+      const inputField = findChatGPTInput();
+      if (!inputField) {
+        this.showChatGPTMessage('error', 'Could not find ChatGPT input field. Please make sure the page is fully loaded.');
+        return;
+      }
+      
+      this.showChatGPTMessage('success', 'ChatGPT input field found successfully!');
+      console.log('✅ Found input field:', inputField);
+      
+      // Show which input field was found
+      const fieldInfo = inputField.tagName + (inputField.getAttribute('data-id') ? `[data-id="${inputField.getAttribute('data-id')}"]` : '') + (inputField.placeholder ? ` placeholder="${inputField.placeholder}"` : '');
+      console.log('📋 Field details:', fieldInfo);
+      
+      // Let user choose a test URL
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, or 3):
+1. Zillow Test URL
+2. Realtor.com Test URL  
+3. Redfin Test URL
+      
+Or enter your own property URL:`);
+      
+      let urlToTest;
+      if (testUrl === '1') {
+        urlToTest = testUrls[0];
+      } else if (testUrl === '2') {
+        urlToTest = testUrls[1];
+      } else if (testUrl === '3') {
+        urlToTest = testUrls[2];
+      } else if (testUrl && testUrl.startsWith('http')) {
+        urlToTest = testUrl;
+      } else {
+        this.showChatGPTMessage('warning', 'Test cancelled');
+        return;
+      }
+      
+      // Test the analysis with the selected URL
+      console.log('🔍 Testing analysis with:', urlToTest);
+      this.showChatGPTMessage('info', `Testing analysis with: ${urlToTest}`);
+      
+      await this.analyzeProperty(urlToTest);
+      
+    } catch (error) {
+      console.error('❌ Test failed:', error);
+      this.showChatGPTMessage('error', `Test failed: ${error.message}`);
+    }
+  }
+
   clearAllData() {
     if (confirm('Are you sure you want to clear all property data? This action cannot be undone.')) {
       safeChromeFall(
@@ -1787,6 +1854,14 @@ class REAnalyzerEmbeddedUI {
         throw new Error('Extension context invalidated. Please reload the page.');
       }
       
+      // First, test if we can find the ChatGPT input field
+      console.log('🔍 Testing ChatGPT input field detection...');
+      const testInput = findChatGPTInput();
+      if (!testInput) {
+        throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page and it has loaded completely.');
+      }
+      console.log('✅ ChatGPT input field found:', testInput);
+      
       // Use the existing insertPropertyAnalysisPrompt function from the original content script
       console.log('🔗 Connecting to existing analysis functionality...');
       
@@ -1795,6 +1870,10 @@ class REAnalyzerEmbeddedUI {
       
       // Call the existing insertPropertyAnalysisPrompt function
       const result = await insertPropertyAnalysisPrompt(url);
+      
+      if (!result) {
+        throw new Error('Failed to insert property analysis prompt into ChatGPT');
+      }
       
       return { success: result, result };
     } catch (error) {
@@ -5767,19 +5846,30 @@ function setupResponseMonitor() {
 
 // Function to find ChatGPT input field with more comprehensive selectors
 function findChatGPTInput() {
-  console.log('Searching for ChatGPT input field...');
+  console.log('🔍 Searching for ChatGPT input field...');
+  console.log('📍 Current URL:', window.location.href);
+  console.log('📱 Viewport:', window.innerWidth + 'x' + window.innerHeight);
+  
+  // First, let's see what input elements exist on the page
+  const allInputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+  console.log(`📋 Found ${allInputs.length} total input/editable elements on page`);
   
   // Try different selectors for ChatGPT input (updated for 2024)
   const selectors = [
-    // Most common current selectors
+    // Latest ChatGPT interface selectors (2024)
+    'textarea[data-id="root"]',
+    'div[contenteditable="true"][data-id="root"]', 
     'textarea[placeholder*="Message"]',
     'textarea[placeholder*="message"]',
-    'div[contenteditable="true"][data-testid*="composer"]',
     'div[contenteditable="true"][role="textbox"]',
     'textarea[data-testid="composer-text-input"]',
     
+    // Common modern selectors
+    'div[contenteditable="true"][data-testid*="composer"]',
+    'textarea[class*="prose"]',
+    'div[contenteditable="true"][class*="prose"]',
+    
     // Fallback selectors
-    'textarea[data-id="root"]',
     'div[contenteditable="true"]',
     '#prompt-textarea',
     'textarea',
@@ -5788,27 +5878,54 @@ function findChatGPTInput() {
     'textarea[class*="composer"]',
     'textarea[class*="input"]',
     'div[class*="composer"][contenteditable="true"]',
-    'div[class*="input"][contenteditable="true"]'
+    'div[class*="input"][contenteditable="true"]',
+    
+    // Additional modern patterns
+    'textarea[spellcheck="false"]',
+    'div[contenteditable="true"][spellcheck="false"]'
   ];
   
   for (const selector of selectors) {
     try {
       const elements = document.querySelectorAll(selector);
-      console.log(`Found ${elements.length} elements for selector: ${selector}`);
+      console.log(`🔍 Testing selector: ${selector} -> ${elements.length} elements found`);
       
-      for (const element of elements) {
+      for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+        const elementInfo = {
+          tag: element.tagName,
+          id: element.id,
+          classes: element.className,
+          placeholder: element.placeholder,
+          dataId: element.getAttribute('data-id'),
+          visible: element.offsetParent !== null,
+          disabled: element.disabled,
+          readOnly: element.readOnly,
+          display: element.style.display
+        };
+        
+        console.log(`  📍 Element ${i + 1}:`, elementInfo);
+        
         // Check if element is visible and not disabled
         if (element.offsetParent !== null && 
             !element.disabled && 
             !element.readOnly &&
             element.style.display !== 'none') {
           
-          console.log('Found suitable input element:', element);
+          console.log('✅ Found suitable input element:', element);
+          console.log('📋 Element details:', elementInfo);
           return element;
+        } else {
+          console.log('❌ Element not suitable:', {
+            visible: element.offsetParent !== null,
+            notDisabled: !element.disabled,
+            notReadOnly: !element.readOnly,
+            notHidden: element.style.display !== 'none'
+          });
         }
       }
     } catch (e) {
-      console.log(`Error with selector ${selector}:`, e);
+      console.log(`❌ Error with selector ${selector}:`, e);
     }
   }
   
