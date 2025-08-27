@@ -3550,13 +3550,9 @@ async function handleConfirmationReceived() {
       return;
     }
     
-    // For split prompt: start tracking NOW since we're about to send the property link
-    currentPropertyAnalysis = {
-      url: propertyLink,
-      timestamp: Date.now(),
-      sessionId: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    console.log('🎯 Split prompt analysis session started (sending property link):', currentPropertyAnalysis.sessionId);
+    // Clear any existing analysis session to prevent conflicts
+    currentPropertyAnalysis = null;
+    console.log('🎯 Cleared existing analysis session for prompt splitting');
     
     const linkMessage = propertyLink;  // Send only the raw link
     
@@ -3578,15 +3574,18 @@ async function handleConfirmationReceived() {
     inputField.focus();
     
     // Auto-submit the link
-        setTimeout(() => {
+    setTimeout(() => {
       submitMessage();
       promptSplittingState.currentPhase = 'complete';
-      showPromptSplittingIndicator('complete', 'Analysis request sent successfully!');
+      showPromptSplittingIndicator('complete', 'Property link sent! Waiting for analysis...');
       
-      // Remove indicator after completion
+      console.log('🎯 Property link sent - phase set to complete');
+      console.log('🔍 Now waiting for ChatGPT analysis response...');
+      
+      // Remove indicator after a longer delay to show we're waiting
       setTimeout(() => {
         removePromptSplittingIndicator();
-      }, 3000);
+      }, 5000);
     }, 500);
     
   } catch (error) {
@@ -6189,14 +6188,16 @@ function setupResponseMonitor() {
   };
   
   // Function to process completed response
-  const processCompletedResponse = (messageText, currentUrl) => {
-    console.log('🎯 Processing completed response for:', currentUrl);
+  const processCompletedResponse = (messageText, propertyUrl) => {
+    console.log('🎯 Processing completed response for:', propertyUrl);
     console.log('📝 Final response length:', messageText.length);
+    console.log('🔍 Current prompt splitting phase:', promptSplittingState.currentPhase);
+    console.log('🔍 Current property analysis:', currentPropertyAnalysis?.url || 'None');
     
     // Clear any existing timer
-    if (completionTimers.has(currentUrl)) {
-      clearTimeout(completionTimers.get(currentUrl));
-      completionTimers.delete(currentUrl);
+    if (completionTimers.has(propertyUrl)) {
+      clearTimeout(completionTimers.get(propertyUrl));
+      completionTimers.delete(propertyUrl);
     }
     
     // Check if we're waiting for confirmation in prompt splitting mode
@@ -6257,6 +6258,48 @@ function setupResponseMonitor() {
       return;
     }
     
+    // Special handling for prompt splitting second response (the actual analysis)
+    if (promptSplittingState.currentPhase === 'complete' && promptSplittingState.pendingPropertyLink) {
+      console.log('🎯 PROCESSING SECOND RESPONSE FROM PROMPT SPLITTING (ACTUAL ANALYSIS)');
+      console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+      console.log('📊 Response length:', messageText.length);
+      
+      // Process this as the analysis response
+      const analysisData = extractPropertyAnalysisData(messageText);
+      
+      if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
+        console.log('✅ Successfully extracted analysis data from split prompt second response');
+        console.log('🔍 Extracted data keys:', Object.keys(analysisData.extractedData));
+        
+        // Save the analysis with the correct URL from prompt splitting
+        safeChromeFall(() => {
+          return chrome.runtime.sendMessage({
+            action: 'savePropertyAnalysis',
+            propertyUrl: promptSplittingState.pendingPropertyLink,
+            sessionId: `split_${Date.now()}`,
+            analysisData: analysisData
+          });
+        }).then(response => {
+          if (response && response.success) {
+            console.log('🎉 Split prompt analysis saved successfully!');
+            
+            // Trigger embedded UI completion
+            if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
+              embeddedUI.completeAnalysis();
+            }
+          }
+        }).catch(err => {
+          console.error('❌ Failed to save split prompt analysis:', err);
+        });
+        
+        // Reset prompt splitting state
+        resetPromptSplittingState();
+        return; // Exit early - we've handled this response
+      } else {
+        console.log('⚠️ No extractable data in split prompt second response');
+      }
+    }
+    
     // Process the analysis data
     const propertyKeywords = [
       'property', 'analysis', 'listing', 'bedroom', 'bathroom', 'price',
@@ -6288,124 +6331,16 @@ function setupResponseMonitor() {
       // Add null check for currentPropertyAnalysis
       if (!currentPropertyAnalysis) {
         console.log('⚠️ No active property analysis session, but detected property keywords');
-        console.log('🔍 This might be a response from prompt splitting or a different analysis');
-        console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
+        console.log('🔍 This might be a stray response - ignoring to prevent duplicate saves');
+        console.log('🔍 Response preview:', messageText.substring(0, 200) + '...');
         
-        // FALLBACK: If we're in prompt splitting mode, this could be the analysis response
-        // NOTE: This should normally not be needed anymore since currentPropertyAnalysis 
-        // is now set consistently when the property link is sent
-        if (promptSplittingState.currentPhase === 'complete' || 
-            promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE SECOND RESPONSE TO THE PROPERTY LINK - SAVING!)...');
-          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
-          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
-          console.log('📊 Response length:', messageText.length);
-          console.log('📄 Response preview:', messageText.substring(0, 300));
-          
-          const analysisData = extractPropertyAnalysisData(messageText);
-          console.log('🔍 Extracted analysis data preview:', {
-            extractedDataKeys: Object.keys(analysisData?.extractedData || {}),
-            hasFullResponse: !!(analysisData?.fullResponse),
-            fullResponseLength: analysisData?.fullResponse?.length || 0
-          });
-          
-          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
-              promptSplittingState.pendingPropertyLink) {
-            
-            console.log('✅ SECOND RESPONSE: Successfully extracted analysis data from split prompt response');
-            console.log('🔍 ANALYSIS DATA BEING SAVED:', {
-              url: promptSplittingState.pendingPropertyLink,
-              hasFullResponse: !!analysisData.fullResponse,
-              fullResponseLength: analysisData.fullResponse?.length || 0,
-              hasFullAnalysis: !!analysisData.fullAnalysis,
-              fullAnalysisLength: analysisData.fullAnalysis?.length || 0,
-              extractedDataKeys: Object.keys(analysisData.extractedData || {}),
-              fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
-            });
-            
-            // Send the analysis data with the pending property link
-            safeChromeFall(() => {
-              return chrome.runtime.sendMessage({
-                action: 'savePropertyAnalysis',
-                propertyUrl: promptSplittingState.pendingPropertyLink,
-                sessionId: `split_${Date.now()}`,
-                analysisData: analysisData
-              });
-            }).then(response => {
-              if (response) {
-                console.log('✅ Split prompt analysis data sent successfully:', response);
-                if (response.success) {
-                  console.log('🎉 Split prompt property analysis saved!');
-                  
-                  // Trigger embedded UI completion if available
-                  if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
-                    embeddedUI.completeAnalysis();
-                  }
-                }
-              }
-            }).catch(err => {
-              console.error('❌ Failed to send split prompt analysis data:', err);
-            });
-            
-            // Reset prompt splitting state
-            resetPromptSplittingState();
-          }
-        }
+        // Skip processing if we don't have an active analysis session
+        // This prevents duplicate saves from prompt splitting fallback logic
         return;
       }
       
-      // CRITICAL: If we're in prompt splitting mode, redirect to fallback logic
-      // to ensure we save with the correct property URL from promptSplittingState
-      if (promptSplittingState.currentPhase === 'complete' || 
-          promptSplittingState.currentPhase === 'sending_link') {
-        console.log('🔄 Redirecting to prompt splitting fallback logic for proper URL handling');
-        
-        // Trigger the fallback logic by temporarily clearing currentPropertyAnalysis
-        const tempCurrentPropertyAnalysis = currentPropertyAnalysis;
-        currentPropertyAnalysis = null;
-        
-        // This will trigger the fallback logic above
-        if (promptSplittingState.pendingPropertyLink) {
-          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE SECOND RESPONSE TO SAVE!)...');
-          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
-          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
-          console.log('📊 Response length:', messageText.length);
-          
-          const analysisData = extractPropertyAnalysisData(messageText);
-          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
-            
-            console.log('✅ Successfully extracted analysis data from split prompt response');
-            
-            // Send the analysis data with the pending property link
-            safeChromeFall(() => {
-              return chrome.runtime.sendMessage({
-                action: 'savePropertyAnalysis',
-                propertyUrl: promptSplittingState.pendingPropertyLink,
-                sessionId: `split_${Date.now()}`,
-                analysisData: analysisData
-              });
-            }).then(response => {
-              if (response) {
-                console.log('✅ Split prompt analysis data sent successfully:', response);
-                if (response.success) {
-                  console.log('🎉 Split prompt property analysis saved!');
-                  
-                  // Trigger embedded UI completion if available
-                  if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
-                    embeddedUI.completeAnalysis();
-                  }
-                }
-              }
-            }).catch(err => {
-              console.error('❌ Failed to send split prompt analysis data:', err);
-            });
-            
-            // Reset prompt splitting state
-            resetPromptSplittingState();
-          }
-        }
-        return;
-      }
+      // Note: We've already handled prompt splitting responses above
+      // This section is only for regular single-prompt analysis
       
       console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
       console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
@@ -6459,14 +6394,14 @@ function setupResponseMonitor() {
         });
         
         // Track this message as processed for this property
-        if (currentUrl) {
-          if (!processedMessagesPerProperty.has(currentUrl)) {
-            processedMessagesPerProperty.set(currentUrl, []);
+        if (propertyUrl) {
+          if (!processedMessagesPerProperty.has(propertyUrl)) {
+            processedMessagesPerProperty.set(propertyUrl, []);
           }
-          processedMessagesPerProperty.get(currentUrl).push(messageText);
+          processedMessagesPerProperty.get(propertyUrl).push(messageText);
           
           // Limit stored messages per property to prevent memory bloat
-          const messages = processedMessagesPerProperty.get(currentUrl);
+          const messages = processedMessagesPerProperty.get(propertyUrl);
           if (messages.length > 5) {
             messages.shift(); // Remove oldest message
           }
@@ -6483,7 +6418,7 @@ function setupResponseMonitor() {
     }
     
     // Clean up buffer
-    responseBuffer.delete(currentUrl);
+    responseBuffer.delete(propertyUrl);
   };
   
   const checkForNewMessages = () => {
@@ -6589,11 +6524,22 @@ function setupResponseMonitor() {
         console.log('⚠️ IMPORTANT: This is the FIRST response (confirmation). We will save the SECOND response (after property link).');
         // Don't save this response - we only want the response AFTER the property link is sent
         // Just continue to trigger sending the property link
-        processCompletedResponse(messageText, currentUrl);
+        processCompletedResponse(messageText, null); // Pass null for confirmation responses
         return; // Don't process as regular property analysis
       }
       
-      // Only process if we have an active property analysis session
+      // Check for prompt splitting second response (the actual analysis)
+      if (promptSplittingState.currentPhase === 'complete' && promptSplittingState.pendingPropertyLink && messageText && messageText.length > 100) {
+        console.log('🎯 Found SECOND response in prompt splitting (ACTUAL ANALYSIS):', messageText.substring(0, 100));
+        console.log('📊 Response length:', messageText.length);
+        console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+        
+        // Process this as the analysis response immediately
+        processCompletedResponse(messageText, promptSplittingState.pendingPropertyLink);
+        return; // Exit early - we've handled this response
+      }
+      
+      // Only process if we have an active property analysis session (for single prompt mode)
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
         console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
         console.log('📊 Current response length:', messageText.length);
@@ -6643,7 +6589,7 @@ function setupResponseMonitor() {
         const monitoringTime = currentTime - bufferEntry.firstSeen;
         if (monitoringTime > 30000 && messageText.length > 500) {
           console.log('⏰ Fallback triggered - response has been monitored for 30+ seconds, processing anyway');
-          processCompletedResponse(messageText, currentUrl);
+          processCompletedResponse(messageText, currentPropertyAnalysis.url);
           return;
         }
         
@@ -6664,7 +6610,7 @@ function setupResponseMonitor() {
           }
           
           // Process immediately
-          processCompletedResponse(messageText, currentUrl);
+          processCompletedResponse(messageText, currentPropertyAnalysis.url);
           
         } else if (isStreaming) {
           console.log('⏳ ChatGPT still writing, waiting for completion...');
@@ -6678,8 +6624,8 @@ function setupResponseMonitor() {
           completionTimers.set(currentUrl, setTimeout(() => {
             console.log('⏰ Completion timer triggered - assuming response is complete');
             const bufferedResponse = responseBuffer.get(currentUrl);
-            if (bufferedResponse) {
-              processCompletedResponse(bufferedResponse.messageText, currentUrl);
+            if (bufferedResponse && currentPropertyAnalysis) {
+              processCompletedResponse(bufferedResponse.messageText, currentPropertyAnalysis.url);
             }
           }, 1500)); // Reduced from 2000ms to 1500ms
         }
