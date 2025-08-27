@@ -3,10 +3,10 @@
 // DOM elements
 let propertyHistoryList, clearHistoryBtn, propertyUrlInput, analyzeBtn, 
     statusElement, propertySection, siteInfoElement, connectionStatus, pasteBtn,
-    successMessage, errorMessage, propertyLinkSection, infoElement, siteElement, urlElement,
+    successMessage, errorMessage, warningMessage, propertyLinkSection, infoElement, siteElement, urlElement,
     propertyHistorySection, settingsSection, settingsToggle, settingsContent,
     customPromptTextarea, savePromptBtn, resetPromptBtn, showDefaultBtn, defaultPromptDisplay,
-    togglePromptBtn, promptContent, propertyCount;
+    togglePromptBtn, promptContent, propertyCount, clearInputBtn;
 
 // Tab system elements
 let tabButtons, tabContents, activeTab = 'analyzer';
@@ -14,6 +14,35 @@ let tabButtons, tabContents, activeTab = 'analyzer';
 // Global variables
 let currentTab = null;
 let contentScriptReady = false;
+
+// UX Enhancement Variables
+let analysisTimer = null;
+let analysisStartTime = 0;
+let workflowSteps = {
+  1: { id: 'step1Status', completed: false },
+  2: { id: 'step2Status', completed: false },
+  3: { id: 'step3Status', completed: false }
+};
+
+// Enhanced validation and progress tracking
+let validationState = {
+  isValid: false,
+  message: '',
+  type: 'none' // 'valid', 'invalid', 'warning', 'none'
+};
+
+// Progress tracking for analysis
+let analysisProgress = {
+  currentStep: 0,
+  steps: ['validate', 'send', 'analyze', 'save'],
+  stepStatus: {}
+};
+
+// Properties Tab State
+let currentView = 'category'; // 'category' or 'list'
+let selectedProperties = new Set();
+let isSelectMode = false;
+let selectedPropertyForCategorization = null;
 
 // Property Category Manager Class
 class PropertyCategoryManager {
@@ -42,7 +71,11 @@ class PropertyCategoryManager {
         if (!property.categoryId) {
           property.categoryId = 'uncategorized';
         }
-        this.properties.set(property.id || `property_${index}`, property);
+        // Use URL as the consistent identifier, fallback to property.id if it exists
+        const propertyId = property.id || property.url || `property_${index}`;
+        // Ensure the property has the ID set
+        property.id = propertyId;
+        this.properties.set(propertyId, property);
       });
       
       this.initialized = true;
@@ -272,7 +305,6 @@ const categoryManager = new PropertyCategoryManager();
 
 // Bulk operations state
 let bulkSelectionMode = false;
-let selectedProperties = new Set();
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -293,6 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   statusElement = document.getElementById('status');
   successMessage = document.getElementById('successMessage');
   errorMessage = document.getElementById('errorMessage');
+  warningMessage = document.getElementById('warningMessage');
   propertyLinkSection = document.getElementById('propertyLinkSection');
   propertyHistorySection = document.getElementById('propertyHistorySection');
   infoElement = document.getElementById('info');
@@ -310,7 +343,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
   togglePromptBtn = document.getElementById('togglePromptBtn');
   promptContent = document.getElementById('promptContent');
-
+  
+  // Clear input button
+  clearInputBtn = document.getElementById('clearInputBtn');
+  
   // Set up collapsible functionality
   setupCollapsibles();
 
@@ -350,12 +386,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       const text = await navigator.clipboard.readText();
       if (propertyUrlInput) {
         propertyUrlInput.value = text;
+        validatePropertyInput();
+        updateWorkflowStep(2, true);
         showSuccess('Link pasted successfully!');
       }
     } catch (err) {
       showError('Unable to paste from clipboard. Please paste manually.');
     }
   });
+
+  // Clear input button
+  if (clearInputBtn) clearInputBtn.addEventListener('click', function() {
+    if (propertyUrlInput) {
+      propertyUrlInput.value = '';
+      clearValidation();
+      updateWorkflowStep(2, false);
+      updateWorkflowStep(3, false);
+    }
+  });
+
+  // Property input validation on change
+  if (propertyUrlInput) {
+    propertyUrlInput.addEventListener('input', validatePropertyInput);
+    propertyUrlInput.addEventListener('paste', function() {
+      // Validate after paste event completes
+      setTimeout(validatePropertyInput, 100);
+    });
+  }
 
   // Settings event listeners
   if (savePromptBtn) savePromptBtn.addEventListener('click', saveCustomPrompt);
@@ -377,6 +434,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize latest analysis section
   initializeLatestAnalysisSection();
 
+  // Initialize UX enhancements
+  initializeUXEnhancements();
+  
+  // Initialize enhanced Properties tab
+  initializeEnhancedPropertiesTab();
+  
+  // Listen for storage changes to detect new analysis
+  setupStorageListener();
+
   // Load initial data and check site status
   await loadPropertyHistory();
   await loadCustomPrompt();
@@ -385,6 +451,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Set up prompt splitting listeners
   addPromptSplittingEventListeners();
+  
+  // Set up close default prompt button
+  const closeDefaultPromptBtn = document.getElementById('closeDefaultPromptBtn');
+  if (closeDefaultPromptBtn) {
+    closeDefaultPromptBtn.addEventListener('click', () => {
+      const defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
+      if (defaultPromptDisplay) {
+        defaultPromptDisplay.classList.add('hidden');
+      }
+    });
+  }
   
   // Set up periodic refresh for pending analyses
   setInterval(async () => {
@@ -432,10 +509,12 @@ function switchToTab(tabId) {
   });
   
   // Handle tab-specific logic
-  handleTabSwitch(tabId);
+  handleTabSwitch(tabId).catch(error => {
+    console.error('Error in tab switch:', error);
+  });
 }
 
-function handleTabSwitch(tabId) {
+async function handleTabSwitch(tabId) {
   // Setup collapsibles for any tab that might have them
   setTimeout(() => {
     setupCollapsibles();
@@ -455,7 +534,11 @@ function handleTabSwitch(tabId) {
       // Refresh property history when switching to properties tab
       loadPropertyHistory();
       // Check for latest analysis to show at the top
-      checkForLatestAnalysis();
+      await checkForLatestAnalysis();
+      // Update enhanced Properties tab
+      await refreshPropertyData();
+      updatePropertiesStats();
+      updateViewDisplay();
       break;
       
     case 'settings':
@@ -556,6 +639,7 @@ async function savePropertyToHistory(url) {
     
     // Create new property entry
     const newProperty = {
+      id: url, // Use URL as consistent identifier
       url: url,
       timestamp: Date.now(),
       date: new Date().toLocaleDateString(),
@@ -563,16 +647,8 @@ async function savePropertyToHistory(url) {
       analysis: null // Will be populated when ChatGPT responds
     };
     
-    // Smart categorization suggestion
-    const suggestedCategory = suggestCategoryForProperty(newProperty);
-    
-    // Add to category manager (use suggested category or default to 'uncategorized')
-    await categoryManager.addPropertyToCategory(newProperty, suggestedCategory);
-    
-    if (suggestedCategory !== 'uncategorized') {
-      const category = categoryManager.getCategory(suggestedCategory);
-      showSuccess(`Property automatically categorized as "${category?.name || suggestedCategory}"`);
-    }
+    // Add to category manager (always start as uncategorized - user will decide)
+    await categoryManager.addPropertyToCategory(newProperty, 'uncategorized');
     
     console.log('✅ Property saved to history');
     
@@ -1051,18 +1127,29 @@ async function handleAnalyzeClick() {
     return;
   }
   
-  if (!isValidPropertyLink(link)) {
-    showError('Please enter a valid property link (Zillow, Realtor.com, etc.)');
+  if (!validationState.isValid) {
+    showError('Please enter a valid property link from a supported real estate website.');
     return;
   }
+  
+  // Start enhanced analysis progress
+  startAnalysisProgress();
   
   // Disable button while processing
   if (analyzeBtn) {
     analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = '<div class="spinner"></div> Analyzing...';
+    analyzeBtn.classList.add('loading');
+    const btnText = analyzeBtn.querySelector('.btn-text');
+    if (btnText) {
+      btnText.innerHTML = '<div class="spinner"></div> Analyzing...';
+    }
   }
   
   try {
+    // Update progress - validating
+    updateAnalysisStep('validate', 'completed');
+    updateAnalysisStep('send', 'active');
+    
     // First ensure content script is ready
     if (!contentScriptReady) {
       console.log('Content script not ready, attempting to inject...');
@@ -1077,21 +1164,49 @@ async function handleAnalyzeClick() {
     });
     
     if (response && response.success) {
+      // Update progress - analyzing
+      updateAnalysisStep('send', 'completed');
+      updateAnalysisStep('analyze', 'active');
+      
       // Save property to history
+      updateAnalysisStep('save', 'active');
       await savePropertyToHistory(link);
-      showSuccess('Property link sent to ChatGPT for analysis!');
-      if (propertyUrlInput) propertyUrlInput.value = ''; // Clear the input
+      updateAnalysisStep('save', 'completed');
+      
+      // Complete analysis
+      completeAnalysisProgress();
+      
+      showSuccess('Property sent to ChatGPT for analysis! Check the Properties tab to see results.');
+      
+      // Clear the input and reset validation
+      if (propertyUrlInput) {
+        propertyUrlInput.value = '';
+        clearValidation();
+        updateWorkflowStep(2, false);
+        updateWorkflowStep(3, false);
+      }
+      
+      // Auto-switch to properties tab after a delay
+      setTimeout(() => {
+        switchToTab('properties');
+      }, 2000);
+      
     } else {
       throw new Error(response?.error || 'Failed to send property link to ChatGPT.');
     }
     
   } catch (error) {
     console.error('Analysis failed:', error);
+    hideAnalysisProgress();
     showError(`Unable to communicate with ChatGPT: ${error.message}`);
   } finally {
     if (analyzeBtn) {
       analyzeBtn.disabled = false;
-      analyzeBtn.innerHTML = '🔍 Analyze Property';
+      analyzeBtn.classList.remove('loading');
+      const btnText = analyzeBtn.querySelector('.btn-text');
+      if (btnText) {
+        btnText.innerHTML = 'Analyze Property';
+      }
     }
   }
 }
@@ -1126,8 +1241,9 @@ async function initializePopup() {
         if (response && response.active) {
           // Content script is active
           statusElement.className = 'status active';
-          statusElement.innerHTML = '✅ Connected to ChatGPT';
+          updateStatusWithProgress('Connected to ChatGPT', 'Ready to analyze properties', 100);
           contentScriptReady = true;
+          updateWorkflowStep(1, true);
           
           // Show site info
           if (infoElement) infoElement.style.display = 'block';
@@ -1149,7 +1265,8 @@ async function initializePopup() {
         
         // Content script might not be loaded, show as active anyway since we're on ChatGPT
         statusElement.className = 'status active';
-        statusElement.innerHTML = '✅ Ready on ChatGPT';
+        updateStatusWithProgress('Ready on ChatGPT', 'Loading extension features...', 75);
+        updateWorkflowStep(1, true);
         
         // Show site info
         if (infoElement) infoElement.style.display = 'block';
@@ -1163,19 +1280,20 @@ async function initializePopup() {
         if (propertyHistorySection) propertyHistorySection.style.display = 'block';
         
         // Try to inject content script
-        try {
-          await injectContentScript();
-          contentScriptReady = true;
-          statusElement.innerHTML = '✅ Connected to ChatGPT';
-        } catch (injectError) {
-          console.error('Failed to inject content script:', injectError);
-        }
+                  try {
+            await injectContentScript();
+            contentScriptReady = true;
+            updateStatusWithProgress('Connected to ChatGPT', 'Ready to analyze properties', 100);
+          } catch (injectError) {
+            console.error('Failed to inject content script:', injectError);
+            updateStatusWithProgress('Ready on ChatGPT', 'Some features may be limited', 75);
+          }
       }
       
     } else {
       // Not on ChatGPT
       statusElement.className = 'status inactive';
-      statusElement.innerHTML = '❌ Please open ChatGPT to use this extension';
+      updateStatusWithProgress('Not Connected', 'Please open ChatGPT to use this extension', 0);
       
       // Show site info
       if (infoElement) infoElement.style.display = 'block';
@@ -1186,7 +1304,7 @@ async function initializePopup() {
   } catch (error) {
     console.error('Failed to initialize popup:', error);
     statusElement.className = 'status inactive';
-    statusElement.innerHTML = '⚠️ Unable to check status';
+    updateStatusWithProgress('Connection Error', 'Unable to check status', 0);
   }
 }
 
@@ -4332,7 +4450,7 @@ function suggestCategoryBasedOnAnalysis(property) {
   return bestCategory;
 }
 
-// Auto-categorization when analysis is received
+// Process property analysis (preserve data, no auto-categorization)
 async function processPropertyAnalysis(propertyUrl, analysis) {
   try {
     await categoryManager.initialize();
@@ -4343,23 +4461,14 @@ async function processPropertyAnalysis(propertyUrl, analysis) {
     
     if (!property) return;
     
-    // Update property with analysis
+    // Update property with analysis - preserve all existing data
     property.analysis = analysis;
     property.updatedAt = new Date().toISOString();
     
-    // Get smart suggestion based on analysis
-    const suggestedCategory = suggestCategoryBasedOnAnalysis(property);
-    
-    // Only auto-move if it's currently uncategorized and we have a good suggestion
-    if (property.categoryId === 'uncategorized' && suggestedCategory !== 'uncategorized') {
-      await categoryManager.movePropertyToCategory(property.id || property.url, suggestedCategory);
-      
-      const category = categoryManager.getCategory(suggestedCategory);
-      showSuccess(`Property auto-categorized as "${category?.name}" based on analysis!`);
-    }
-    
-    // Save the updated property
+    // Save the updated property (preserve category assignment)
     await categoryManager.saveProperties();
+    
+    console.log('✅ Property analysis saved, category preserved');
     
   } catch (error) {
     console.error('Failed to process property analysis:', error);
@@ -4429,69 +4538,151 @@ async function showLatestAnalysis(property) {
   // Get all categories for quick selection
   const allCategories = categoryManager.getAllCategories();
   
+  const address = extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname;
+  
   latestContent.innerHTML = `
     <div class="latest-analysis-content">
-      <div class="latest-property-header">
-        <div class="latest-property-info">
-          <a href="${property.url}" target="_blank" class="latest-property-url">
-            ${property.domain || new URL(property.url).hostname}
-          </a>
-          <div class="latest-property-meta">
-            <div class="latest-property-timestamp">
-              <span>🕒</span>
-              <span>Analyzed ${getTimeAgo(property.updatedAt || property.timestamp)}</span>
-            </div>
-            <div class="current-category" style="color: ${currentCategory?.color || '#6B7280'};">
-              ${currentCategory?.icon || '📋'} ${currentCategory?.name || 'Uncategorized'}
+      <!-- Property Summary -->
+      <div class="property-summary-card">
+        <div class="property-summary-header">
+          <div class="property-icon">🏠</div>
+          <div class="property-info">
+            <h3 class="property-address">
+              <a href="${property.url}" target="_blank" class="property-link">${address}</a>
+            </h3>
+            <div class="property-details">
+              <span class="analysis-status">✅ Analysis Complete</span>
+              <span class="analysis-time">📅 ${getTimeAgo(property.updatedAt || property.timestamp)}</span>
             </div>
           </div>
         </div>
-      </div>
-      
-      <div class="latest-analysis-preview">
-        <div class="latest-analysis-text">
-          ${property.analysis.fullResponse.substring(0, 300)}${property.analysis.fullResponse.length > 300 ? '...' : ''}
-        </div>
-      </div>
-      
-      <div class="latest-categorization-section">
-        <div class="categorization-header">
-          <span>🏷️</span>
-          Quick Categorization
-          ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? 
-            `<span style="font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: normal;">AI suggests: ${suggestedCategoryObj?.icon} ${suggestedCategoryObj?.name}</span>` : ''}
-        </div>
         
-        <div class="quick-categorization">
-          ${allCategories.map(category => `
-            <button class="quick-category-btn ${category.id === suggestedCategory && category.id !== property.categoryId ? 'suggested' : ''}" 
-                    data-action="quick-categorize" 
-                    data-property-id="${property.id || property.url}" 
-                    data-category-id="${category.id}"
-                    style="color: ${category.color};">
-              ${category.icon} ${category.name}
+        <div class="analysis-preview-section">
+          <div class="analysis-preview-header">
+            <span class="preview-icon">📊</span>
+            <span class="preview-title">Key Insights</span>
+            <button class="btn-link" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
+              View Full Analysis →
             </button>
-          `).join('')}
-        </div>
-        
-        <div class="custom-categorization">
-          <select class="category-select-latest" id="latestCategorySelect">
-            ${allCategories.map(cat => 
-              `<option value="${cat.id}" ${property.categoryId === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
-            ).join('')}
-          </select>
-          <button class="btn btn-primary btn-sm" data-action="apply-category" data-property-id="${property.id || property.url}">
-            Apply
-          </button>
+          </div>
+          <div class="analysis-preview-text">
+            ${property.analysis.fullResponse.substring(0, 280)}${property.analysis.fullResponse.length > 280 ? '...' : ''}
+          </div>
         </div>
       </div>
-      
-      <div class="latest-actions">
-        <button class="btn btn-ghost btn-sm" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
-          👁️ View Full Analysis
+
+      <!-- Categorization Workflow -->
+      <div class="categorization-workflow">
+        <div class="workflow-step-header">
+          <div class="step-number">2</div>
+          <div class="step-info">
+            <h3 class="step-title">Organize Your Property</h3>
+            <p class="step-description">Choose where this property belongs in your portfolio</p>
+          </div>
+        </div>
+
+        <!-- Current Status -->
+        <div class="current-status">
+          <div class="status-label">Currently in:</div>
+          <div class="current-category-display" style="border-color: ${currentCategory?.color || '#6B7280'};">
+            <span class="category-icon" style="color: ${currentCategory?.color || '#6B7280'};">${currentCategory?.icon || '📋'}</span>
+            <span class="category-name">${currentCategory?.name || 'Uncategorized'}</span>
+          </div>
+        </div>
+
+        <!-- AI Suggestion (if available) -->
+        ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? `
+          <div class="ai-suggestion-card">
+            <div class="suggestion-header">
+              <span class="ai-icon">🤖</span>
+              <span class="suggestion-title">Smart Suggestion</span>
+            </div>
+            <div class="suggestion-content">
+              <div class="suggested-category" style="border-color: ${suggestedCategoryObj?.color};">
+                <span class="category-icon" style="color: ${suggestedCategoryObj?.color};">${suggestedCategoryObj?.icon}</span>
+                <span class="category-name">${suggestedCategoryObj?.name}</span>
+              </div>
+              <div class="suggestion-reason">Based on the property analysis</div>
+              <button class="btn btn-primary btn-sm suggestion-apply-btn" 
+                      data-action="quick-categorize" 
+                      data-property-id="${property.id || property.url}" 
+                      data-category-id="${suggestedCategory}">
+                Use This Category
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Category Options -->
+        <div class="category-selection-section">
+          <div class="selection-header">
+            <span class="selection-icon">📁</span>
+            <span class="selection-title">Choose Category</span>
+          </div>
+          
+          <div class="category-grid">
+            ${allCategories.map(category => `
+              <div class="category-option-card ${category.id === property.categoryId ? 'current' : ''} ${category.id === suggestedCategory && category.id !== property.categoryId ? 'suggested' : ''}" 
+                   data-action="quick-categorize" 
+                   data-property-id="${property.id || property.url}" 
+                   data-category-id="${category.id}">
+                <div class="category-option-header">
+                  <span class="category-option-icon" style="color: ${category.color};">${category.icon}</span>
+                  <div class="category-option-status">
+                    ${category.id === property.categoryId ? '<span class="current-badge">Current</span>' : ''}
+                    ${category.id === suggestedCategory && category.id !== property.categoryId ? '<span class="suggested-badge">Suggested</span>' : ''}
+                  </div>
+                </div>
+                <div class="category-option-name">${category.name}</div>
+                <div class="category-option-description">${category.description}</div>
+                <div class="category-property-count">${categoryManager.getPropertiesByCategory(category.id).length} properties</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Advanced Options -->
+        <div class="advanced-categorization">
+          <details class="advanced-options">
+            <summary class="advanced-summary">
+              <span class="advanced-icon">⚙️</span>
+              <span>Advanced Options</span>
+            </summary>
+            <div class="advanced-content">
+              <div class="dropdown-categorization">
+                <label for="latestCategorySelect" class="dropdown-label">Select from dropdown:</label>
+                <div class="dropdown-group">
+                  <select class="category-select-latest" id="latestCategorySelect">
+                    ${allCategories.map(cat => 
+                      `<option value="${cat.id}" ${property.categoryId === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
+                    ).join('')}
+                  </select>
+                  <button class="btn btn-secondary btn-sm" data-action="apply-category" data-property-id="${property.id || property.url}">
+                    Apply
+                  </button>
+                </div>
+              </div>
+              
+              <div class="create-category-option">
+                <button class="btn btn-ghost btn-sm" id="latestCreateCategoryBtn">
+                  ➕ Create New Category
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions-bar">
+        <button class="btn btn-secondary btn-sm" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
+          📖 Read Full Analysis
         </button>
-        <button class="btn btn-ghost btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
+        <button class="btn btn-secondary btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
           📄 Export to Word
+        </button>
+        <button class="btn btn-ghost btn-sm" id="latestAnalysisDoneBtn">
+          ✅ Done for Now
         </button>
       </div>
     </div>
@@ -4548,6 +4739,21 @@ function setupLatestAnalysisEventListeners() {
   const latestContent = document.getElementById('latestAnalysisContent');
   if (!latestContent) return;
   
+  // Set up done button event listener
+  const doneBtn = document.getElementById('latestAnalysisDoneBtn');
+  if (doneBtn) {
+    doneBtn.addEventListener('click', dismissLatestAnalysis);
+  }
+  
+  // Set up create category button event listener
+  const createCategoryBtn = document.getElementById('latestCreateCategoryBtn');
+  if (createCategoryBtn) {
+    createCategoryBtn.addEventListener('click', () => {
+      const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+      if (manageCategoriesBtn) manageCategoriesBtn.click();
+    });
+  }
+  
   // Use event delegation for all actions
   latestContent.addEventListener('click', async (event) => {
     const target = event.target;
@@ -4586,10 +4792,22 @@ async function handleQuickCategorization(propertyId, categoryId) {
     await renderCategoryGrid();
     await loadPropertyHistory();
     
-    // Auto-dismiss after successful categorization
-    setTimeout(() => {
-      dismissLatestAnalysis();
-    }, 1500);
+    // Update the latest analysis display to show new category without dismissing
+    const property = categoryManager.properties.get(propertyId);
+    if (property && property.analysis) {
+      await showLatestAnalysis(property);
+    }
+    
+    // Show a subtle confirmation that categorization was successful
+    const latestSection = document.getElementById('latestAnalysisSection');
+    if (latestSection) {
+      latestSection.classList.add('success-highlight');
+      
+      // Reset highlight after a few seconds
+      setTimeout(() => {
+        latestSection.classList.remove('success-highlight');
+      }, 3000);
+    }
     
   } catch (error) {
     console.error('Failed to categorize property:', error);
@@ -4645,4 +4863,1261 @@ document.addEventListener('DOMContentLoaded', () => {
 window.WordExportModule = WordExportModule;
 window.showProgress = showProgress;
 window.hideProgress = hideProgress;
+
+// ===============================================
+// ENHANCED UX FUNCTIONS
+// ===============================================
+
+// Enhanced message system
+function showMessage(message, type = 'success', duration = 3000) {
+  const messageElements = {
+    success: successMessage,
+    error: errorMessage,
+    warning: warningMessage
+  };
+
+  const messageElement = messageElements[type];
+  if (!messageElement) return;
+
+  // Hide all other messages first
+  Object.values(messageElements).forEach(el => {
+    if (el && el !== messageElement) {
+      el.classList.remove('show');
+      el.style.display = 'none';
+    }
+  });
+
+  // Show the message
+  const contentEl = messageElement.querySelector('.message-content');
+  if (contentEl) {
+    contentEl.textContent = message;
+  } else {
+    messageElement.textContent = message;
+  }
+  
+  messageElement.classList.add('show');
+  messageElement.style.display = 'flex';
+
+  // Auto-hide after duration
+  if (duration > 0) {
+    setTimeout(() => {
+      messageElement.classList.remove('show');
+      messageElement.style.display = 'none';
+    }, duration);
+  }
+}
+
+// Enhanced success/error/warning functions (override existing)
+function showSuccess(message, duration = 3000) {
+  showMessage(message, 'success', duration);
+}
+
+function showError(message, duration = 5000) {
+  showMessage(message, 'error', duration);
+}
+
+function showWarning(message, duration = 4000) {
+  showMessage(message, 'warning', duration);
+}
+
+// Workflow step management
+function updateWorkflowStep(stepNumber, completed) {
+  const step = workflowSteps[stepNumber];
+  if (!step) return;
+
+  step.completed = completed;
+  const stepElement = document.getElementById(step.id);
+  
+  if (stepElement) {
+    if (completed) {
+      stepElement.textContent = '✅';
+      stepElement.className = 'step-status completed';
+    } else {
+      stepElement.textContent = '⏳';
+      stepElement.className = 'step-status';
+    }
+  }
+
+  // Update analysis badge
+  updateAnalysisBadge();
+}
+
+function updateAnalysisBadge() {
+  const analysisBadge = document.getElementById('analysisBadge');
+  if (!analysisBadge) return;
+
+  const completedSteps = Object.values(workflowSteps).filter(step => step.completed).length;
+  const totalSteps = Object.keys(workflowSteps).length;
+
+  if (completedSteps === 0) {
+    analysisBadge.textContent = 'Ready';
+    analysisBadge.className = 'section-badge';
+  } else if (completedSteps === totalSteps) {
+    analysisBadge.textContent = 'Ready to Analyze';
+    analysisBadge.className = 'section-badge ready';
+    analysisBadge.style.background = 'var(--primary)';
+    analysisBadge.style.color = 'white';
+  } else {
+    analysisBadge.textContent = `${completedSteps}/${totalSteps} Steps`;
+    analysisBadge.className = 'section-badge progress';
+    analysisBadge.style.background = '#fef3c7';
+    analysisBadge.style.color = '#92400e';
+  }
+}
+
+// Property URL validation
+function validatePropertyInput() {
+  const input = propertyUrlInput?.value?.trim() || '';
+  const validationElement = document.getElementById('urlValidation');
+  
+  if (!validationElement) return;
+
+  if (input === '') {
+    clearValidation();
+    return;
+  }
+
+  // Check if it's a valid URL
+  let url;
+  try {
+    url = new URL(input);
+  } catch (e) {
+    setValidationState('invalid', 'Please enter a valid URL starting with http:// or https://');
+    return;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  
+  // Check for supported property sites
+  const supportedSites = [
+    'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+    'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com',
+    'yad2.co.il', 'madlan.co.il', 'spitogatos.gr', 'zoopla.co.uk', 'rightmove.co.uk',
+    'homestra.com', 'boligportal.dk', 'lejebolig.dk', 'zyprus.com', 'bazaraki.com'
+  ];
+
+  const isSupported = supportedSites.some(site => hostname.includes(site));
+  
+  if (isSupported) {
+    setValidationState('valid', `✓ Valid ${hostname} property link`);
+    updateWorkflowStep(2, true);
+  } else {
+    setValidationState('warning', `⚠ ${hostname} - may work but not fully tested`);
+    updateWorkflowStep(2, true);
+  }
+}
+
+function setValidationState(type, message) {
+  validationState.type = type;
+  validationState.message = message;
+  validationState.isValid = type === 'valid' || type === 'warning';
+
+  const validationElement = document.getElementById('urlValidation');
+  const inputElement = propertyUrlInput;
+
+  if (validationElement) {
+    validationElement.textContent = message;
+    validationElement.className = `input-validation ${type}`;
+  }
+
+  if (inputElement) {
+    inputElement.className = `form-input ${type}`;
+  }
+}
+
+function clearValidation() {
+  validationState = { isValid: false, message: '', type: 'none' };
+  
+  const validationElement = document.getElementById('urlValidation');
+  const inputElement = propertyUrlInput;
+
+  if (validationElement) {
+    validationElement.textContent = '';
+    validationElement.className = 'input-validation';
+  }
+
+  if (inputElement) {
+    inputElement.className = 'form-input';
+  }
+}
+
+// Enhanced analysis progress tracking
+function startAnalysisProgress() {
+  const tracker = document.getElementById('analysisTracker');
+  const timeElement = document.getElementById('analysisTime');
+  
+  if (tracker) {
+    tracker.style.display = 'block';
+  }
+
+  // Reset all steps
+  analysisProgress.currentStep = 0;
+  analysisProgress.stepStatus = {};
+  
+  analysisProgress.steps.forEach(step => {
+    const stepElement = document.querySelector(`.tracker-step[data-step="${step}"]`);
+    if (stepElement) {
+      stepElement.classList.remove('active', 'completed');
+    }
+  });
+
+  // Start timer
+  analysisStartTime = Date.now();
+  analysisTimer = setInterval(() => {
+    if (timeElement) {
+      const elapsed = Math.floor((Date.now() - analysisStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      timeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }, 1000);
+
+  // Start first step
+  updateAnalysisStep('validate', 'active');
+}
+
+function updateAnalysisStep(stepName, status) {
+  const stepElement = document.querySelector(`.tracker-step[data-step="${stepName}"]`);
+  const iconElement = document.getElementById(`${stepName}Icon`);
+  
+  if (!stepElement) return;
+
+  // Remove all status classes
+  stepElement.classList.remove('active', 'completed');
+  
+  if (status === 'active') {
+    stepElement.classList.add('active');
+    if (iconElement) iconElement.textContent = '⏳';
+  } else if (status === 'completed') {
+    stepElement.classList.add('completed');
+    if (iconElement) iconElement.textContent = '✅';
+  }
+
+  analysisProgress.stepStatus[stepName] = status;
+}
+
+function completeAnalysisProgress() {
+  // Complete all remaining steps
+  analysisProgress.steps.forEach(step => {
+    updateAnalysisStep(step, 'completed');
+  });
+
+  // Stop timer
+  if (analysisTimer) {
+    clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+
+  // Hide tracker after a delay
+  setTimeout(() => {
+    const tracker = document.getElementById('analysisTracker');
+    if (tracker) {
+      tracker.style.display = 'none';
+    }
+  }, 2000);
+
+  updateWorkflowStep(3, true);
+}
+
+function hideAnalysisProgress() {
+  const tracker = document.getElementById('analysisTracker');
+  if (tracker) {
+    tracker.style.display = 'none';
+  }
+
+  if (analysisTimer) {
+    clearInterval(analysisTimer);
+    analysisTimer = null;
+  }
+}
+
+// Enhanced status updates with progress
+function updateStatusWithProgress(title, subtitle, progress = 0) {
+  const statusTitle = document.querySelector('.status-title');
+  const statusSubtitle = document.querySelector('.status-subtitle');
+  const progressFill = document.getElementById('statusProgress');
+
+  if (statusTitle) statusTitle.textContent = title;
+  if (statusSubtitle) statusSubtitle.textContent = subtitle;
+  if (progressFill) progressFill.style.width = `${progress}%`;
+}
+
+// Initialize UX enhancements
+function initializeUXEnhancements() {
+  // Check initial workflow state
+  checkWorkflowSteps();
+  
+  // Initialize validation if input has content
+  if (propertyUrlInput && propertyUrlInput.value.trim()) {
+    validatePropertyInput();
+  }
+}
+
+function checkWorkflowSteps() {
+  // Check if we're on ChatGPT (step 1)
+  if (currentTab && (currentTab.url?.includes('chatgpt.com') || currentTab.url?.includes('chat.openai.com'))) {
+    updateWorkflowStep(1, true);
+  }
+
+  // Check if there's content in the input (step 2)
+  if (propertyUrlInput && propertyUrlInput.value.trim()) {
+    updateWorkflowStep(2, true);
+  }
+}
+
+// ===============================================
+// ENHANCED PROPERTIES TAB FUNCTIONS
+// ===============================================
+
+// Initialize enhanced Properties tab
+function initializeEnhancedPropertiesTab() {
+  setupPropertiesEventListeners();
+  setupViewToggle();
+  setupCategorization();
+  updatePropertiesStats();
+  
+  // Set up periodic refresh to catch new analysis data
+  setInterval(async () => {
+    if (activeTab === 'properties') {
+      await refreshPropertyData();
+      updatePropertiesStats();
+      updateViewDisplay();
+    }
+  }, 5000); // Check every 5 seconds when on Properties tab
+}
+
+// Setup event listeners for Properties tab
+function setupPropertiesEventListeners() {
+  // View toggle buttons
+  const categoryViewBtn = document.getElementById('categoryViewBtn');
+  const listViewBtn = document.getElementById('listViewBtn');
+  
+  if (categoryViewBtn) {
+    categoryViewBtn.addEventListener('click', () => switchView('category'));
+  }
+  
+  if (listViewBtn) {
+    listViewBtn.addEventListener('click', () => switchView('list'));
+  }
+  
+  // Organize now button
+  const organizeNowBtn = document.getElementById('organizeNowBtn');
+  if (organizeNowBtn) {
+    organizeNowBtn.addEventListener('click', startCategorization);
+  }
+  
+  // Dismiss alert button
+  const dismissAlertBtn = document.getElementById('dismissAlertBtn');
+  if (dismissAlertBtn) {
+    dismissAlertBtn.addEventListener('click', dismissUncategorizedAlert);
+  }
+  
+  // Clear history button
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', handleClearHistory);
+  }
+
+  // Test categorization button
+  const testCategorizationBtn = document.getElementById('testCategorizationBtn');
+  if (testCategorizationBtn) {
+    testCategorizationBtn.addEventListener('click', testCategorization);
+  }
+
+
+  
+  // Latest analysis dismiss button
+  const dismissLatestBtn = document.getElementById('dismissLatestBtn');
+  if (dismissLatestBtn) {
+    dismissLatestBtn.addEventListener('click', dismissLatestAnalysis);
+  }
+  
+  // Categorization modal events
+  setupCategorizationModal();
+}
+
+// Setup view toggle functionality
+function setupViewToggle() {
+  currentView = 'category'; // Default view
+  updateViewDisplay();
+}
+
+// Switch between category and list views
+function switchView(view) {
+  currentView = view;
+  
+  // Update button states
+  const categoryBtn = document.getElementById('categoryViewBtn');
+  const listBtn = document.getElementById('listViewBtn');
+  
+  if (categoryBtn && listBtn) {
+    categoryBtn.classList.toggle('active', view === 'category');
+    listBtn.classList.toggle('active', view === 'list');
+  }
+  
+  updateViewDisplay();
+}
+
+// Update view display based on current view
+function updateViewDisplay() {
+  const categorySection = document.getElementById('categoryViewSection');
+  const listSection = document.getElementById('listViewSection');
+  
+  if (currentView === 'category') {
+    if (categorySection) categorySection.style.display = 'block';
+    if (listSection) listSection.style.display = 'none';
+    renderEnhancedCategoryGrid();
+  } else {
+    if (categorySection) categorySection.style.display = 'none';
+    if (listSection) listSection.style.display = 'block';
+    renderPropertiesList();
+  }
+}
+
+// Render enhanced category grid
+async function renderEnhancedCategoryGrid() {
+  await categoryManager.initialize();
+  
+  const categoryGrid = document.getElementById('categoryGrid');
+  if (!categoryGrid) return;
+  
+  const categories = categoryManager.getAllCategories();
+  const allProperties = Array.from(categoryManager.properties.values());
+  
+  if (categories.length === 0) {
+    categoryGrid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📁</div>
+        <p>No categories created yet</p>
+        <button class="btn btn-primary btn-sm" id="emptyCategoriesCreateBtn">
+          Create Categories
+        </button>
+      </div>
+    `;
+    
+    // Add event listener for the create categories button
+    const createBtn = document.getElementById('emptyCategoriesCreateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+        if (manageCategoriesBtn) manageCategoriesBtn.click();
+      });
+    }
+    return;
+  }
+  
+  const categoryCards = categories.map(category => {
+    const properties = allProperties.filter(p => p.categoryId === category.id);
+    const hasProperties = properties.length > 0;
+    
+    return `
+      <div class="category-card ${hasProperties ? 'has-properties' : ''}" data-category-id="${category.id}">
+        <div class="category-header">
+          <div class="category-info">
+            <div class="category-icon" style="color: ${category.color}">${category.icon}</div>
+            <div class="category-details">
+              <h3>${category.name}</h3>
+              <p>${category.description}</p>
+            </div>
+          </div>
+          <div class="category-count">${properties.length}</div>
+        </div>
+        
+        <div class="category-properties">
+          ${properties.length > 0 ? `
+            <div class="category-properties-list">
+                             ${properties.slice(0, 4).map(property => `
+                 <div class="category-property-item" data-property-id="${property.id || property.url}" title="${property.url}">
+                   <div class="property-item-content">
+                     <span class="property-status-icon ${property.analysis ? 'analyzed' : 'pending'}">
+                       ${property.analysis ? '●' : '○'}
+                     </span>
+                     <span class="property-domain-clickable" data-url="${property.url}">
+                       ${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}
+                     </span>
+                   </div>
+                   <button class="property-edit-category-btn" data-property-id="${property.id || property.url}" title="Edit Category">
+                     📝
+                   </button>
+                 </div>
+               `).join('')}
+              ${properties.length > 4 ? `
+                <div class="category-property-item">
+                  <span style="color: var(--text-secondary); font-style: italic;">
+                    +${properties.length - 4} more...
+                  </span>
+                </div>
+              ` : ''}
+            </div>
+          ` : `
+            <div class="empty-state" style="padding: var(--space-md); text-align: center;">
+              <p style="color: var(--text-secondary); font-size: var(--font-size-sm); margin: 0;">
+                No properties in this category
+              </p>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  categoryGrid.innerHTML = categoryCards;
+  
+  // Add click handlers for category cards
+  categoryGrid.querySelectorAll('.category-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      const categoryId = card.dataset.categoryId;
+      
+      // Check if clicked on edit category button
+      if (e.target.closest('.property-edit-category-btn')) {
+        e.stopPropagation();
+        const propertyId = e.target.closest('.property-edit-category-btn').dataset.propertyId;
+        if (propertyId) {
+          openCategorizationModal(propertyId);
+        }
+        return;
+      }
+      
+      // Check if clicked on property domain (to open URL)
+      if (e.target.closest('.property-domain-clickable')) {
+        e.stopPropagation();
+        const url = e.target.closest('.property-domain-clickable').dataset.url;
+        if (url) {
+          window.open(url, '_blank');
+        }
+        return;
+      }
+      
+      if (e.target.closest('.category-property-item')) {
+        // Clicked on a property item
+        const propertyId = e.target.closest('.category-property-item').dataset.propertyId;
+        if (propertyId) {
+          showPropertyDetails(propertyId);
+        }
+      } else {
+        // Clicked on category - show category details
+        showCategoryDetails(categoryId);
+      }
+    });
+  });
+}
+
+// Render properties list view
+async function renderPropertiesList() {
+  await categoryManager.initialize();
+  
+  const propertiesList = document.getElementById('propertiesList');
+  const filteredCountElement = document.getElementById('filteredPropertiesCount');
+  
+  if (!propertiesList) return;
+  
+  const allProperties = Array.from(categoryManager.properties.values());
+  
+  if (allProperties.length === 0) {
+    propertiesList.innerHTML = `
+      <div class="empty-state" style="padding: var(--space-xl);">
+        <div class="empty-state-icon">📄</div>
+        <p>No properties analyzed yet</p>
+        <p style="font-size: var(--font-size-sm); color: var(--text-secondary);">
+          Go to the Analyzer tab to add your first property
+        </p>
+      </div>
+    `;
+    if (filteredCountElement) filteredCountElement.textContent = '0 properties';
+    return;
+  }
+  
+  // Sort by most recent first
+  const sortedProperties = allProperties.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  
+  const propertyItems = sortedProperties.map(property => {
+    const category = categoryManager.getCategory(property.categoryId || 'uncategorized');
+    const hasAnalysis = property.analysis && property.analysis.fullResponse;
+    
+    return `
+      <div class="property-item ${selectedProperties.has(property.id || property.url) ? 'selected' : ''}" 
+           data-property-id="${property.id || property.url}">
+        ${isSelectMode ? `
+          <input type="checkbox" class="property-checkbox" 
+                 ${selectedProperties.has(property.id || property.url) ? 'checked' : ''}>
+        ` : ''}
+        
+        <div class="property-status ${hasAnalysis ? 'analyzed' : 'pending'}"></div>
+        
+        <div class="property-info">
+          <a href="${property.url}" target="_blank" class="property-url" title="${property.url}">
+            ${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}
+          </a>
+          <div class="property-meta">
+            ${property.date || new Date(property.timestamp).toLocaleDateString()} • 
+            <span class="property-category" style="background-color: ${category?.color}22;">
+              ${category?.icon || '📋'} ${category?.name || 'Uncategorized'}
+            </span>
+          </div>
+        </div>
+        
+                  <div class="property-actions">
+            <button class="btn btn-primary btn-sm categorize-btn" title="Change Category">
+              📝 Edit Category
+            </button>
+            ${hasAnalysis ? `
+              <button class="btn btn-ghost btn-sm view-btn" title="View Analysis">👁️</button>
+            ` : ''}
+            <button class="btn btn-ghost btn-sm delete-btn" title="Delete">🗑️</button>
+          </div>
+      </div>
+    `;
+  }).join('');
+  
+  propertiesList.innerHTML = propertyItems;
+  
+  // Update count
+  if (filteredCountElement) {
+    filteredCountElement.textContent = `${sortedProperties.length} properties`;
+  }
+  
+  // Add event listeners
+  propertiesList.querySelectorAll('.property-item').forEach(item => {
+    const propertyId = item.dataset.propertyId;
+    
+    // Checkbox for selection
+    const checkbox = item.querySelector('.property-checkbox');
+    if (checkbox) {
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handlePropertySelection(propertyId, checkbox.checked);
+      });
+    }
+    
+    // Categorize button
+    const categorizeBtn = item.querySelector('.categorize-btn');
+    if (categorizeBtn) {
+      categorizeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCategorizationModal(propertyId);
+      });
+    }
+    
+    // View button
+    const viewBtn = item.querySelector('.view-btn');
+    if (viewBtn) {
+      viewBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showPropertyDetails(propertyId);
+      });
+    }
+    
+    // Delete button
+    const deleteBtn = item.querySelector('.delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteProperty(propertyId);
+      });
+    }
+    
+    // Click on item to view details (if not in select mode)
+    if (!isSelectMode) {
+      item.addEventListener('click', () => {
+        showPropertyDetails(propertyId);
+      });
+    }
+  });
+}
+
+// Refresh property data from storage to pick up any new analysis
+async function refreshPropertyData() {
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const properties = result.propertyHistory || [];
+    
+    // Update category manager properties with latest data
+    properties.forEach(property => {
+      const propertyId = property.id || property.url;
+      const existingProperty = categoryManager.properties.get(propertyId);
+      
+      if (existingProperty) {
+        // Update existing property with any new analysis data
+        existingProperty.analysis = property.analysis;
+        existingProperty.analysisTimestamp = property.analysisTimestamp;
+        existingProperty.sessionId = property.sessionId;
+      } else {
+        // Add new property if it doesn't exist
+        property.id = propertyId;
+        if (!property.categoryId) {
+          property.categoryId = 'uncategorized';
+        }
+        categoryManager.properties.set(propertyId, property);
+      }
+    });
+    
+    console.log('🔄 Property data refreshed from storage');
+  } catch (error) {
+    console.error('Failed to refresh property data:', error);
+  }
+}
+
+// Update properties statistics
+async function updatePropertiesStats() {
+  await categoryManager.initialize();
+  
+  const allProperties = Array.from(categoryManager.properties.values());
+  const analyzedProperties = allProperties.filter(p => p.analysis && p.analysis.fullResponse);
+  const categories = categoryManager.getAllCategories();
+  const uncategorizedProperties = allProperties.filter(p => p.categoryId === 'uncategorized');
+  
+  // Update stat numbers
+  const totalCountElement = document.getElementById('totalPropertiesCount');
+  const analyzedCountElement = document.getElementById('analyzedPropertiesCount');
+  const categoriesCountElement = document.getElementById('categoriesCount');
+  
+  if (totalCountElement) totalCountElement.textContent = allProperties.length;
+  if (analyzedCountElement) analyzedCountElement.textContent = analyzedProperties.length;
+  if (categoriesCountElement) categoriesCountElement.textContent = categories.length;
+  
+  // Show/hide uncategorized alert
+  const uncategorizedAlert = document.getElementById('uncategorizedAlert');
+  const uncategorizedCount = document.getElementById('uncategorizedCount');
+  
+  if (uncategorizedProperties.length > 0) {
+    if (uncategorizedAlert) uncategorizedAlert.style.display = 'block';
+    if (uncategorizedCount) uncategorizedCount.textContent = uncategorizedProperties.length;
+  } else {
+    if (uncategorizedAlert) uncategorizedAlert.style.display = 'none';
+  }
+}
+
+// Setup categorization functionality
+function setupCategorization() {
+  // This function sets up the categorization modal and related functionality
+  // The actual modal setup is handled in setupCategorizationModal()
+}
+
+// Open categorization modal for a property
+function openCategorizationModal(propertyId) {
+  selectedPropertyForCategorization = propertyId;
+  const property = categoryManager.properties.get(propertyId);
+  
+  if (!property) {
+    console.error('Property not found:', propertyId);
+    return;
+  }
+  
+  console.log('Opening categorization modal for property:', property);
+  
+  // Populate property preview
+  const propertyPreview = document.getElementById('categorizationPropertyPreview');
+  if (propertyPreview) {
+    const address = extractAddressFromUrl(property.url) || property.address || property.url;
+    propertyPreview.innerHTML = `
+      <div class="preview-url">
+        <a href="${property.url}" target="_blank" class="property-address-link">${address}</a>
+      </div>
+      <div class="preview-meta">
+        ${property.domain || new URL(property.url).hostname} • 
+        ${property.date || new Date(property.timestamp).toLocaleDateString()}
+        ${property.analysis ? ' • Analyzed' : ' • Pending Analysis'}
+      </div>
+      <div class="current-category">
+        <strong>Current Category:</strong> ${categoryManager.getCategory(property.categoryId)?.name || 'Uncategorized'}
+      </div>
+    `;
+  }
+   
+  // Populate category options
+  populateCategoryOptions();
+  
+  // Show the modal
+  const modal = document.getElementById('categorizationModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    console.log('Categorization modal opened');
+  } else {
+    console.error('Categorization modal not found');
+  }
+}
+ 
+ // Function to extract address from property URL
+ function extractAddressFromUrl(url) {
+   if (!url) return null;
+   
+   try {
+     const urlObj = new URL(url);
+     const pathname = urlObj.pathname;
+     const hostname = urlObj.hostname.toLowerCase();
+     
+     // Zillow URL patterns
+     if (hostname.includes('zillow.com')) {
+       // Pattern: /homedetails/123-Main-St-City-State-12345/zpid_123456789/
+       const zillowMatch = pathname.match(/\/homedetails\/([^\/]+)\//);
+       if (zillowMatch) {
+         return decodeURIComponent(zillowMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Realtor.com URL patterns
+     if (hostname.includes('realtor.com')) {
+       // Pattern: /realestateandhomes-detail/123-Main-St_City_State_12345_M12345-12345
+       const realtorMatch = pathname.match(/\/realestateandhomes-detail\/([^_]+)/);
+       if (realtorMatch) {
+         return decodeURIComponent(realtorMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Redfin URL patterns
+     if (hostname.includes('redfin.com')) {
+       // Pattern: /city/state/12345/123-Main-St-12345
+       const redfinMatch = pathname.match(/\/[^\/]+\/[^\/]+\/\d+\/([^\/]+)/);
+       if (redfinMatch) {
+         return decodeURIComponent(redfinMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Trulia URL patterns
+     if (hostname.includes('trulia.com')) {
+       // Pattern: /p/state/city/123-main-st-city-state-12345--2123456789
+       const truliaMatch = pathname.match(/\/p\/[^\/]+\/[^\/]+\/([^-]+(?:-[^-]+)*)/);
+       if (truliaMatch) {
+         return decodeURIComponent(truliaMatch[1].replace(/-/g, ' '));
+       }
+     }
+     
+     // Homes.com URL patterns
+     if (hostname.includes('homes.com')) {
+       // Pattern: /123-main-st-city-state-12345/
+       const homesMatch = pathname.match(/\/([^\/]+)\//);
+       if (homesMatch) {
+         const address = homesMatch[1].replace(/-/g, ' ');
+         if (address.match(/\d+\s+\w+/)) { // Check if it looks like an address
+           return decodeURIComponent(address);
+         }
+       }
+     }
+     
+     // Generic pattern: look for address-like strings in the URL
+     const addressMatch = pathname.match(/\/([^\/]*\d+[^\/]*(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pl|place|way|blvd|boulevard)[^\/]*)/i);
+     if (addressMatch) {
+       return decodeURIComponent(addressMatch[1].replace(/[-_]/g, ' '));
+     }
+     
+     // If no specific pattern matches, return null to fall back to other options
+     return null;
+     
+   } catch (error) {
+     console.warn('Error extracting address from URL:', error);
+     return null;
+   }
+  
+  // Show modal
+  const modal = document.getElementById('categorizationModal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+// Populate category options in modal
+function populateCategoryOptions() {
+  const categoryOptions = document.getElementById('categoryOptions');
+  if (!categoryOptions) {
+    console.error('Category options container not found');
+    return;
+  }
+  
+  const categories = categoryManager.getAllCategories();
+  const currentProperty = categoryManager.properties.get(selectedPropertyForCategorization);
+  const currentCategoryId = currentProperty?.categoryId;
+  
+  console.log('Available categories:', categories);
+  console.log('Current property category:', currentCategoryId);
+  
+  if (categories.length === 0) {
+    categoryOptions.innerHTML = `
+      <div class="no-categories-message">
+        <p>No categories available. Please create categories first.</p>
+        <button class="btn btn-primary" id="noCategoriesCreateBtn">
+          Create Categories
+        </button>
+      </div>
+    `;
+    
+    // Add event listener for create categories button
+    const createBtn = document.getElementById('noCategoriesCreateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+        if (manageCategoriesBtn) manageCategoriesBtn.click();
+        const modal = document.getElementById('categorizationModal');
+        if (modal) modal.style.display = 'none';
+      });
+    }
+    return;
+  }
+  
+  const optionsHTML = categories.map(category => `
+    <div class="category-option ${category.id === currentCategoryId ? 'selected' : ''}" 
+         data-category-id="${category.id}">
+      <div class="category-option-icon" style="color: ${category.color}">${category.icon}</div>
+      <div class="category-option-info">
+        <h5>${category.name}</h5>
+        <p>${category.description}</p>
+      </div>
+      ${category.id === currentCategoryId ? '<div class="current-indicator">Current</div>' : ''}
+    </div>
+  `).join('');
+  
+  categoryOptions.innerHTML = optionsHTML;
+  
+  // Add click handlers
+  categoryOptions.querySelectorAll('.category-option').forEach(option => {
+    option.addEventListener('click', () => {
+      // Remove previous selection
+      categoryOptions.querySelectorAll('.category-option').forEach(opt => 
+        opt.classList.remove('selected'));
+      
+      // Select this option
+      option.classList.add('selected');
+      
+      // Enable confirm button
+      const confirmBtn = document.getElementById('confirmCategorizationBtn');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+      }
+    });
+  });
+}
+
+// Setup categorization modal event listeners
+function setupCategorizationModal() {
+  const modal = document.getElementById('categorizationModal');
+  const closeBtn = document.getElementById('categorizationModalClose');
+  const cancelBtn = document.getElementById('cancelCategorizationBtn');
+  const confirmBtn = document.getElementById('confirmCategorizationBtn');
+  
+  // Close modal handlers
+  [closeBtn, cancelBtn].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        selectedPropertyForCategorization = null;
+      });
+    }
+  });
+  
+  // Confirm categorization
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      const selectedOption = document.querySelector('.category-option.selected');
+      if (!selectedOption || !selectedPropertyForCategorization) return;
+      
+      const categoryId = selectedOption.dataset.categoryId;
+      
+      try {
+        await categoryManager.movePropertyToCategory(selectedPropertyForCategorization, categoryId);
+        const category = categoryManager.getCategory(categoryId);
+        showSuccess(`Property moved to "${category?.name || 'category'}"!`);
+        
+        // Close modal
+        modal.style.display = 'none';
+        selectedPropertyForCategorization = null;
+        
+        // Refresh views
+        updatePropertiesStats();
+        updateViewDisplay();
+        
+      } catch (error) {
+        console.error('Failed to categorize property:', error);
+        showError('Failed to update property category');
+      }
+    });
+  }
+  
+  // Close on background click
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+        selectedPropertyForCategorization = null;
+      }
+    });
+  }
+}
+
+// Helper functions
+function startCategorization() {
+  // Switch to list view and show properties that need categorization
+  switchView('list');
+  // Could add filtering here to show only uncategorized properties
+}
+
+function dismissUncategorizedAlert() {
+  const alert = document.getElementById('uncategorizedAlert');
+  if (alert) {
+    alert.style.display = 'none';
+  }
+}
+
+function handleClearHistory() {
+  if (confirm('Are you sure you want to clear all property history? This action cannot be undone.')) {
+    categoryManager.properties.clear();
+    categoryManager.saveProperties();
+    updatePropertiesStats();
+    updateViewDisplay();
+    showSuccess('Property history cleared successfully');
+  }
+}
+
+// Test categorization functionality
+async function testCategorization() {
+  await categoryManager.initialize();
+  
+  // Create a test property if none exist
+  const testProperty = {
+    id: 'test_property_' + Date.now(),
+    url: 'https://www.zillow.com/homedetails/123-Main-St-Anytown-ST-12345/123456789_zpid/',
+    timestamp: Date.now(),
+    date: new Date().toLocaleDateString(),
+    domain: 'zillow.com',
+    categoryId: 'uncategorized',
+    analysis: null
+  };
+  
+  // Add to category manager
+  categoryManager.properties.set(testProperty.id, testProperty);
+  await categoryManager.saveData();
+  
+  // Update displays
+  updatePropertiesStats();
+  updateViewDisplay();
+  
+  // Open categorization modal for the test property
+  setTimeout(() => {
+    openCategorizationModal(testProperty.id);
+  }, 500);
+  
+  showSuccess('Test property created! Try categorizing it.');
+}
+
+function exportSingleProperty(propertyId) {
+  const property = categoryManager.properties.get(propertyId);
+  if (!property || !property.analysis) {
+    showError('No analysis data available for export');
+    return;
+  }
+
+  // Create a temporary array with just this property for export
+  const tempProperties = [property];
+  const originalProperties = Array.from(categoryManager.properties.values());
+  
+  // Temporarily replace the properties for export
+  categoryManager.properties.clear();
+  tempProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
+  
+  // Trigger export
+  const exportWordBtn = document.getElementById('exportWordBtn');
+  if (exportWordBtn) {
+    exportWordBtn.click();
+  }
+  
+  // Restore original properties
+  setTimeout(() => {
+    categoryManager.properties.clear();
+    originalProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
+  }, 1000);
+}
+
+function showPropertyDetails(propertyId) {
+  const property = categoryManager.properties.get(propertyId);
+  if (!property) {
+    showError('Property not found');
+    return;
+  }
+
+  // Populate modal content
+  const modalPropertyUrl = document.getElementById('modalPropertyUrl');
+  const modalPropertyMeta = document.getElementById('modalPropertyMeta');
+  const modalAnalysisStatus = document.getElementById('modalAnalysisStatus');
+  const modalAnalysisContent = document.getElementById('modalAnalysisContent');
+
+  if (modalPropertyUrl) {
+    const address = extractAddressFromUrl(property.url) || property.address || property.url;
+    modalPropertyUrl.innerHTML = `<a href="${property.url}" target="_blank" class="property-address-link">${address}</a>`;
+  }
+
+  if (modalPropertyMeta) {
+    const category = categoryManager.getCategory(property.categoryId || 'uncategorized');
+    modalPropertyMeta.innerHTML = `
+             <span>${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}</span>
+      <span>${property.date || new Date(property.timestamp).toLocaleDateString()}</span>
+      <span style="background-color: ${category?.color}22; padding: 4px 8px; border-radius: 4px;">
+        ${category?.icon || '📋'} ${category?.name || 'Uncategorized'}
+      </span>
+    `;
+  }
+
+  // Handle analysis content
+  const hasAnalysis = property.analysis && property.analysis.fullResponse;
+  
+  if (modalAnalysisStatus) {
+    modalAnalysisStatus.className = `analysis-status ${hasAnalysis ? 'analyzed' : 'pending'}`;
+    modalAnalysisStatus.textContent = hasAnalysis ? 'Analyzed' : 'Pending Analysis';
+  }
+
+  if (modalAnalysisContent) {
+    if (hasAnalysis) {
+      modalAnalysisContent.innerHTML = `
+        <pre>${property.analysis.fullResponse}</pre>
+      `;
+    } else {
+      modalAnalysisContent.innerHTML = `
+        <div class="analysis-empty">
+          <div class="analysis-empty-icon">⏳</div>
+          <p><strong>Analysis Pending</strong></p>
+          <p>This property hasn't been analyzed yet or the analysis is still processing.</p>
+        </div>
+      `;
+    }
+  }
+
+  // Setup modal action buttons
+  setupPropertyModalActions(propertyId);
+
+  // Show modal
+  const modal = document.getElementById('propertyDetailsModal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+function setupPropertyModalActions(propertyId) {
+  // Recategorize button
+  const recategorizeBtn = document.getElementById('recategorizePropertyBtn');
+  if (recategorizeBtn) {
+    recategorizeBtn.onclick = () => {
+      // Close details modal and open categorization modal
+      document.getElementById('propertyDetailsModal').style.display = 'none';
+      openCategorizationModal(propertyId);
+    };
+  }
+
+  // Export single property button
+  const exportSingleBtn = document.getElementById('exportSinglePropertyBtn');
+  if (exportSingleBtn) {
+    exportSingleBtn.onclick = () => {
+      exportSingleProperty(propertyId);
+    };
+  }
+
+  // Delete property button
+  const deleteModalBtn = document.getElementById('deletePropertyModalBtn');
+  if (deleteModalBtn) {
+    deleteModalBtn.onclick = () => {
+      if (confirm('Are you sure you want to delete this property?')) {
+        categoryManager.removeProperty(propertyId);
+        document.getElementById('propertyDetailsModal').style.display = 'none';
+        updatePropertiesStats();
+        updateViewDisplay();
+        showSuccess('Property deleted successfully');
+      }
+    };
+  }
+
+  // Close modal button
+  const closeBtn = document.getElementById('propertyModalClose');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      document.getElementById('propertyDetailsModal').style.display = 'none';
+    };
+  }
+
+  // Close modal when clicking outside
+  const modal = document.getElementById('propertyDetailsModal');
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.style.display = 'none';
+      }
+    };
+  }
+}
+
+function showCategoryDetails(categoryId) {
+  // Show category details (could filter list view to this category)
+  console.log('Show category details for:', categoryId);
+}
+
+function handlePropertySelection(propertyId, selected) {
+  if (selected) {
+    selectedProperties.add(propertyId);
+  } else {
+    selectedProperties.delete(propertyId);
+  }
+  
+  updateBulkActionsBar();
+}
+
+function updateBulkActionsBar() {
+  const bulkActionsBar = document.getElementById('bulkActionsBar');
+  const selectedCount = document.querySelector('.selected-count');
+  
+  if (selectedProperties.size > 0) {
+    if (bulkActionsBar) bulkActionsBar.style.display = 'flex';
+    if (selectedCount) selectedCount.textContent = `${selectedProperties.size} selected`;
+  } else {
+    if (bulkActionsBar) bulkActionsBar.style.display = 'none';
+  }
+}
+
+function deleteProperty(propertyId) {
+  if (confirm('Are you sure you want to delete this property?')) {
+    categoryManager.removeProperty(propertyId);
+    updatePropertiesStats();
+    updateViewDisplay();
+    showSuccess('Property deleted successfully');
+  }
+}
+
+
+
+// Setup storage listener to detect analysis updates
+function setupStorageListener() {
+  // Listen for chrome storage changes
+  if (chrome && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener(async (changes, namespace) => {
+      if (namespace === 'local' && changes.propertyHistory) {
+        console.log('🔄 Property history updated in storage, refreshing...');
+        await refreshPropertyData();
+        
+        // If on Properties tab, update the display
+        if (activeTab === 'properties') {
+          updatePropertiesStats();
+          updateViewDisplay();
+        }
+        
+        // Show notification if new analysis was added
+        checkForNewAnalysis(changes.propertyHistory.oldValue, changes.propertyHistory.newValue);
+      }
+    });
+  }
+}
+
+// Check if new analysis was added and show notification
+function checkForNewAnalysis(oldHistory, newHistory) {
+  if (!oldHistory || !newHistory) return;
+  
+  // Find properties with new analysis
+  const oldAnalyzed = oldHistory.filter(p => p.analysis && p.analysis.fullResponse).map(p => p.url);
+  const newAnalyzed = newHistory.filter(p => p.analysis && p.analysis.fullResponse).map(p => p.url);
+  
+  const newlyAnalyzed = newAnalyzed.filter(url => !oldAnalyzed.includes(url));
+  
+  if (newlyAnalyzed.length > 0) {
+    console.log('🎉 New analysis detected for:', newlyAnalyzed);
+    showSuccess(`Analysis completed for ${newlyAnalyzed.length} property${newlyAnalyzed.length > 1 ? 'ies' : ''}!`);
+    
+    // If not on Properties tab, add notification badge
+    if (activeTab !== 'properties') {
+      addPropertiesTabNotification();
+    }
+  }
+}
 

@@ -1567,6 +1567,2400 @@
       padding-top: var(--space-md);
       border-top: 1px solid rgba(16, 163, 127, 0.2);
     }
+
+    /* Enhanced Categorization Section */
+    .categorization-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      font-weight: normal;
+      margin-top: var(--space-xs);
+    }
+
+    .ai-suggestion {
+      font-size: var(--font-size-sm);
+      color: var(--primary);
+      font-weight: var(--font-weight-medium);
+      margin-top: var(--space-xs);
+      padding: var(--space-xs) var(--space-sm);
+      background: rgba(16, 163, 127, 0.1);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--primary);
+    }
+
+    /* Make latest analysis section more prominent when visible */
+    #latestAnalysisSection {
+      transition: border-color 0.3s ease-in-out;
+    }
+
+    #latestAnalysisSection.success-highlight {
+      border-color: #10B981 !important;
+      border-width: 2px !important;
+    }
+
+    /* =============================================== */
+    /* INTUITIVE CATEGORIZATION WORKFLOW */
+    /* =============================================== */
+
+    /* Property Summary Card */
+    .property-summary-card {
+      background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+
+    .property-summary-header {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .property-icon {
+      font-size: 32px;
+      background: white;
+      width: 56px;
+      height: 56px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--primary);
+      flex-shrink: 0;
+    }
+
+    .property-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .property-address {
+      margin: 0 0 var(--space-sm) 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .property-link {
+      color: var(--primary);
+      text-decoration: none;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .property-link:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
+    .property-details {
+      display: flex;
+      gap: var(--space-lg);
+      flex-wrap: wrap;
+    }
+
+    .analysis-status, .analysis-time {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .analysis-status {
+      color: #16a34a;
+      font-weight: var(--font-weight-medium);
+    }
+
+    /* Analysis Preview */
+    .analysis-preview-section {
+      background: white;
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(16, 163, 127, 0.2);
+      overflow: hidden;
+    }
+
+    .analysis-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-md);
+      background: rgba(16, 163, 127, 0.05);
+      border-bottom: 1px solid rgba(16, 163, 127, 0.2);
+    }
+
+    .preview-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      text-decoration: none;
+      padding: 0;
+    }
+
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
+    .analysis-preview-text {
+      padding: var(--space-md);
+      font-size: var(--font-size-sm);
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* Categorization Workflow */
+    .categorization-workflow {
+      background: white;
+      border-radius: var(--radius-lg);
+      border: 2px solid #e5e7eb;
+      padding: var(--space-xl);
+      margin-bottom: var(--space-lg);
+    }
+
+    .workflow-step-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      margin-bottom: var(--space-xl);
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: white;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-bold);
+      flex-shrink: 0;
+    }
+
+    .step-info {
+      flex: 1;
+    }
+
+    .step-title {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .step-description {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+    }
+
+    /* Current Status */
+    .current-status {
+      margin-bottom: var(--space-xl);
+      padding: var(--space-lg);
+      background: #f8fafc;
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .status-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .current-category-display {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: white;
+      border: 2px solid;
+      border-radius: var(--radius-md);
+    }
+
+    .category-icon {
+      font-size: 20px;
+    }
+
+    .category-name {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    /* AI Suggestion Card */
+    .ai-suggestion-card {
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+      border: 2px solid #f59e0b;
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-xl);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ai-suggestion-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+
+    .suggestion-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-md);
+    }
+
+    .ai-icon {
+      font-size: 20px;
+    }
+
+    .suggestion-title {
+      font-weight: var(--font-weight-semibold);
+      color: #92400e;
+      font-size: var(--font-size-lg);
+    }
+
+    .suggestion-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .suggested-category {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: white;
+      border: 2px solid;
+      border-radius: var(--radius-md);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .suggestion-reason {
+      font-size: var(--font-size-sm);
+      color: #92400e;
+      font-style: italic;
+    }
+
+    .suggestion-apply-btn {
+      align-self: flex-start;
+      background: #f59e0b;
+      border-color: #f59e0b;
+    }
+
+    .suggestion-apply-btn:hover {
+      background: #d97706;
+      border-color: #d97706;
+    }
+
+    /* Category Selection Section */
+    .category-selection-section {
+      margin-bottom: var(--space-xl);
+    }
+
+    .selection-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+    }
+
+    .selection-icon {
+      font-size: 20px;
+    }
+
+    .selection-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .category-option-card {
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      position: relative;
+    }
+
+    .category-option-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-color: var(--primary);
+    }
+
+    .category-option-card.current {
+      border-color: #16a34a;
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    }
+
+    .category-option-card.suggested {
+      border-color: #f59e0b;
+      background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    }
+
+    .category-option-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+
+    .category-option-icon {
+      font-size: 24px;
+    }
+
+    .category-option-status {
+      display: flex;
+      gap: var(--space-xs);
+    }
+
+    .current-badge, .suggested-badge {
+      font-size: var(--font-size-xs);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .current-badge {
+      background: #16a34a;
+      color: white;
+    }
+
+    .suggested-badge {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .category-option-name {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .category-option-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      line-height: 1.4;
+      margin-bottom: var(--space-sm);
+    }
+
+    .category-property-count {
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    /* Advanced Options */
+    .advanced-categorization {
+      border-top: 1px solid #e5e7eb;
+      padding-top: var(--space-lg);
+    }
+
+    .advanced-options {
+      border: none;
+    }
+
+    .advanced-summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      cursor: pointer;
+      font-weight: var(--font-weight-medium);
+      color: var(--text-secondary);
+      list-style: none;
+      padding: var(--space-md);
+      background: #f8fafc;
+      border-radius: var(--radius-md);
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    .advanced-summary:hover {
+      background: #f1f5f9;
+    }
+
+    .advanced-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advanced-content {
+      padding: var(--space-lg) var(--space-md) 0;
+    }
+
+    .dropdown-categorization {
+      margin-bottom: var(--space-lg);
+    }
+
+    .dropdown-label {
+      display: block;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    .dropdown-group {
+      display: flex;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+
+    .category-select-latest {
+      flex: 1;
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      background: white;
+    }
+
+    .create-category-option {
+      text-align: center;
+    }
+
+    /* Quick Actions Bar */
+    .quick-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: #f8fafc;
+      border-radius: var(--radius-lg);
+      border-top: 1px solid #e5e7eb;
+    }
+
+    /* Success Badge */
+    .section-badge.success {
+      background: #16a34a;
+      color: white;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .category-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .property-summary-header {
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .workflow-step-header {
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .quick-actions-bar {
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+      
+      .quick-actions-bar > * {
+        width: 100%;
+      }
+    }
+
+    /* =============================================== */
+    /* ENHANCED UX COMPONENTS */
+    /* =============================================== */
+
+    /* Workflow Guide */
+    .workflow-guide {
+      background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+      border: 2px solid var(--primary);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .workflow-header {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .workflow-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-xs) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+    }
+
+    .workflow-subtitle {
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+      margin: 0;
+    }
+
+    .workflow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .workflow-step {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(16, 163, 127, 0.2);
+      transition: all 0.2s ease-in-out;
+    }
+
+    .workflow-step:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--font-size-base);
+      flex-shrink: 0;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-content h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .step-content p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .step-content a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .step-content a:hover {
+      text-decoration: underline;
+    }
+
+    .step-status {
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+    }
+
+    .step-status.completed {
+      color: #16a34a;
+    }
+
+    .step-status.active {
+      color: var(--primary);
+      animation: pulse 2s infinite;
+    }
+
+    .workflow-tip {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      background: rgba(16, 163, 127, 0.1);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .tip-icon {
+      font-size: 16px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .tip-text {
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    /* Enhanced Status Container */
+    .status-container {
+      margin-bottom: var(--space-lg);
+    }
+
+    .status {
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-content {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .status-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--secondary-background);
+    }
+
+    .status-text {
+      flex: 1;
+    }
+
+    .status-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .status-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .status-progress {
+      margin-top: var(--space-md);
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: var(--secondary-background);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #0d8a69);
+      border-radius: 2px;
+      transition: width 0.3s ease-in-out;
+      width: 0%;
+    }
+
+    /* Status Variants */
+    .status.active .status-icon {
+      background: rgba(16, 163, 127, 0.1);
+      color: var(--primary);
+    }
+
+    .status.active {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.05) 0%, rgba(16, 163, 127, 0.02) 100%);
+    }
+
+    .status.inactive .status-icon {
+      background: rgba(220, 38, 38, 0.1);
+      color: #dc2626;
+    }
+
+    .status.inactive {
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    /* Enhanced Analysis Card */
+    .analysis-card {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Label Helper */
+    .label-helper {
+      font-weight: var(--font-weight-normal);
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+
+    /* Input Container with Validation */
+    .input-container {
+      position: relative;
+    }
+
+    .input-validation {
+      margin-top: var(--space-xs);
+      font-size: var(--font-size-sm);
+      min-height: 20px;
+    }
+
+    .input-validation.valid {
+      color: #16a34a;
+    }
+
+    .input-validation.invalid {
+      color: #dc2626;
+    }
+
+    .input-validation.warning {
+      color: #f59e0b;
+    }
+
+    /* Form Input States */
+    .form-input.valid {
+      border-color: #16a34a;
+      background: rgba(22, 163, 74, 0.05);
+    }
+
+    .form-input.invalid {
+      border-color: #dc2626;
+      background: rgba(220, 38, 38, 0.05);
+    }
+
+    .form-input.warning {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    /* Enhanced Action Buttons */
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      margin: var(--space-lg) 0;
+    }
+
+    .primary-actions {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    .secondary-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* Enhanced Button Structure */
+    .btn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-icon {
+      margin-right: var(--space-sm);
+    }
+
+    .btn-text {
+      position: relative;
+      z-index: 2;
+    }
+
+    .btn-progress {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.3);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .btn.loading .btn-progress {
+      transform: scaleX(1);
+      animation: progressAnimation 2s ease-in-out infinite;
+    }
+
+    @keyframes progressAnimation {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Analysis Progress Tracker */
+    .analysis-progress-tracker {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      margin: var(--space-lg) 0;
+    }
+
+    .tracker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .tracker-header h4 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .tracker-time {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      font-family: monospace;
+      background: var(--secondary-background);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+    }
+
+    .tracker-steps {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .tracker-step {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-sm);
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease-in-out;
+    }
+
+    .tracker-step.active {
+      background: rgba(16, 163, 127, 0.1);
+      transform: translateX(4px);
+    }
+
+    .tracker-step.completed {
+      background: rgba(22, 163, 74, 0.1);
+    }
+
+    .step-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 14px;
+      background: var(--secondary-background);
+      transition: all 0.3s ease-in-out;
+    }
+
+    .tracker-step.active .step-icon {
+      background: var(--primary);
+      color: white;
+      animation: pulse 2s infinite;
+    }
+
+    .tracker-step.completed .step-icon {
+      background: #16a34a;
+      color: white;
+    }
+
+    .tracker-tip {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-sm);
+      background: rgba(59, 130, 246, 0.1);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid #3b82f6;
+    }
+
+    /* Enhanced Message Container */
+    .message-container {
+      margin-top: var(--space-lg);
+    }
+
+    .message {
+      display: none;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-sm);
+    }
+
+    .message.show {
+      display: flex;
+      animation: slideInMessage 0.3s ease-out;
+    }
+
+    .message-icon {
+      font-size: 16px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .message-content {
+      flex: 1;
+      font-size: var(--font-size-sm);
+      line-height: 1.5;
+    }
+
+    .message.warning {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fbbf24;
+    }
+
+    @keyframes slideInMessage {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Connection Info */
+    .connection-info {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .connection-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: var(--space-xs);
+    }
+
+    .connection-indicator.connected {
+      color: #16a34a;
+      animation: pulse 2s infinite;
+    }
+
+    .connection-indicator.disconnected {
+      color: #dc2626;
+    }
+
+    /* Settings Tab Enhancements */
+    .settings-overview {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+      padding: var(--space-lg);
+      background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--primary);
+    }
+
+    .settings-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+    }
+
+    .settings-subtitle {
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+      margin: 0;
+    }
+
+    .settings-card {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .settings-card-header {
+      margin-bottom: var(--space-lg);
+    }
+
+    .settings-card-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-xs) 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .settings-card-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .settings-icon {
+      font-size: 20px;
+    }
+
+    .settings-grid {
+      display: grid;
+      gap: var(--space-lg);
+    }
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .setting-label {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .setting-title {
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .setting-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .setting-label-range {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    .setting-range {
+      width: 100%;
+      margin: var(--space-sm) 0;
+    }
+
+    /* Prompt Editor */
+    .prompt-editor {
+      margin-top: var(--space-md);
+    }
+
+    .prompt-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-md);
+      gap: var(--space-md);
+    }
+
+    .prompt-templates {
+      flex: 1;
+    }
+
+    .toolbar-label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+      display: block;
+    }
+
+    .template-buttons {
+      display: flex;
+      gap: var(--space-xs);
+      flex-wrap: wrap;
+    }
+
+    .prompt-actions {
+      display: flex;
+      gap: var(--space-xs);
+    }
+
+    .prompt-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-sm);
+    }
+
+    .prompt-char-count {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .prompt-actions-secondary {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    /* Advanced Settings */
+    .settings-card-header-button {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 0;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .settings-card-header-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .advanced-settings-content {
+      padding-top: var(--space-lg);
+    }
+
+    .advanced-section {
+      margin-bottom: var(--space-xl);
+      padding-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .advanced-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .advanced-section-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-md);
+    }
+
+    /* Export Info */
+    .export-info-content {
+      padding-top: var(--space-lg);
+    }
+
+    .export-info-description {
+      color: var(--text-secondary);
+      margin-bottom: var(--space-lg);
+    }
+
+    .export-items-grid {
+      display: grid;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .export-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+    }
+
+    .export-item-icon {
+      font-size: 20px;
+      margin-top: 2px;
+    }
+
+    .export-item-content {
+      flex: 1;
+    }
+
+    .export-item-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .export-item-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .export-actions {
+      display: flex;
+      gap: var(--space-md);
+    }
+
+    /* =============================================== */
+    /* ENHANCED PROPERTIES TAB STYLES */
+    /* =============================================== */
+
+    /* Properties Overview */
+    .properties-overview {
+      text-align: center;
+      margin-bottom: var(--space-xl);
+      padding: var(--space-lg);
+      background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+      border-radius: var(--radius-lg);
+      border: 2px solid var(--primary);
+    }
+
+    .properties-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0 0 var(--space-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+    }
+
+    .properties-subtitle {
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+      margin: 0 0 var(--space-lg) 0;
+    }
+
+    .properties-stats {
+      display: flex;
+      justify-content: center;
+      gap: var(--space-xl);
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-number {
+      display: block;
+      font-size: 32px;
+      font-weight: var(--font-weight-semibold);
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    /* Uncategorized Alert */
+    .alert-card {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-lg);
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-lg);
+    }
+
+    .alert-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .alert-content {
+      flex: 1;
+    }
+
+    .alert-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: #92400e;
+      margin-bottom: var(--space-xs);
+    }
+
+    .alert-description {
+      font-size: var(--font-size-sm);
+      color: #92400e;
+    }
+
+    .alert-actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    /* Quick Actions Bar */
+    .quick-actions-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-lg);
+      gap: var(--space-lg);
+    }
+
+    .view-controls {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .view-toggle {
+      display: flex;
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .view-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      border-right: 1px solid var(--border);
+    }
+
+    .view-btn:last-child {
+      border-right: none;
+    }
+
+    .view-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .view-btn:hover:not(.active) {
+      background: var(--background);
+      color: var(--text-primary);
+    }
+
+    .view-icon {
+      font-size: 16px;
+    }
+
+    .filter-controls {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .filter-select {
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      background: var(--background);
+      color: var(--text-primary);
+      min-width: 120px;
+    }
+
+    .action-controls {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    /* Enhanced Category Grid */
+    .enhanced-category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-lg);
+    }
+
+    .category-card {
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      position: relative;
+      min-height: 140px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .category-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary);
+    }
+
+    .category-card.has-properties {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, rgba(16, 163, 127, 0.05) 0%, rgba(16, 163, 127, 0.02) 100%);
+    }
+
+    .category-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+
+    .category-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      flex: 1;
+    }
+
+    .category-icon {
+      font-size: 28px;
+    }
+
+    .category-details h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .category-details p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .category-count {
+      background: var(--primary);
+      color: white;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-semibold);
+      min-width: 24px;
+      text-align: center;
+    }
+
+    .category-properties {
+      flex: 1;
+      margin-top: var(--space-sm);
+    }
+
+    .category-properties-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .category-property-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      padding: var(--space-xs);
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+    }
+
+    .property-item-content {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex: 1;
+      min-width: 0;
+    }
+
+    .property-edit-category-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      opacity: 0.7;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .property-edit-category-btn:hover {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.1);
+      transform: scale(1.1);
+    }
+
+    .property-status-icon {
+      font-size: 12px;
+    }
+
+    .property-status-icon.analyzed {
+      color: #16a34a;
+    }
+
+    .property-status-icon.pending {
+      color: #f59e0b;
+    }
+
+    .property-domain {
+      color: var(--text-primary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .property-domain-clickable {
+      color: var(--primary);
+      font-weight: var(--font-weight-medium);
+      cursor: pointer;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .property-domain-clickable:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
+    /* Properties List View */
+    .properties-list-container {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .list-title h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .list-count {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .list-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .bulk-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--primary);
+      color: white;
+      border-radius: var(--radius-md);
+    }
+
+    .selected-count {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .bulk-select {
+      padding: var(--space-xs) var(--space-sm);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      background: white;
+      color: var(--text-primary);
+    }
+
+    .properties-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .property-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--border);
+      transition: all 0.2s ease-in-out;
+      cursor: pointer;
+    }
+
+    .property-item:hover {
+      background: var(--secondary-background);
+    }
+
+    .property-item.selected {
+      background: rgba(16, 163, 127, 0.1);
+      border-color: var(--primary);
+    }
+
+    .property-checkbox {
+      margin: 0;
+    }
+
+    .property-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .property-status.analyzed {
+      background: #16a34a;
+    }
+
+    .property-status.pending {
+      background: #f59e0b;
+    }
+
+    .property-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .property-url {
+      font-weight: var(--font-weight-medium);
+      color: var(--primary);
+      text-decoration: none;
+      font-size: var(--font-size-sm);
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color 0.2s ease-in-out;
+    }
+
+    .property-url:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
+    .property-address-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: var(--font-weight-semibold);
+      transition: color 0.2s ease-in-out;
+      word-break: break-word;
+    }
+
+    .property-address-link:hover {
+      color: #0d8a69;
+      text-decoration: underline;
+    }
+
+    .property-meta {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .property-category {
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .property-actions {
+      display: flex;
+      gap: var(--space-xs);
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .property-item:hover .property-actions {
+      opacity: 1;
+    }
+
+    /* Modals */
+    .property-modal {
+      max-width: 900px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .property-analysis-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .property-header {
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .property-url-display {
+      font-weight: var(--font-weight-semibold);
+      color: var(--primary);
+      font-size: var(--font-size-lg);
+      word-break: break-all;
+      margin-bottom: var(--space-sm);
+    }
+
+    .property-meta-display {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .analysis-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .analysis-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--secondary-background);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .analysis-header h4 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .analysis-status {
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .analysis-status.analyzed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .analysis-status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .analysis-content {
+      padding: var(--space-lg);
+      max-height: 400px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .analysis-content pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: inherit;
+      margin: 0;
+      color: var(--text-primary);
+    }
+
+    .analysis-empty {
+      text-align: center;
+      padding: var(--space-xl);
+      color: var(--text-secondary);
+    }
+
+    .analysis-empty-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-md);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border);
+      gap: var(--space-md);
+      flex-wrap: wrap;
+    }
+
+    .categorization-modal {
+      max-width: 500px;
+    }
+
+    .current-indicator {
+      position: absolute;
+      top: var(--space-xs);
+      right: var(--space-xs);
+      background: var(--primary);
+      color: white;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    .category-option {
+      position: relative;
+    }
+
+    .no-categories-message {
+      text-align: center;
+      padding: var(--space-lg);
+      color: var(--text-secondary);
+    }
+
+    .no-categories-message p {
+      margin-bottom: var(--space-md);
+    }
+
+
+
+    .categorization-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .property-preview {
+      padding: var(--space-md);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      border-left: 4px solid var(--primary);
+    }
+
+    .preview-url {
+      font-weight: var(--font-weight-medium);
+      color: var(--primary);
+      font-size: var(--font-size-sm);
+      word-break: break-all;
+    }
+
+    .preview-meta {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .category-selection {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .selection-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .category-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .category-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md);
+      background: var(--background);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .category-option:hover {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+
+    .category-option.selected {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.1);
+    }
+
+    .category-option-icon {
+      font-size: 20px;
+    }
+
+    .category-option-info h5 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .category-option-info p {
+      margin: 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .create-new-category {
+      text-align: center;
+      padding: var(--space-md) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .categorization-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--space-md);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 400px) {
+      .workflow-guide {
+        padding: var(--space-md);
+      }
+      
+      .workflow-steps {
+        gap: var(--space-sm);
+      }
+      
+      .workflow-step {
+        padding: var(--space-sm);
+      }
+      
+      .primary-actions {
+        flex-direction: column;
+      }
+      
+      .status-content {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--space-sm);
+      }
+      
+      .prompt-toolbar {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+      
+      .template-buttons {
+        justify-content: center;
+      }
+      
+      .settings-grid {
+        gap: var(--space-md);
+      }
+    }
+
+    /* Settings Tab Styles */
+    .settings-overview {
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .settings-title {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .settings-subtitle {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .settings-card {
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .settings-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-sm);
+    }
+
+    .settings-card-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .settings-card-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .settings-grid {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .setting-label {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .setting-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .setting-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .setting-range {
+      width: 100%;
+    }
+
+    .prompt-editor {
+      margin-top: var(--space-md);
+    }
+
+    .prompt-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-sm);
+    }
+
+    .prompt-templates {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .toolbar-label {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .template-buttons {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .prompt-actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .prompt-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-xs);
+    }
+
+    .prompt-char-count {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .prompt-actions-secondary {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .validation-card {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      margin: var(--space-md) 0;
+      padding: var(--space-md);
+    }
+
+    .validation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-xs);
+    }
+
+    .validation-icon {
+      font-size: 16px;
+      margin-right: var(--space-xs);
+    }
+
+    .validation-title {
+      font-weight: var(--font-weight-medium);
+      color: #92400e;
+    }
+
+    .validation-list {
+      margin: 0;
+      padding-left: var(--space-lg);
+      color: #92400e;
+      font-size: var(--font-size-sm);
+    }
+
+    .default-prompt-card {
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      padding: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .default-prompt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-sm);
+    }
+
+    .default-prompt-title {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .auto-save-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-top: var(--space-xs);
+    }
+
+    .indicator-icon {
+      font-size: 16px;
+      margin-right: var(--space-xs);
+    }
+
+    .indicator-text {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .advanced-settings-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .advanced-section {
+      margin-bottom: var(--space-md);
+    }
+
+    .advanced-section-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .setting-item-checkbox {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .setting-label-checkbox {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .setting-description-checkbox {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .setting-item-range {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .setting-label-range {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .setting-description-range {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .setting-range {
+      width: 100%;
+    }
+
+    .debug-info-card {
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      padding: var(--space-md);
+      margin-top: var(--space-md);
+    }
+
+    .debug-info-header {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .debug-info-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .debug-info-item {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .debug-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-sm);
+    }
+
+    .import-export-actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .prompt-history-section {
+      margin-top: var(--space-md);
+    }
+
+    .prompt-history-title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .prompt-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .prompt-history-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .prompt-history-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .prompt-history-item .prompt-date {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .prompt-history-item .prompt-content {
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+    }
+
+    .stats-grid {
+      display: grid;
+      gap: var(--space-md);
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .stat-label {
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .stat-value {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .stats-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-sm);
+    }
+
+    .advanced-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-md);
+    }
+
+    .settings-card-header-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-sm);
+    }
+
+    .settings-card-header-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .settings-icon {
+      font-size: 24px;
+      margin-right: var(--space-xs);
+    }
   </style>
 </head>
 <body>
@@ -1597,45 +3991,172 @@
       <!-- Analyzer Tab -->
       <div id="analyzerTab" class="tab-content active">
         
-        <!-- Status Section -->
-        <section class="section">
-          <div id="status" class="status loading">
-            <div class="spinner"></div>
-            Checking status...
+        <!-- Workflow Guide Section -->
+        <section class="section" id="workflowGuideSection">
+          <div class="workflow-guide">
+            <div class="workflow-header">
+              <h2 class="workflow-title">
+                <span>🚀</span>
+                Get Started
+              </h2>
+              <p class="workflow-subtitle">Follow these simple steps to analyze any property</p>
+            </div>
+            
+            <div class="workflow-steps">
+              <div class="workflow-step" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                  <h3>Open ChatGPT</h3>
+                  <p>Make sure you're on <a href="https://chatgpt.com" target="_blank">chatgpt.com</a></p>
+                </div>
+                <div class="step-status" id="step1Status">⏳</div>
+              </div>
+              
+              <div class="workflow-step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                  <h3>Find a Property</h3>
+                  <p>Copy the URL from Zillow, Realtor.com, or any real estate site</p>
+                </div>
+                <div class="step-status" id="step2Status">⏳</div>
+              </div>
+              
+              <div class="workflow-step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                  <h3>Paste & Analyze</h3>
+                  <p>Paste the property URL below and click analyze</p>
+                </div>
+                <div class="step-status" id="step3Status">⏳</div>
+              </div>
+            </div>
+            
+            <div class="workflow-tip">
+              <span class="tip-icon">💡</span>
+              <span class="tip-text">Pro tip: The extension will automatically categorize your properties and provide detailed investment analysis!</span>
+            </div>
           </div>
         </section>
         
-        <!-- Property Analysis Section -->
+        <!-- Enhanced Status Section -->
+        <section class="section">
+          <div class="status-container">
+            <div id="status" class="status loading">
+              <div class="status-content">
+                <div class="status-icon">
+                  <div class="spinner"></div>
+                </div>
+                <div class="status-text">
+                  <div class="status-title">Checking Connection...</div>
+                  <div class="status-subtitle">Verifying ChatGPT access</div>
+                </div>
+              </div>
+              <div class="status-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="statusProgress"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Enhanced Property Analysis Section -->
         <section class="section" id="propertyLinkSection" style="display: none;">
           <div class="section-header">
             <h2 class="section-title">
               <span>🔍</span>
               Analyze Property
             </h2>
+            <div class="section-badge" id="analysisBadge">Ready</div>
           </div>
           
-          <div class="card">
+          <div class="analysis-card">
+            <!-- URL Input with Validation -->
             <div class="form-group">
-              <label for="propertyLinkInput" class="form-label">Property URL</label>
-              <textarea 
-                id="propertyLinkInput" 
-                class="form-input" 
-                placeholder="Paste a property link (Zillow, Realtor.com, etc.)"
-                rows="2"
-              ></textarea>
+              <label for="propertyLinkInput" class="form-label">
+                Property URL
+                <span class="label-helper">Supports Zillow, Realtor.com, Redfin, and more</span>
+              </label>
+              <div class="input-container">
+                <textarea 
+                  id="propertyLinkInput" 
+                  class="form-input" 
+                  placeholder="Paste property link here (e.g., https://zillow.com/property-link)"
+                  rows="2"
+                ></textarea>
+                <div class="input-validation" id="urlValidation"></div>
+              </div>
             </div>
             
-            <div class="btn-group">
-              <button id="pasteBtn" class="btn btn-secondary btn-sm">
-                📋 Paste
-              </button>
-              <button id="analyzeBtn" class="btn btn-primary">
-                🔍 Analyze Property
-              </button>
+            <!-- Enhanced Action Buttons -->
+            <div class="action-buttons">
+              <div class="primary-actions">
+                <button id="pasteBtn" class="btn btn-secondary">
+                  <span class="btn-icon">📋</span>
+                  <span class="btn-text">Paste from Clipboard</span>
+                </button>
+                <button id="analyzeBtn" class="btn btn-primary">
+                  <span class="btn-icon">🔍</span>
+                  <span class="btn-text">Analyze Property</span>
+                  <div class="btn-progress" id="analyzeProgress"></div>
+                </button>
+              </div>
+              
+              <div class="secondary-actions">
+                <button id="clearInputBtn" class="btn btn-ghost btn-sm">
+                  <span class="btn-icon">🗑️</span>
+                  Clear
+                </button>
+              </div>
             </div>
             
-            <div id="successMessage" class="message success"></div>
-            <div id="errorMessage" class="message error"></div>
+            <!-- Analysis Progress Tracker -->
+            <div class="analysis-progress-tracker" id="analysisTracker" style="display: none;">
+              <div class="tracker-header">
+                <h4>Analysis in Progress</h4>
+                <div class="tracker-time" id="analysisTime">0:00</div>
+              </div>
+              
+              <div class="tracker-steps">
+                <div class="tracker-step" data-step="validate">
+                  <div class="step-icon" id="validateIcon">⏳</div>
+                  <span>Validating URL</span>
+                </div>
+                <div class="tracker-step" data-step="send">
+                  <div class="step-icon" id="sendIcon">⏳</div>
+                  <span>Sending to ChatGPT</span>
+                </div>
+                <div class="tracker-step" data-step="analyze">
+                  <div class="step-icon" id="analyzeIcon">⏳</div>
+                  <span>AI Analysis</span>
+                </div>
+                <div class="tracker-step" data-step="save">
+                  <div class="step-icon" id="saveIcon">⏳</div>
+                  <span>Saving Results</span>
+                </div>
+              </div>
+              
+              <div class="tracker-tip">
+                <span class="tip-icon">ℹ️</span>
+                <span class="tip-text">This usually takes 30-60 seconds depending on the property complexity</span>
+              </div>
+            </div>
+            
+            <!-- Enhanced Messages -->
+            <div class="message-container">
+              <div id="successMessage" class="message success">
+                <div class="message-icon">✅</div>
+                <div class="message-content"></div>
+              </div>
+              <div id="errorMessage" class="message error">
+                <div class="message-icon">❌</div>
+                <div class="message-content"></div>
+              </div>
+              <div id="warningMessage" class="message warning">
+                <div class="message-icon">⚠️</div>
+                <div class="message-content"></div>
+              </div>
+            </div>
           </div>
         </section>
         
@@ -1643,12 +4164,12 @@
         <section class="section" id="info" style="display: none;">
           <div class="collapsible">
             <button class="collapsible-header">
-              <span>📍 Site Information</span>
+              <span>📍 Connection Info</span>
               <span class="collapsible-icon">▼</span>
             </button>
             
             <div class="collapsible-content">
-              <div class="info-grid">
+              <div class="connection-info">
                 <div class="info-item">
                   <div class="info-label">Current Site</div>
                   <div class="info-value" id="site">-</div>
@@ -1656,6 +4177,13 @@
                 <div class="info-item">
                   <div class="info-label">URL</div>
                   <div class="info-value" id="url">-</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Connection Status</div>
+                  <div class="info-value">
+                    <span class="connection-indicator" id="connectionIndicator">●</span>
+                    <span id="connectionStatus">Connected</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1667,29 +4195,27 @@
       <!-- Properties Tab -->
       <div id="propertiesTab" class="tab-content">
         
-        <!-- View Toggle and Category Management -->
+        <!-- Properties Overview -->
         <section class="section">
-          <div class="section-header">
-            <h2 class="section-title">
-              <span>📊</span>
-              Properties Dashboard
-              <span id="propertyCount" class="section-badge">0</span>
+          <div class="properties-overview">
+            <h2 class="properties-title">
+              <span>🏠</span>
+              Property Portfolio
             </h2>
-            <div class="section-controls">
-              <div class="btn-group">
-                <button id="categoryViewBtn" class="btn btn-ghost btn-sm active" title="Category View">
-                  🗂️
-                </button>
-                <button id="listViewBtn" class="btn btn-ghost btn-sm" title="List View">
-                  📋
-                </button>
+            <p class="properties-subtitle">Organize and manage your analyzed properties</p>
+            <div class="properties-stats">
+              <div class="stat-item">
+                <span class="stat-number" id="totalPropertiesCount">0</span>
+                <span class="stat-label">Total Properties</span>
               </div>
-              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm" title="Manage Categories">
-                ⚙️ Categories
-              </button>
-              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-                🗑️
-              </button>
+              <div class="stat-item">
+                <span class="stat-number" id="analyzedPropertiesCount">0</span>
+                <span class="stat-label">Analyzed</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number" id="categoriesCount">0</span>
+                <span class="stat-label">Categories</span>
+              </div>
             </div>
           </div>
         </section>
@@ -1698,13 +4224,13 @@
         <section class="section" id="latestAnalysisSection" style="display: none;">
           <div class="section-header">
             <h2 class="section-title">
-              <span>⚡</span>
-              Latest Analysis
-              <span class="section-badge pulse">New</span>
+              <span>🎉</span>
+              Analysis Complete!
+              <span class="section-badge success">Ready to Organize</span>
             </h2>
             <div class="section-controls">
-              <button id="dismissLatestBtn" class="btn btn-ghost btn-sm" title="Dismiss">
-                ✖️
+              <button id="dismissLatestBtn" class="btn btn-ghost btn-sm" title="I'll organize later">
+                ⏭️ Later
               </button>
             </div>
           </div>
@@ -1716,354 +4242,475 @@
           </div>
         </section>
 
-        <!-- Category Grid View -->
-        <section class="section" id="categoryGridSection">
-          <div id="categoryGrid" class="category-grid">
+        <!-- Uncategorized Properties Alert -->
+        <section class="section" id="uncategorizedAlert" style="display: none;">
+          <div class="alert-card uncategorized-alert">
+            <div class="alert-icon">📋</div>
+            <div class="alert-content">
+              <div class="alert-title">Properties Need Categorization</div>
+              <div class="alert-description">You have <span id="uncategorizedCount">0</span> properties that haven't been organized yet.</div>
+            </div>
+            <div class="alert-actions">
+              <button id="organizeNowBtn" class="btn btn-primary btn-sm">📁 Organize Now</button>
+              <button id="dismissAlertBtn" class="btn btn-ghost btn-sm">✕</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Quick Actions Bar -->
+        <section class="section">
+          <div class="quick-actions-bar">
+            <div class="view-controls">
+              <div class="view-toggle">
+                <button id="categoryViewBtn" class="view-btn active" data-view="category" title="Category View">
+                  <span class="view-icon">🗂️</span>
+                  <span class="view-label">Categories</span>
+                </button>
+                <button id="listViewBtn" class="view-btn" data-view="list" title="List View">
+                  <span class="view-icon">📋</span>
+                  <span class="view-label">List</span>
+                </button>
+              </div>
+              
+              <div class="filter-controls">
+                <select id="categoryFilter" class="filter-select">
+                  <option value="all">All Categories</option>
+                </select>
+                <select id="statusFilter" class="filter-select">
+                  <option value="all">All Status</option>
+                  <option value="analyzed">Analyzed</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="action-controls">
+              <button id="testCategorizationBtn" class="btn btn-primary btn-sm" title="Test categorization with a sample property">
+                <span class="btn-icon">🧪</span>
+                Test Categorization
+              </button>
+              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
+                <span class="btn-icon">⚙️</span>
+                Manage Categories
+              </button>
+              <button id="exportWordBtn" class="btn btn-secondary btn-sm">
+                <span class="btn-icon">📄</span>
+                Export to Word
+              </button>
+              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
+                <span class="btn-icon">🗑️</span>
+                Clear All
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Category View -->
+        <section class="section" id="categoryViewSection">
+          <div id="categoryGrid" class="enhanced-category-grid">
             <!-- Categories will be populated here -->
           </div>
         </section>
         
-        <!-- Property History Section -->
-        <section class="section" id="propertyHistorySection" style="display: none;">
-          <div class="section-header">
-            <h2 class="section-title">
-              <span>📋</span>
-              Property List
-            </h2>
-            <div class="section-controls">
-              <div class="bulk-actions" style="display: none; margin-right: 8px;">
-                <span id="selectedCount" class="text-sm">0 selected</span>
-                <select id="bulkCategoryAction" class="btn btn-sm" style="margin: 0 4px;">
-                  <option value="">Move to...</option>
-                </select>
-                <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm" title="Delete selected">🗑️</button>
-                <button id="bulkDeselectBtn" class="btn btn-ghost btn-sm" title="Deselect all">✖️</button>
+        <!-- List View -->
+        <section class="section" id="listViewSection" style="display: none;">
+          <div class="properties-list-container">
+            <div class="list-header">
+              <div class="list-title">
+                <h3>All Properties</h3>
+                <span class="list-count" id="filteredPropertiesCount">0 properties</span>
               </div>
-              <button id="selectModeBtn" class="btn btn-ghost btn-sm" title="Select multiple (S)">☑️</button>
-              <select id="categoryFilter" class="btn btn-sm" style="margin-right: 8px;">
-                <option value="all">All Categories</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="card">
-            <!-- Simple List View -->
-            <div id="propertyHistoryList" class="history-list">
-              <div class="empty-state">
-                <div class="empty-state-icon">📄</div>
-                <p>No properties analyzed yet</p>
+              <div class="list-actions">
+                <button id="selectModeBtn" class="btn btn-ghost btn-sm">
+                  <span class="btn-icon">☑️</span>
+                  Select
+                </button>
+                <div class="bulk-actions" id="bulkActionsBar" style="display: none;">
+                  <span class="selected-count">0 selected</span>
+                  <select id="bulkCategorySelect" class="bulk-select">
+                    <option value="">Move to category...</option>
+                  </select>
+                  <button id="bulkDeleteBtn" class="btn btn-ghost btn-sm">🗑️</button>
+                  <button id="cancelSelectBtn" class="btn btn-ghost btn-sm">✕</button>
+                </div>
               </div>
             </div>
             
-            <!-- Action Buttons -->
-            <div class="property-actions" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border);">
-              <div class="btn-group">
-                <button id="exportWordBtn" class="btn btn-primary btn-sm">
-                  📄 Export to Word
-                </button>
-              </div>
+            <div id="propertiesList" class="properties-list">
+              <!-- Properties list will be populated here -->
             </div>
           </div>
         </section>
+
+        <!-- Property Details Modal -->
+        <div id="propertyDetailsModal" class="modal" style="display: none;">
+          <div class="modal-content property-modal">
+            <div class="modal-header">
+              <h3 class="modal-title">Property Analysis</h3>
+              <button class="modal-close" id="propertyModalClose">×</button>
+            </div>
+            <div class="modal-body" id="propertyModalBody">
+              <!-- Property details will be populated here -->
+              <div class="property-analysis-content">
+                <div class="property-header">
+                  <div class="property-url-display" id="modalPropertyUrl"></div>
+                  <div class="property-meta-display" id="modalPropertyMeta"></div>
+                </div>
+                
+                <div class="analysis-section" id="modalAnalysisSection">
+                  <div class="analysis-header">
+                    <h4>📊 Analysis Results</h4>
+                    <div class="analysis-status" id="modalAnalysisStatus"></div>
+                  </div>
+                  <div class="analysis-content" id="modalAnalysisContent">
+                    <!-- Analysis content will be populated here -->
+                  </div>
+                </div>
+                
+                <div class="modal-actions">
+                  <button id="recategorizePropertyBtn" class="btn btn-secondary btn-sm">
+                    📁 Recategorize
+                  </button>
+                  <button id="exportSinglePropertyBtn" class="btn btn-primary btn-sm">
+                    📄 Export This Property
+                  </button>
+                  <button id="deletePropertyModalBtn" class="btn btn-ghost btn-sm">
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categorization Modal -->
+        <div id="categorizationModal" class="modal" style="display: none;">
+          <div class="modal-content categorization-modal">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                <span class="modal-icon">📁</span>
+                Organize Property
+              </h3>
+              <button class="modal-close" id="categorizationModalClose">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="categorization-content">
+                <div class="property-preview" id="categorizationPropertyPreview">
+                  <!-- Property preview will be shown here -->
+                </div>
+                
+                <div class="category-selection">
+                  <h4 class="selection-title">Choose a Category</h4>
+                  <div class="category-options" id="categoryOptions">
+                    <!-- Category options will be populated here -->
+                  </div>
+                  
+                  <div class="create-new-category">
+                    <button id="createNewCategoryBtn" class="btn btn-ghost btn-sm">
+                      <span class="btn-icon">➕</span>
+                      Create New Category
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="categorization-actions">
+                  <button id="cancelCategorizationBtn" class="btn btn-secondary">Cancel</button>
+                  <button id="confirmCategorizationBtn" class="btn btn-primary" disabled>
+                    <span class="btn-icon">📁</span>
+                    Organize Property
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
         
       </div>
       
       <!-- Settings Tab -->
       <div id="settingsTab" class="tab-content">
         
-        <!-- Custom Prompt Settings -->
+        <!-- Settings Overview -->
         <section class="section">
-          <div class="collapsible" style="margin-bottom: var(--space-md);">
-            <button class="collapsible-header" id="togglePromptBtn">
-              <span>🤖 Custom Analysis Prompt</span>
-              <span class="collapsible-icon">▼</span>
-            </button>
+          <div class="settings-overview">
+            <h2 class="settings-title">
+              <span>⚙️</span>
+              Extension Settings
+            </h2>
+            <p class="settings-subtitle">Customize how the RE Analyzer works for you</p>
+          </div>
+        </section>
+        
+        <!-- Quick Settings -->
+        <section class="section">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3 class="settings-card-title">
+                <span class="settings-icon">🚀</span>
+                Quick Settings
+              </h3>
+              <p class="settings-card-description">Essential settings to get you started</p>
+            </div>
             
-            <div class="collapsible-content hidden" id="promptContent">
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label class="setting-label">
+                  <input type="checkbox" id="enableAutoSaveQuick" checked>
+                  <span class="setting-title">Auto-save prompts</span>
+                </label>
+                <p class="setting-description">Automatically save your prompt changes</p>
+              </div>
+              
+              <div class="setting-item">
+                <label class="setting-label">
+                  <input type="checkbox" id="enablePromptValidationQuick" checked>
+                  <span class="setting-title">Prompt validation</span>
+                </label>
+                <p class="setting-description">Check for common prompt issues</p>
+              </div>
+              
+              <div class="setting-item">
+                <label class="setting-label">
+                  <input type="checkbox" id="enablePromptSplittingQuick" checked>
+                  <span class="setting-title">Smart prompt splitting</span>
+                </label>
+                <p class="setting-description">Improve link processing for long prompts</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Custom Analysis Prompt -->
+        <section class="section">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3 class="settings-card-title">
+                <span class="settings-icon">🤖</span>
+                Analysis Prompt
+              </h3>
+              <p class="settings-card-description">Customize how ChatGPT analyzes properties</p>
+            </div>
+            
+            <div class="prompt-editor">
+              <div class="prompt-toolbar">
+                <div class="prompt-templates">
+                  <label class="toolbar-label">Quick Templates:</label>
+                  <div class="template-buttons">
+                    <button id="templateBasicBtn" class="btn btn-ghost btn-sm">📝 Basic</button>
+                    <button id="templateDetailedBtn" class="btn btn-ghost btn-sm">📊 Detailed</button>
+                    <button id="templateInvestmentBtn" class="btn btn-ghost btn-sm">💰 Investment</button>
+                    <button id="templateRentalBtn" class="btn btn-ghost btn-sm">🏠 Rental</button>
+                  </div>
+                </div>
+                
+                <div class="prompt-actions">
+                  <button id="showDefaultBtn" class="btn btn-ghost btn-sm">📄 View Default</button>
+                  <button id="validatePromptBtn" class="btn btn-secondary btn-sm">✅ Validate</button>
+                </div>
+              </div>
+              
               <div class="form-group">
                 <label for="customPrompt" class="form-label">
-                  Analysis Prompt
-                  <span style="color: var(--text-secondary); font-weight: var(--font-weight-normal); font-size: var(--font-size-sm);">
-                    (First prompt sent to ChatGPT)
-                  </span>
+                  Custom Analysis Prompt
+                  <span class="label-helper">Use {PROPERTY_URL} as placeholder for the property link</span>
                 </label>
                 <textarea 
                   id="customPrompt" 
                   class="form-input" 
-                  rows="8"
+                  rows="12"
                   placeholder="Enter your custom analysis prompt..."
                 ></textarea>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-xs);">
-                  <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                    Use {PROPERTY_URL} as placeholder for the property link
-                  </small>
-                  <small id="promptCharCount" style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                    0 characters
-                  </small>
-                </div>
-              </div>
-              
-              <!-- Prompt Templates -->
-              <div class="form-group">
-                <label class="form-label">Quick Templates</label>
-                <div class="btn-group" style="flex-wrap: wrap;">
-                  <button id="templateBasicBtn" class="btn btn-ghost btn-sm">
-                    📝 Basic Analysis
-                  </button>
-                  <button id="templateDetailedBtn" class="btn btn-ghost btn-sm">
-                    📊 Detailed Report
-                  </button>
-                  <button id="templateInvestmentBtn" class="btn btn-ghost btn-sm">
-                    💰 Investment Focus
-                  </button>
-                  <button id="templateRentalBtn" class="btn btn-ghost btn-sm">
-                    🏠 Rental Analysis
-                  </button>
-                </div>
-              </div>
-              
-              <!-- Prompt Validation -->
-              <div id="promptValidation" class="card hidden" style="background: #fef3c7; border-left: 4px solid #f59e0b; margin: var(--space-md) 0;">
-                <div style="font-weight: var(--font-weight-medium); color: #92400e; margin-bottom: var(--space-xs);">
-                  ⚠️ Prompt Validation
-                </div>
-                <ul id="validationMessages" style="margin: 0; padding-left: var(--space-lg); color: #92400e; font-size: var(--font-size-sm);">
-                </ul>
-              </div>
-              
-              <div class="btn-group">
-                <button id="showDefaultBtn" class="btn btn-ghost btn-sm">
-                  📄 View Default
-                </button>
-                <button id="validatePromptBtn" class="btn btn-secondary btn-sm">
-                  ✅ Validate
-                </button>
-                <button id="resetPromptBtn" class="btn btn-secondary btn-sm">
-                  🔄 Reset
-                </button>
-                <button id="savePromptBtn" class="btn btn-primary btn-sm">
-                  💾 Save
-                </button>
-              </div>
-              
-              <div id="defaultPromptDisplay" class="card hidden" style="margin-top: var(--space-md); background: var(--secondary-background);">
-                <!-- Default prompt will be shown here -->
-              </div>
-              
-              <!-- Auto-save indicator -->
-              <div id="autoSaveIndicator" class="hidden" style="margin-top: var(--space-sm); padding: var(--space-sm); background: #dcfce7; border-radius: var(--radius-sm); color: #166534; font-size: var(--font-size-sm);">
-                ✅ Auto-saved
-              </div>
-            </div>
-          </div>
-        </section>
-        
-        <!-- Advanced Prompt Settings -->
-        <section class="section">
-          <div class="collapsible" style="margin-bottom: var(--space-md);">
-            <button class="collapsible-header" id="toggleAdvancedPromptBtn">
-              <span>⚙️ Advanced Prompt Settings</span>
-              <span class="collapsible-icon">▼</span>
-            </button>
-            
-            <div class="collapsible-content hidden" id="advancedPromptContent">
-              <div class="form-group">
-                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                  <input type="checkbox" id="enableAutoSave" checked>
-                  Enable Auto-save
-                </label>
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Automatically save prompt changes after 3 seconds of inactivity
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                  <input type="checkbox" id="enablePromptValidation" checked>
-                  Enable Prompt Validation
-                </label>
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Check for common issues and provide suggestions
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label for="maxPromptLength" class="form-label">
-                  Maximum Prompt Length: <span id="maxLengthValue">2000</span> characters
-                </label>
-                <input 
-                  type="range" 
-                  id="maxPromptLength" 
-                  min="500" 
-                  max="4000" 
-                  value="2000" 
-                  step="100"
-                  style="width: 100%;"
-                >
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Recommended: 1500-2500 characters for optimal performance
-                </small>
-              </div>
-              
-              <!-- Prompt History -->
-              <div class="form-group">
-                <label class="form-label">Recent Prompt Versions</label>
-                <div id="promptHistory" class="card" style="max-height: 150px; overflow-y: auto; background: var(--secondary-background);">
-                  <div class="empty-state" style="padding: var(--space-md);">
-                    <p style="font-size: var(--font-size-sm); color: var(--text-secondary);">No previous versions saved</p>
+                <div class="prompt-footer">
+                  <small id="promptCharCount" class="prompt-char-count">0 characters</small>
+                  <div class="prompt-actions-secondary">
+                    <button id="resetPromptBtn" class="btn btn-ghost btn-sm">🔄 Reset</button>
+                    <button id="savePromptBtn" class="btn btn-primary btn-sm">💾 Save</button>
                   </div>
                 </div>
               </div>
               
-              <div class="btn-group">
-                <button id="exportPromptBtn" class="btn btn-ghost btn-sm">
-                  📤 Export Prompt
-                </button>
-                <button id="importPromptBtn" class="btn btn-ghost btn-sm">
-                  📥 Import Prompt
-                </button>
-                <button id="saveAdvancedSettingsBtn" class="btn btn-primary btn-sm">
-                  💾 Save Settings
-                </button>
+              <!-- Prompt Validation -->
+              <div id="promptValidation" class="validation-card hidden">
+                <div class="validation-header">
+                  <span class="validation-icon">⚠️</span>
+                  <span class="validation-title">Prompt Issues Found</span>
+                </div>
+                <ul id="validationMessages" class="validation-list"></ul>
               </div>
               
-              <input type="file" id="promptFileInput" accept=".txt,.json" style="display: none;">
+              <!-- Default Prompt Display -->
+              <div id="defaultPromptDisplay" class="default-prompt-card hidden">
+                <div class="default-prompt-header">
+                  <span class="default-prompt-title">Default Prompt</span>
+                  <button class="btn btn-ghost btn-sm" id="closeDefaultPromptBtn">✕</button>
+                </div>
+                <div class="default-prompt-content"></div>
+              </div>
+              
+              <!-- Auto-save indicator -->
+              <div id="autoSaveIndicator" class="auto-save-indicator hidden">
+                <span class="indicator-icon">✅</span>
+                <span class="indicator-text">Auto-saved</span>
+              </div>
             </div>
           </div>
         </section>
         
-        <!-- Prompt Splitting Settings -->
+        <!-- Advanced Settings -->
         <section class="section">
-          <div class="collapsible" style="margin-bottom: var(--space-md);">
-            <button class="collapsible-header" id="togglePromptSplittingBtn">
-              <span>🔀 Prompt Splitting</span>
+          <div class="collapsible settings-card">
+            <button class="collapsible-header settings-card-header-button">
+              <div class="settings-card-header-content">
+                <h3 class="settings-card-title">
+                  <span class="settings-icon">🔧</span>
+                  Advanced Settings
+                </h3>
+                <p class="settings-card-description">Fine-tune extension behavior</p>
+              </div>
               <span class="collapsible-icon">▼</span>
             </button>
             
-            <div class="collapsible-content hidden" id="promptSplittingContent">
-              <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
-                Improve link processing by splitting long prompts into instructions and property link phases.
-              </p>
-              
-              <div class="form-group">
-                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                  <input type="checkbox" id="enablePromptSplitting" checked>
-                  Enable Prompt Splitting
-                </label>
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Automatically split prompts longer than the threshold for better link fetching
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label for="promptLengthThreshold" class="form-label">
-                  Length Threshold: <span id="thresholdValue">200</span> characters
-                </label>
-                <input 
-                  type="range" 
-                  id="promptLengthThreshold" 
-                  min="50" 
-                  max="1000" 
-                  value="200" 
-                  step="25"
-                  style="width: 100%;"
-                >
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Prompts longer than this will be split into two phases
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label for="confirmationTimeout" class="form-label">
-                  Confirmation Timeout: <span id="timeoutValue">15</span> seconds
-                </label>
-                <input 
-                  type="range" 
-                  id="confirmationTimeout" 
-                  min="5" 
-                  max="60" 
-                  value="15" 
-                  step="5"
-                  style="width: 100%;"
-                >
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  How long to wait for ChatGPT's confirmation before falling back
-                </small>
-              </div>
-              
-              <div class="info-grid" style="margin: var(--space-md) 0;">
-                <div class="info-item">
-                  <div class="info-label">Success Rate</div>
-                  <div class="info-value" id="splittingSuccessRate">No data yet</div>
+            <div class="collapsible-content hidden">
+              <div class="advanced-settings-content">
+                
+                <!-- Prompt Settings -->
+                <div class="advanced-section">
+                  <h4 class="advanced-section-title">Prompt Configuration</h4>
+                  
+                  <div class="setting-item">
+                    <label for="maxPromptLength" class="setting-label-range">
+                      Maximum Prompt Length: <span id="maxLengthValue">2000</span> characters
+                    </label>
+                    <input 
+                      type="range" 
+                      id="maxPromptLength" 
+                      min="500" 
+                      max="4000" 
+                      value="2000" 
+                      step="100"
+                      class="setting-range"
+                    >
+                    <p class="setting-description">Recommended: 1500-2500 characters for optimal performance</p>
+                  </div>
+                  
+                  <div class="setting-item">
+                    <label for="promptLengthThreshold" class="setting-label-range">
+                      Splitting Threshold: <span id="thresholdValue">200</span> characters
+                    </label>
+                    <input 
+                      type="range" 
+                      id="promptLengthThreshold" 
+                      min="50" 
+                      max="1000" 
+                      value="200" 
+                      step="25"
+                      class="setting-range"
+                    >
+                    <p class="setting-description">Prompts longer than this will be split for better processing</p>
+                  </div>
+                  
+                  <div class="setting-item">
+                    <label for="confirmationTimeout" class="setting-label-range">
+                      Confirmation Timeout: <span id="timeoutValue">15</span> seconds
+                    </label>
+                    <input 
+                      type="range" 
+                      id="confirmationTimeout" 
+                      min="5" 
+                      max="60" 
+                      value="15" 
+                      step="5"
+                      class="setting-range"
+                    >
+                    <p class="setting-description">How long to wait for ChatGPT's confirmation</p>
+                  </div>
                 </div>
-                <div class="info-item">
-                  <div class="info-label">Total Attempts</div>
-                  <div class="info-value" id="splittingAttempts">0</div>
+                
+                <!-- Debug & Development -->
+                <div class="advanced-section">
+                  <h4 class="advanced-section-title">Debug & Development</h4>
+                  
+                  <div class="settings-grid">
+                    <div class="setting-item">
+                      <label class="setting-label">
+                        <input type="checkbox" id="enableDebugMode">
+                        <span class="setting-title">Debug mode</span>
+                      </label>
+                      <p class="setting-description">Show detailed logs in console</p>
+                    </div>
+                    
+                    <div class="setting-item">
+                      <label class="setting-label">
+                        <input type="checkbox" id="enablePromptPreview">
+                        <span class="setting-title">Prompt preview</span>
+                      </label>
+                      <p class="setting-description">Show final prompt before sending</p>
+                    </div>
+                  </div>
+                  
+                  <div class="debug-info-card">
+                    <div class="debug-info-header">Extension Information</div>
+                    <div class="debug-info-content">
+                      <div class="debug-info-item">Version: v1.1.1</div>
+                      <div class="debug-info-item">Tab System: ✅ Active</div>
+                      <div class="debug-info-item" id="debugActiveTab">Active Tab: settings</div>
+                      <div class="debug-info-item" id="debugTimestamp">Last Updated: <span id="debugTime">--</span></div>
+                    </div>
+                  </div>
+                  
+                  <div class="debug-actions">
+                    <button id="clearDebugBtn" class="btn btn-ghost btn-sm">🗑️ Clear Console</button>
+                    <button id="exportDebugBtn" class="btn btn-ghost btn-sm">📤 Export Debug Info</button>
+                  </div>
                 </div>
-              </div>
-              
-              <div class="btn-group">
-                <button id="resetSplittingStatsBtn" class="btn btn-ghost btn-sm">
-                  📊 Reset Stats
-                </button>
-                <button id="saveSplittingSettingsBtn" class="btn btn-primary btn-sm">
-                  💾 Save Settings
-                </button>
-              </div>
-              
-              <div id="splittingMessage" class="message"></div>
-            </div>
-          </div>
-        </section>
-        
-        <!-- Debug Mode -->
-        <section class="section">
-          <div class="collapsible" style="margin-bottom: var(--space-md);">
-            <button class="collapsible-header" id="toggleDebugBtn">
-              <span>🐛 Debug Mode</span>
-              <span class="collapsible-icon">▼</span>
-            </button>
-            
-            <div class="collapsible-content hidden" id="debugContent">
-              <div class="form-group">
-                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                  <input type="checkbox" id="enableDebugMode">
-                  Enable Debug Mode
-                </label>
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Show detailed logs and debugging information in console
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
-                  <input type="checkbox" id="enablePromptPreview">
-                  Show Prompt Preview
-                </label>
-                <small style="color: var(--text-secondary); font-size: var(--font-size-sm);">
-                  Display the final prompt before sending to ChatGPT
-                </small>
-              </div>
-              
-              <div id="debugInfo" class="card" style="background: var(--secondary-background); font-family: monospace; font-size: var(--font-size-sm); margin: var(--space-md) 0;">
-                <div style="font-weight: var(--font-weight-medium); margin-bottom: var(--space-sm);">Extension Info:</div>
-                                 <div>Version: v1.1.1</div>
-                <div>Tab System: ✅ Active</div>
-                <div>Settings Tab: ✅ Loaded</div>
-                <div id="debugActiveTab">Active Tab: settings</div>
-                <div id="debugTimestamp">Last Updated: <span id="debugTime">--</span></div>
-              </div>
-              
-              <div class="btn-group">
-                <button id="clearDebugBtn" class="btn btn-ghost btn-sm">
-                  🗑️ Clear Console
-                </button>
-                <button id="exportDebugBtn" class="btn btn-ghost btn-sm">
-                  📤 Export Debug Info
-                </button>
-                <button id="saveDebugSettingsBtn" class="btn btn-primary btn-sm">
-                  💾 Save Debug Settings
-                </button>
+                
+                <!-- Import/Export -->
+                <div class="advanced-section">
+                  <h4 class="advanced-section-title">Import/Export</h4>
+                  
+                  <div class="import-export-actions">
+                    <button id="exportPromptBtn" class="btn btn-secondary btn-sm">📤 Export Prompt</button>
+                    <button id="importPromptBtn" class="btn btn-secondary btn-sm">📥 Import Prompt</button>
+                    <input type="file" id="promptFileInput" accept=".txt,.json" style="display: none;">
+                  </div>
+                  
+                  <!-- Prompt History -->
+                  <div class="prompt-history-section">
+                    <h5 class="prompt-history-title">Recent Prompt Versions</h5>
+                    <div id="promptHistory" class="prompt-history-list">
+                      <div class="empty-state">
+                        <p>No previous versions saved</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Statistics -->
+                <div class="advanced-section">
+                  <h4 class="advanced-section-title">Statistics</h4>
+                  
+                  <div class="stats-grid">
+                    <div class="stat-item">
+                      <div class="stat-label">Splitting Success Rate</div>
+                      <div class="stat-value" id="splittingSuccessRate">No data yet</div>
+                    </div>
+                    <div class="stat-item">
+                      <div class="stat-label">Total Attempts</div>
+                      <div class="stat-value" id="splittingAttempts">0</div>
+                    </div>
+                  </div>
+                  
+                  <div class="stats-actions">
+                    <button id="resetSplittingStatsBtn" class="btn btn-ghost btn-sm">📊 Reset Stats</button>
+                  </div>
+                </div>
+                
+                <div class="advanced-actions">
+                  <button id="saveAdvancedSettingsBtn" class="btn btn-primary btn-sm">💾 Save Advanced Settings</button>
+                </div>
+                
               </div>
             </div>
           </div>
@@ -2071,43 +4718,62 @@
         
         <!-- Export Information -->
         <section class="section">
-          <div class="collapsible">
-            <button class="collapsible-header" id="toggleExportInfoBtn">
-              <span>📊 Export Information</span>
+          <div class="collapsible settings-card">
+            <button class="collapsible-header settings-card-header-button">
+              <div class="settings-card-header-content">
+                <h3 class="settings-card-title">
+                  <span class="settings-icon">📊</span>
+                  Export Information
+                </h3>
+                <p class="settings-card-description">What gets included in exports</p>
+              </div>
               <span class="collapsible-icon">▼</span>
             </button>
             
-            <div class="collapsible-content hidden" id="exportInfoContent">
-              <p style="color: var(--text-secondary); margin-bottom: var(--space-md); font-size: var(--font-size-sm);">
-                The export will include:
-              </p>
-              
-              <div class="info-grid">
-                <div class="info-item">
-                  <div class="info-label">Property URL</div>
-                  <div class="info-value">Full property listing link</div>
+            <div class="collapsible-content hidden">
+              <div class="export-info-content">
+                <p class="export-info-description">
+                  When you export properties to Word or Excel, the following information is included:
+                </p>
+                
+                <div class="export-items-grid">
+                  <div class="export-item">
+                    <div class="export-item-icon">🔗</div>
+                    <div class="export-item-content">
+                      <div class="export-item-title">Property URL</div>
+                      <div class="export-item-description">Full property listing link</div>
+                    </div>
+                  </div>
+                  
+                  <div class="export-item">
+                    <div class="export-item-icon">🌐</div>
+                    <div class="export-item-content">
+                      <div class="export-item-title">Source</div>
+                      <div class="export-item-description">Website domain (Zillow, Realtor.com, etc.)</div>
+                    </div>
+                  </div>
+                  
+                  <div class="export-item">
+                    <div class="export-item-icon">📅</div>
+                    <div class="export-item-content">
+                      <div class="export-item-title">Analysis Date</div>
+                      <div class="export-item-description">When the analysis was performed</div>
+                    </div>
+                  </div>
+                  
+                  <div class="export-item">
+                    <div class="export-item-icon">🤖</div>
+                    <div class="export-item-content">
+                      <div class="export-item-title">ChatGPT Response</div>
+                      <div class="export-item-description">Complete AI analysis and recommendations</div>
+                    </div>
+                  </div>
                 </div>
-                <div class="info-item">
-                  <div class="info-label">Source</div>
-                  <div class="info-value">Website domain (Zillow, Realtor.com, etc.)</div>
+                
+                <div class="export-actions">
+                  <button id="previewExportBtn" class="btn btn-secondary btn-sm">👁️ Preview Export</button>
+                  <button id="customizeExportBtn" class="btn btn-secondary btn-sm">⚙️ Customize Format</button>
                 </div>
-                <div class="info-item">
-                  <div class="info-label">Analysis Date</div>
-                  <div class="info-value">When the analysis was performed</div>
-                </div>
-                <div class="info-item">
-                  <div class="info-label">ChatGPT Response</div>
-                  <div class="info-value">Complete unprocessed AI analysis</div>
-                </div>
-              </div>
-              
-              <div class="btn-group" style="margin-top: var(--space-md);">
-                <button id="previewExportBtn" class="btn btn-ghost btn-sm">
-                  👁️ Preview Export
-                </button>
-                <button id="customizeExportBtn" class="btn btn-secondary btn-sm">
-                  ⚙️ Customize Format
-                </button>
               </div>
             </div>
           </div>
