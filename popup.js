@@ -5191,6 +5191,12 @@ function setupPropertiesEventListeners() {
   if (clearHistoryBtn) {
     clearHistoryBtn.addEventListener('click', handleClearHistory);
   }
+
+  // Organize properties button
+  const organizePropertiesBtn = document.getElementById('organizePropertiesBtn');
+  if (organizePropertiesBtn) {
+    organizePropertiesBtn.addEventListener('click', openOrganizePropertiesModal);
+  }
   
   // Latest analysis dismiss button
   const dismissLatestBtn = document.getElementById('dismissLatestBtn');
@@ -5387,13 +5393,15 @@ async function renderPropertiesList() {
           </div>
         </div>
         
-        <div class="property-actions">
-          <button class="btn btn-ghost btn-sm categorize-btn" title="Categorize">📁</button>
-          ${hasAnalysis ? `
-            <button class="btn btn-ghost btn-sm view-btn" title="View Analysis">👁️</button>
-          ` : ''}
-          <button class="btn btn-ghost btn-sm delete-btn" title="Delete">🗑️</button>
-        </div>
+                  <div class="property-actions">
+            <button class="btn btn-primary btn-sm categorize-btn" title="Change Category">
+              📁 Organize
+            </button>
+            ${hasAnalysis ? `
+              <button class="btn btn-ghost btn-sm view-btn" title="View Analysis">👁️</button>
+            ` : ''}
+            <button class="btn btn-ghost btn-sm delete-btn" title="Delete">🗑️</button>
+          </div>
       </div>
     `;
   }).join('');
@@ -5924,6 +5932,291 @@ function deleteProperty(propertyId) {
     updatePropertiesStats();
     updateViewDisplay();
     showSuccess('Property deleted successfully');
+  }
+}
+
+// ===============================================
+// ORGANIZE PROPERTIES MODAL FUNCTIONALITY
+// ===============================================
+
+let organizeModalState = {
+  selectedProperties: new Set(),
+  filterStatus: 'uncategorized',
+  sortBy: 'recent',
+  pendingChanges: new Map() // propertyId -> newCategoryId
+};
+
+// Open organize properties modal
+async function openOrganizePropertiesModal() {
+  await categoryManager.initialize();
+  
+  // Reset state
+  organizeModalState.selectedProperties.clear();
+  organizeModalState.pendingChanges.clear();
+  
+  // Show modal
+  const modal = document.getElementById('organizePropertiesModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    setupOrganizePropertiesModal();
+    renderOrganizePropertiesGrid();
+  }
+}
+
+// Setup event listeners for organize properties modal
+function setupOrganizePropertiesModal() {
+  const modal = document.getElementById('organizePropertiesModal');
+  const closeBtn = document.getElementById('organizePropertiesModalClose');
+  const cancelBtn = document.getElementById('organizeModalCancel');
+  const saveBtn = document.getElementById('organizeModalSave');
+  
+  // Filter and sort controls
+  const filterStatus = document.getElementById('organizeFilterStatus');
+  const sortBy = document.getElementById('organizeSortBy');
+  
+  // Selection controls
+  const selectAllBtn = document.getElementById('organizeSelectAll');
+  const clearSelectionBtn = document.getElementById('organizeClearSelection');
+  
+  // Bulk action buttons
+  const bulkActions = document.querySelectorAll('.bulk-action-item');
+  
+  // Close modal handlers
+  [closeBtn, cancelBtn].forEach(btn => {
+    if (btn) {
+      btn.onclick = () => {
+        modal.style.display = 'none';
+      };
+    }
+  });
+  
+  // Save changes
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      await saveOrganizeChanges();
+      modal.style.display = 'none';
+    };
+  }
+  
+  // Filter and sort handlers
+  if (filterStatus) {
+    filterStatus.onchange = () => {
+      organizeModalState.filterStatus = filterStatus.value;
+      renderOrganizePropertiesGrid();
+    };
+  }
+  
+  if (sortBy) {
+    sortBy.onchange = () => {
+      organizeModalState.sortBy = sortBy.value;
+      renderOrganizePropertiesGrid();
+    };
+  }
+  
+  // Selection handlers
+  if (selectAllBtn) {
+    selectAllBtn.onclick = () => {
+      const visibleCards = document.querySelectorAll('.organize-property-card');
+      visibleCards.forEach(card => {
+        const propertyId = card.dataset.propertyId;
+        organizeModalState.selectedProperties.add(propertyId);
+        card.classList.add('selected');
+      });
+      updateOrganizeSelectionInfo();
+    };
+  }
+  
+  if (clearSelectionBtn) {
+    clearSelectionBtn.onclick = () => {
+      organizeModalState.selectedProperties.clear();
+      document.querySelectorAll('.organize-property-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      updateOrganizeSelectionInfo();
+    };
+  }
+  
+  // Bulk action handlers
+  bulkActions.forEach(action => {
+    action.onclick = () => {
+      const actionId = action.id;
+      let categoryId = 'uncategorized';
+      
+      switch (actionId) {
+        case 'bulkCategorizeInvestment':
+          categoryId = 'investment';
+          break;
+        case 'bulkCategorizeResidence':
+          categoryId = 'primary_residence';
+          break;
+        case 'bulkCategorizeRental':
+          categoryId = 'rental';
+          break;
+        case 'bulkCategorizeFavorites':
+          categoryId = 'favorites';
+          break;
+      }
+      
+      // Apply to selected properties
+      organizeModalState.selectedProperties.forEach(propertyId => {
+        organizeModalState.pendingChanges.set(propertyId, categoryId);
+      });
+      
+      // Visual feedback
+      action.classList.add('active');
+      setTimeout(() => {
+        action.classList.remove('active');
+      }, 1000);
+      
+      // Update grid to show pending changes
+      renderOrganizePropertiesGrid();
+      
+      showSuccess(`${organizeModalState.selectedProperties.size} properties will be moved to ${categoryManager.getCategory(categoryId)?.name || 'category'}`);
+    };
+  });
+  
+  // Close on background click
+  modal.onclick = (e) => {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+    }
+  };
+}
+
+// Render properties grid in organize modal
+function renderOrganizePropertiesGrid() {
+  const grid = document.getElementById('organizePropertiesGrid');
+  if (!grid) return;
+  
+  const allProperties = Array.from(categoryManager.properties.values());
+  
+  // Filter properties
+  let filteredProperties = allProperties.filter(property => {
+    switch (organizeModalState.filterStatus) {
+      case 'uncategorized':
+        return property.categoryId === 'uncategorized';
+      case 'analyzed':
+        return property.analysis && property.analysis.fullResponse;
+      case 'all':
+      default:
+        return true;
+    }
+  });
+  
+  // Sort properties
+  filteredProperties.sort((a, b) => {
+    switch (organizeModalState.sortBy) {
+      case 'oldest':
+        return (a.timestamp || 0) - (b.timestamp || 0);
+      case 'domain':
+        const domainA = a.domain || new URL(a.url).hostname;
+        const domainB = b.domain || new URL(b.url).hostname;
+        return domainA.localeCompare(domainB);
+      case 'recent':
+      default:
+        return (b.timestamp || 0) - (a.timestamp || 0);
+    }
+  });
+  
+  if (filteredProperties.length === 0) {
+    grid.innerHTML = `
+      <div class="organize-empty-state">
+        <div class="organize-empty-icon">📁</div>
+        <p><strong>No properties to organize</strong></p>
+        <p>All properties are already categorized or no properties match your filter.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const propertyCards = filteredProperties.map(property => {
+    const address = extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname;
+    const hasAnalysis = property.analysis && property.analysis.fullResponse;
+    const isSelected = organizeModalState.selectedProperties.has(property.id || property.url);
+    
+    // Check for pending changes
+    const pendingCategoryId = organizeModalState.pendingChanges.get(property.id || property.url);
+    const currentCategoryId = pendingCategoryId || property.categoryId || 'uncategorized';
+    const category = categoryManager.getCategory(currentCategoryId);
+    
+    return `
+      <div class="organize-property-card ${isSelected ? 'selected' : ''}" 
+           data-property-id="${property.id || property.url}">
+        <div class="organize-property-header">
+          <div class="organize-property-status ${hasAnalysis ? 'analyzed' : 'pending'}"></div>
+          <div class="organize-property-address" title="${property.url}">${address}</div>
+        </div>
+        
+        <div class="organize-property-meta">
+          <span>${new Date(property.timestamp).toLocaleDateString()}</span>
+          <div class="organize-property-category" style="background-color: ${category?.color}22; color: ${category?.color};">
+            ${category?.icon || '📋'} ${category?.name || 'Uncategorized'}
+            ${pendingCategoryId ? ' (pending)' : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  grid.innerHTML = propertyCards;
+  
+  // Add click handlers to property cards
+  grid.querySelectorAll('.organize-property-card').forEach(card => {
+    card.onclick = () => {
+      const propertyId = card.dataset.propertyId;
+      
+      if (organizeModalState.selectedProperties.has(propertyId)) {
+        organizeModalState.selectedProperties.delete(propertyId);
+        card.classList.remove('selected');
+      } else {
+        organizeModalState.selectedProperties.add(propertyId);
+        card.classList.add('selected');
+      }
+      
+      updateOrganizeSelectionInfo();
+    };
+  });
+  
+  updateOrganizeSelectionInfo();
+}
+
+// Update selection info display
+function updateOrganizeSelectionInfo() {
+  const selectedCount = document.getElementById('organizeSelectedCount');
+  if (selectedCount) {
+    const count = organizeModalState.selectedProperties.size;
+    selectedCount.textContent = `${count} selected`;
+  }
+}
+
+// Save organize changes
+async function saveOrganizeChanges() {
+  if (organizeModalState.pendingChanges.size === 0) {
+    showSuccess('No changes to save');
+    return;
+  }
+  
+  try {
+    let changeCount = 0;
+    
+    for (const [propertyId, newCategoryId] of organizeModalState.pendingChanges) {
+      await categoryManager.movePropertyToCategory(propertyId, newCategoryId);
+      changeCount++;
+    }
+    
+    // Clear pending changes
+    organizeModalState.pendingChanges.clear();
+    organizeModalState.selectedProperties.clear();
+    
+    // Update main UI
+    updatePropertiesStats();
+    updateViewDisplay();
+    
+    showSuccess(`Successfully organized ${changeCount} properties!`);
+    
+  } catch (error) {
+    console.error('Failed to save organize changes:', error);
+    showError('Failed to save some changes');
   }
 }
 

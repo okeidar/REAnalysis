@@ -3406,6 +3406,275 @@
       max-width: 500px;
     }
 
+    /* =============================================== */
+    /* ORGANIZE PROPERTIES MODAL */
+    /* =============================================== */
+
+    .organize-properties-modal {
+      max-width: 900px;
+      max-height: 90vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .organize-properties-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+      max-height: calc(90vh - 120px);
+    }
+
+    /* Filter Controls */
+    .organize-filters {
+      display: flex;
+      gap: var(--space-lg);
+      padding: var(--space-md);
+      background: var(--secondary-background);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .filter-label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .filter-select {
+      padding: var(--space-xs) var(--space-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      background: white;
+      min-width: 140px;
+    }
+
+    /* Properties Grid */
+    .organize-properties-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--space-md);
+      max-height: 300px;
+      overflow-y: auto;
+      padding: var(--space-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #fafafa;
+    }
+
+    .organize-property-card {
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      position: relative;
+    }
+
+    .organize-property-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .organize-property-card.selected {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.05);
+    }
+
+    .organize-property-card.selected::before {
+      content: '✓';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: var(--primary);
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .organize-property-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-sm);
+    }
+
+    .organize-property-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .organize-property-status.analyzed {
+      background: #16a34a;
+    }
+
+    .organize-property-status.pending {
+      background: #f59e0b;
+    }
+
+    .organize-property-address {
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .organize-property-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: var(--space-sm);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
+
+    .organize-property-category {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: 2px 6px;
+      background: var(--secondary-background);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+    }
+
+    /* Bulk Categorization Section */
+    .bulk-categorization-section {
+      border-top: 1px solid var(--border);
+      padding-top: var(--space-lg);
+    }
+
+    .bulk-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .bulk-header h4 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .selection-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .bulk-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .bulk-action-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-lg);
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      text-align: center;
+    }
+
+    .bulk-action-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .bulk-action-item.active {
+      border-color: var(--primary);
+      background: rgba(16, 163, 127, 0.1);
+    }
+
+    .bulk-action-icon {
+      font-size: 24px;
+      margin-bottom: var(--space-xs);
+    }
+
+    .bulk-action-label {
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    /* Modal Actions */
+    .organize-modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Empty State */
+    .organize-empty-state {
+      text-align: center;
+      padding: var(--space-xl);
+      color: var(--text-secondary);
+    }
+
+    .organize-empty-icon {
+      font-size: 48px;
+      margin-bottom: var(--space-md);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .organize-properties-modal {
+        max-width: 95vw;
+        margin: var(--space-md);
+      }
+      
+      .organize-filters {
+        flex-direction: column;
+        gap: var(--space-md);
+      }
+      
+      .organize-properties-grid {
+        grid-template-columns: 1fr;
+        max-height: 250px;
+      }
+      
+      .bulk-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .organize-modal-actions {
+        flex-direction: column;
+      }
+    }
+
     .categorization-content {
       display: flex;
       flex-direction: column;
@@ -4230,11 +4499,15 @@
             </div>
             
             <div class="action-controls">
+              <button id="organizePropertiesBtn" class="btn btn-primary btn-sm">
+                <span class="btn-icon">📁</span>
+                Organize Properties
+              </button>
               <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
                 <span class="btn-icon">⚙️</span>
                 Manage Categories
               </button>
-              <button id="exportWordBtn" class="btn btn-primary btn-sm">
+              <button id="exportWordBtn" class="btn btn-secondary btn-sm">
                 <span class="btn-icon">📄</span>
                 Export to Word
               </button>
@@ -4359,6 +4632,91 @@
                   <button id="confirmCategorizationBtn" class="btn btn-primary" disabled>
                     <span class="btn-icon">📁</span>
                     Organize Property
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Organize Properties Modal -->
+        <div id="organizePropertiesModal" class="modal" style="display: none;">
+          <div class="modal-content organize-properties-modal">
+            <div class="modal-header">
+              <h3 class="modal-title">
+                <span class="modal-icon">🗂️</span>
+                Organize All Properties
+              </h3>
+              <button class="modal-close" id="organizePropertiesModalClose">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="organize-properties-content">
+                <!-- Filter and Sort Controls -->
+                <div class="organize-filters">
+                  <div class="filter-group">
+                    <label class="filter-label">Show:</label>
+                    <select id="organizeFilterStatus" class="filter-select">
+                      <option value="all">All Properties</option>
+                      <option value="uncategorized" selected>Uncategorized Only</option>
+                      <option value="analyzed">Analyzed Only</option>
+                    </select>
+                  </div>
+                  <div class="filter-group">
+                    <label class="filter-label">Sort by:</label>
+                    <select id="organizeSortBy" class="filter-select">
+                      <option value="recent">Most Recent</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="domain">Domain Name</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Properties Grid -->
+                <div class="organize-properties-grid" id="organizePropertiesGrid">
+                  <!-- Properties will be populated here -->
+                </div>
+
+                <!-- Bulk Actions -->
+                <div class="bulk-categorization-section">
+                  <div class="bulk-header">
+                    <h4>Quick Bulk Actions</h4>
+                    <div class="selection-info">
+                      <span id="organizeSelectedCount">0 selected</span>
+                      <button id="organizeSelectAll" class="btn btn-ghost btn-sm">Select All</button>
+                      <button id="organizeClearSelection" class="btn btn-ghost btn-sm">Clear</button>
+                    </div>
+                  </div>
+                  
+                  <div class="bulk-actions-grid">
+                    <div class="bulk-action-item" id="bulkCategorizeUncategorized">
+                      <div class="bulk-action-icon">📋</div>
+                      <div class="bulk-action-label">Leave Uncategorized</div>
+                    </div>
+                    <div class="bulk-action-item" id="bulkCategorizeInvestment">
+                      <div class="bulk-action-icon">💰</div>
+                      <div class="bulk-action-label">Investment</div>
+                    </div>
+                    <div class="bulk-action-item" id="bulkCategorizeResidence">
+                      <div class="bulk-action-icon">🏠</div>
+                      <div class="bulk-action-label">Primary Residence</div>
+                    </div>
+                    <div class="bulk-action-item" id="bulkCategorizeRental">
+                      <div class="bulk-action-icon">🏨</div>
+                      <div class="bulk-action-label">Rental</div>
+                    </div>
+                    <div class="bulk-action-item" id="bulkCategorizeFavorites">
+                      <div class="bulk-action-icon">⭐</div>
+                      <div class="bulk-action-label">Favorites</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="organize-modal-actions">
+                  <button id="organizeModalCancel" class="btn btn-secondary">Close</button>
+                  <button id="organizeModalSave" class="btn btn-primary">
+                    <span class="btn-icon">✅</span>
+                    Save Changes
                   </button>
                 </div>
               </div>
