@@ -669,13 +669,13 @@ class REAnalyzerEmbeddedUI {
           
           <!-- Tabular Configuration Tabs -->
           <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 12px;">
-            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500; font-size: 12px;">
+            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500; font-size: 12px; color: #ffffff;">
               📊 Columns
             </button>
-            <button class="re-tabular-tab" data-tab="prompt" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px;">
+            <button class="re-tabular-tab" data-tab="prompt" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
               📝 Template
             </button>
-            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px;">
+            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
               ➕ Custom
             </button>
           </div>
@@ -4720,11 +4720,13 @@ Or enter your own property URL:`);
           t.classList.remove('re-tabular-tab-active');
           t.style.borderBottomColor = 'transparent';
           t.style.fontWeight = 'normal';
+          t.style.color = '#d1d5db';
         });
         
         tab.classList.add('re-tabular-tab-active');
         tab.style.borderBottomColor = 'var(--chatgpt-accent)';
         tab.style.fontWeight = '500';
+        tab.style.color = '#ffffff';
         
         // Show/hide content
         tabContents.forEach(content => {
@@ -4860,6 +4862,7 @@ Or enter your own property URL:`);
       padding: 8px 12px; 
       font-weight: 500; 
       font-size: 14px;
+      color: #ffffff;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -4869,7 +4872,7 @@ Or enter your own property URL:`);
     const enabledCount = columns.filter(col => col.enabled).length;
     header.innerHTML = `
       <span>${categoryName}</span>
-      <span style="font-size: 12px; color: var(--chatgpt-text-secondary);">${enabledCount}/${columns.length}</span>
+      <span style="font-size: 12px; color: #d1d5db;">${enabledCount}/${columns.length}</span>
     `;
     
     // Category content
@@ -4941,10 +4944,10 @@ Or enter your own property URL:`);
     if (column.isCalculated) badges.push('<span style="background: #3b82f6; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">CALCULATED</span>');
     
     label.innerHTML = `
-      <div style="font-weight: 500; color: var(--chatgpt-text-primary);">
+      <div style="font-weight: 500; color: #ffffff;">
         ${column.name} ${badges.join(' ')}
       </div>
-      ${column.description ? `<div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 2px;">${column.description || ''}</div>` : ''}
+      ${column.description ? `<div style="font-size: 11px; color: #d1d5db; margin-top: 2px;">${column.description || ''}</div>` : ''}
     `;
     
     item.appendChild(checkbox);
