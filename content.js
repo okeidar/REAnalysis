@@ -3690,25 +3690,90 @@ async function handleConfirmationReceived() {
     
     const linkMessage = propertyLink;  // Send only the raw link
     
-    // Insert the link message
+    console.log('🔍 DEBUG: About to insert link message:', linkMessage);
+    console.log('🔍 DEBUG: Input field type:', inputField.tagName);
+    console.log('🔍 DEBUG: Input field contentEditable:', inputField.contentEditable);
+    console.log('🔍 DEBUG: Input field current value/content:', inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent);
+    
+    // Insert the link message with enhanced React compatibility
     if (inputField.tagName === 'TEXTAREA') {
+      // Clear field first
       inputField.value = '';
       inputField.focus();
+      
+      // Set the link
       inputField.value = linkMessage;
+      
+      // Trigger React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log('🔍 DEBUG: After setting textarea value:', inputField.value);
     } else if (inputField.contentEditable === 'true') {
+      // Clear field first
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the link using multiple methods for better compatibility
       inputField.textContent = linkMessage;
+      
+      // Also try innerHTML as backup
+      if (inputField.textContent !== linkMessage) {
+        inputField.innerHTML = linkMessage;
+      }
+      
+      // Trigger React state updates with more events
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+      inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+      
+      // Modern React sometimes uses these events
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      
+      console.log('🔍 DEBUG: After setting contentEditable content:', inputField.textContent);
+      console.log('🔍 DEBUG: contentEditable innerHTML:', inputField.innerHTML);
+    }
+    
+    // Wait a moment for React state to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Verify the content was set
+    const finalContent = inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent;
+    console.log('🔍 DEBUG: Final content in input field:', finalContent);
+    
+    if (finalContent !== linkMessage) {
+      console.warn('⚠️ WARNING: Link may not have been set correctly in input field');
+      console.warn('⚠️ Expected:', linkMessage);
+      console.warn('⚠️ Actual:', finalContent);
+      
+      // Try alternative method with direct manipulation
+      try {
+        if (inputField.contentEditable === 'true') {
+          // Try using document.execCommand as fallback
+          inputField.focus();
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+          document.execCommand('insertText', false, linkMessage);
+          
+          console.log('🔄 RETRY: Attempted alternative content setting method');
+          console.log('🔍 DEBUG: Content after retry:', inputField.textContent);
+        }
+      } catch (execError) {
+        console.warn('⚠️ Alternative content setting method failed:', execError);
+      }
     }
     
     inputField.focus();
     
-    // Auto-submit the link
-        setTimeout(() => {
+    // Auto-submit the link with additional delay to ensure content is ready
+    setTimeout(() => {
+      console.log('🚀 DEBUG: About to submit message');
+      console.log('🔍 DEBUG: Input content before submit:', inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent);
+      
       submitMessage();
       promptSplittingState.currentPhase = 'complete';
       showPromptSplittingIndicator('complete', 'Analysis request sent successfully!');
@@ -3773,19 +3838,37 @@ async function handleSplittingFallback() {
       .replace('{PROPERTY_URL}', promptSplittingState.pendingPropertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
     
-    // Insert the full prompt
+    // Insert the full prompt with enhanced React compatibility
+    console.log('🔄 DEBUG FALLBACK: About to insert full prompt:', fullPrompt.substring(0, 100) + '...');
+    console.log('🔄 DEBUG FALLBACK: Input field type:', inputField.tagName);
+    
     if (inputField.tagName === 'TEXTAREA') {
       inputField.value = '';
       inputField.focus();
       inputField.value = fullPrompt;
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log('🔄 DEBUG FALLBACK: Textarea value set to length:', inputField.value.length);
     } else if (inputField.contentEditable === 'true') {
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the content using multiple methods
       inputField.textContent = fullPrompt;
+      
+      // Also try innerHTML as backup
+      if (inputField.textContent !== fullPrompt) {
+        inputField.innerHTML = fullPrompt;
+      }
+      
+      // Trigger comprehensive React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
+      
+      console.log('🔄 DEBUG FALLBACK: ContentEditable content set to length:', inputField.textContent.length);
     }
     
     inputField.focus();
@@ -6899,6 +6982,115 @@ function setupResponseMonitor() {
   };
 }
 
+// Enhanced text insertion function for modern ChatGPT input compatibility
+async function insertTextInChatGPTInput(inputField, text, description = 'text') {
+  console.log(`🔤 Enhanced text insertion (${description}):`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+  console.log(`🔤 Input field type: ${inputField.tagName}, contentEditable: ${inputField.contentEditable}`);
+  
+  // Clear field first
+  if (inputField.tagName === 'TEXTAREA') {
+    inputField.value = '';
+  } else if (inputField.contentEditable === 'true') {
+    inputField.textContent = '';
+    inputField.innerHTML = '';
+  }
+  
+  // Focus the field
+  inputField.focus();
+  
+  // Wait a moment for focus to take effect
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  if (inputField.tagName === 'TEXTAREA') {
+    // For textarea elements
+    inputField.value = text;
+    
+    // Trigger React state updates
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    console.log(`🔤 Textarea content set (${description}), length:`, inputField.value.length);
+    
+  } else if (inputField.contentEditable === 'true') {
+    // For contentEditable elements (modern ChatGPT)
+    
+    // Method 1: Direct property assignment
+    inputField.textContent = text;
+    
+    // Method 2: If textContent fails, try innerHTML
+    if (inputField.textContent !== text) {
+      console.log('🔄 Trying innerHTML method as fallback...');
+      inputField.innerHTML = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
+    // Method 3: If both fail, try execCommand
+    if (inputField.textContent !== text && document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+      console.log('🔄 Trying execCommand method as fallback...');
+      try {
+        inputField.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, text);
+      } catch (execError) {
+        console.warn('⚠️ execCommand method failed:', execError);
+      }
+    }
+    
+    // Method 4: Modern alternative using clipboard API
+    if (inputField.textContent !== text && navigator.clipboard) {
+      console.log('🔄 Trying clipboard API method as final fallback...');
+      try {
+        await navigator.clipboard.writeText(text);
+        inputField.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('paste', false, null);
+      } catch (clipError) {
+        console.warn('⚠️ Clipboard API method failed:', clipError);
+      }
+    }
+    
+    // Trigger comprehensive React state updates
+    const events = [
+      new Event('beforeinput', { bubbles: true }),
+      new Event('input', { bubbles: true }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' })
+    ];
+    
+    // Add composition events for international input support
+    try {
+      events.push(new CompositionEvent('compositionstart', { bubbles: true }));
+      events.push(new CompositionEvent('compositionend', { bubbles: true }));
+    } catch (compError) {
+      // CompositionEvent might not be supported in all browsers
+    }
+    
+    events.forEach(event => {
+      try {
+        inputField.dispatchEvent(event);
+      } catch (eventError) {
+        console.warn('⚠️ Event dispatch failed:', eventError);
+      }
+    });
+    
+    console.log(`🔤 ContentEditable content set (${description}), length:`, inputField.textContent.length);
+  }
+  
+  // Final verification
+  const finalContent = inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent;
+  const success = finalContent === text;
+  
+  console.log(`🔤 Text insertion ${success ? 'SUCCESS' : 'FAILED'} (${description})`);
+  if (!success) {
+    console.warn(`⚠️ Expected length: ${text.length}, Actual length: ${finalContent.length}`);
+    console.warn(`⚠️ Expected start: "${text.substring(0, 50)}"`);
+    console.warn(`⚠️ Actual start: "${finalContent.substring(0, 50)}"`);
+  }
+  
+  return success;
+}
+
 // Function to find ChatGPT input field with more comprehensive selectors
 function findChatGPTInput() {
   console.log('🔍 Searching for ChatGPT input field...');
@@ -7122,7 +7314,10 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       const prompt = fullPrompt;
       console.log('Inserting prompt into input field:', inputField);
     
-    // Clear existing content first
+    // Clear existing content first and insert with enhanced React compatibility
+    console.log('🔀 DEBUG SINGLE: About to insert single prompt:', prompt.substring(0, 100) + '...');
+    console.log('🔀 DEBUG SINGLE: Input field type:', inputField.tagName);
+    
     if (inputField.tagName === 'TEXTAREA') {
       inputField.value = '';
       inputField.focus();
@@ -7132,18 +7327,50 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
       
+      console.log('🔀 DEBUG SINGLE: Textarea value set to length:', inputField.value.length);
+      
     } else if (inputField.contentEditable === 'true') {
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the content using multiple methods for better compatibility
       inputField.textContent = prompt;
       
-      // Trigger input events for contenteditable
+      // Also try innerHTML as backup
+      if (inputField.textContent !== prompt) {
+        inputField.innerHTML = prompt;
+      }
+      
+      // Trigger comprehensive React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
       
       // Also try composition events which some modern inputs use
-      inputField.dispatchEvent(new CompositionEvent('compositionstart'));
-      inputField.dispatchEvent(new CompositionEvent('compositionend'));
+      inputField.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      
+      console.log('🔀 DEBUG SINGLE: ContentEditable content set to length:', inputField.textContent.length);
+      
+      // Verify the content was set correctly
+      if (inputField.textContent !== prompt) {
+        console.warn('⚠️ WARNING: Single prompt may not have been set correctly');
+        console.warn('⚠️ Expected length:', prompt.length);
+        console.warn('⚠️ Actual length:', inputField.textContent.length);
+        
+        // Try alternative method with direct manipulation
+        try {
+          inputField.focus();
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+          document.execCommand('insertText', false, prompt);
+          
+          console.log('🔄 RETRY SINGLE: Attempted alternative content setting method');
+        } catch (execError) {
+          console.warn('⚠️ Alternative single prompt setting method failed:', execError);
+        }
+      }
     }
     
       // Ensure the field has focus
