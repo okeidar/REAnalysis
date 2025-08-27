@@ -1683,11 +1683,12 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, or 4):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, or 5):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
 4. Monitor ChatGPT responses (for debugging)
+5. Debug saved analysis data
       
 Or enter your own property URL:`);
       
@@ -1700,6 +1701,12 @@ Or enter your own property URL:`);
         console.log('🔍 Send a property link to ChatGPT and watch the console for:');
         console.log('🔍 - "FIRST response (confirmation)" - this should NOT be saved');
         console.log('🔍 - "SECOND response (analysis)" - this SHOULD be saved');
+        return;
+      }
+      
+      // Special debug option to inspect saved data
+      if (testUrl === '5') {
+        this.debugSavedAnalyses();
         return;
       }
       if (testUrl === '1') {
@@ -2361,8 +2368,23 @@ Or enter your own property URL:`);
         return;
       }
       
-      if (!property.analysis || !property.analysis.fullResponse) {
-        this.showChatGPTMessage('warning', 'No saved ChatGPT analysis found for this property. Click "Analyze" to generate analysis.');
+      // Debug what analysis data we have
+      console.log('🔍 DEBUG: Property found:', property.url);
+      console.log('🔍 DEBUG: Has analysis object:', !!property.analysis);
+      console.log('🔍 DEBUG: Analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
+      console.log('🔍 DEBUG: Has fullResponse:', !!(property.analysis?.fullResponse));
+      console.log('🔍 DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
+      console.log('🔍 DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 200) || 'No fullResponse');
+      console.log('🔍 DEBUG: All analysis data:', property.analysis);
+      
+      if (!property.analysis) {
+        this.showChatGPTMessage('warning', 'No analysis data found for this property. Click "Analyze" to generate analysis.');
+        return;
+      }
+      
+      if (!property.analysis.fullResponse && !property.analysis.fullAnalysis) {
+        this.showChatGPTMessage('warning', 'No saved ChatGPT response found for this property. The analysis may not have completed properly. Try analyzing again.');
+        console.log('🔍 DEBUG: Available analysis fields:', Object.keys(property.analysis));
         return;
       }
       
@@ -2394,7 +2416,7 @@ Or enter your own property URL:`);
     
     // Format the analysis data for display
     const propertyDetails = this.formatPropertyDetails(extractedData);
-    const analysisText = analysisData.fullResponse || 'No full analysis text available';
+    const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
     
     modal.innerHTML = `
       <div class="re-modal">
@@ -2693,6 +2715,58 @@ Or enter your own property URL:`);
     document.head.appendChild(styles);
   }
 
+  async debugSavedAnalyses() {
+    try {
+      this.showChatGPTMessage('info', 'Debugging saved analysis data. Check console for detailed information.');
+      
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      console.log('🔍 =================================');
+      console.log('🔍 DEBUGGING SAVED ANALYSIS DATA');
+      console.log('🔍 =================================');
+      console.log('📊 Total properties in storage:', properties.length);
+      
+      if (properties.length === 0) {
+        console.log('❌ No properties found in storage');
+        return;
+      }
+      
+      properties.forEach((property, index) => {
+        console.log(`\n🏠 Property ${index + 1}:`);
+        console.log('  📍 URL:', property.url);
+        console.log('  📅 Date:', property.date);
+        console.log('  🌐 Domain:', property.domain);
+        console.log('  📊 Has analysis object:', !!property.analysis);
+        
+        if (property.analysis) {
+          console.log('  🔍 Analysis keys:', Object.keys(property.analysis));
+          console.log('  📄 Has fullResponse:', !!property.analysis.fullResponse);
+          console.log('  📏 fullResponse length:', property.analysis.fullResponse?.length || 0);
+          console.log('  📄 Has fullAnalysis:', !!property.analysis.fullAnalysis);
+          console.log('  📏 fullAnalysis length:', property.analysis.fullAnalysis?.length || 0);
+          console.log('  📊 Extracted data keys:', Object.keys(property.analysis.extractedData || {}));
+          console.log('  📄 fullResponse preview:', property.analysis.fullResponse?.substring(0, 200) || 'No fullResponse');
+          console.log('  📄 fullAnalysis preview:', property.analysis.fullAnalysis?.substring(0, 200) || 'No fullAnalysis');
+        } else {
+          console.log('  ❌ No analysis data');
+        }
+      });
+      
+      console.log('\n🔍 =================================');
+      console.log('🔍 END DEBUG INFO');
+      console.log('🔍 =================================');
+      
+    } catch (error) {
+      console.error('❌ Failed to debug saved analyses:', error);
+      this.showChatGPTMessage('error', 'Failed to load saved analysis data for debugging');
+    }
+  }
+
   async copyAnalysisToClipboard(url) {
     try {
       // Load property data
@@ -2705,7 +2779,7 @@ Or enter your own property URL:`);
       const property = properties.find(p => p.url === url);
       
       if (property && property.analysis) {
-        const analysisText = property.analysis.fullResponse || 'No analysis available';
+        const analysisText = property.analysis.fullResponse || property.analysis.fullAnalysis || 'No analysis available';
         await navigator.clipboard.writeText(analysisText);
         this.showChatGPTMessage('success', 'Analysis copied to clipboard!');
       }
@@ -5965,6 +6039,15 @@ function setupResponseMonitor() {
               promptSplittingState.pendingPropertyLink) {
             
             console.log('✅ SECOND RESPONSE: Successfully extracted analysis data from split prompt response');
+            console.log('🔍 ANALYSIS DATA BEING SAVED:', {
+              url: promptSplittingState.pendingPropertyLink,
+              hasFullResponse: !!analysisData.fullResponse,
+              fullResponseLength: analysisData.fullResponse?.length || 0,
+              hasFullAnalysis: !!analysisData.fullAnalysis,
+              fullAnalysisLength: analysisData.fullAnalysis?.length || 0,
+              extractedDataKeys: Object.keys(analysisData.extractedData || {}),
+              fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
+            });
             
             // Send the analysis data with the pending property link
             safeChromeFall(() => {
@@ -6047,6 +6130,15 @@ function setupResponseMonitor() {
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
         console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
+        console.log('🔍 ANALYSIS DATA BEING SAVED:', {
+          url: currentPropertyAnalysis.url,
+          hasFullResponse: !!analysisData.fullResponse,
+          fullResponseLength: analysisData.fullResponse?.length || 0,
+          hasFullAnalysis: !!analysisData.fullAnalysis,
+          fullAnalysisLength: analysisData.fullAnalysis?.length || 0,
+          extractedDataKeys: Object.keys(analysisData.extractedData || {}),
+          fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
+        });
         console.log('📊 Extracted data summary:', {
           propertyUrl: currentPropertyAnalysis.url,
           sessionId: currentPropertyAnalysis.sessionId,
