@@ -548,54 +548,173 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
         
-        <!-- Prompt Selection Settings -->
+        <!-- Analysis Prompt Configuration -->
         <div class="re-section">
           <div class="re-section-header">
             <div class="re-section-title">Analysis Prompt Configuration</div>
-            <div class="re-section-subtitle">Choose and customize the prompt sent to ChatGPT for property analysis</div>
+            <div class="re-section-subtitle">Customize all prompts sent to ChatGPT for property analysis</div>
           </div>
           
-          <div class="re-form-group">
-            <label class="re-form-label">Prompt Type</label>
-            <select class="re-form-input" id="re-prompt-type-select">
-              <option value="default">Default - Standard Analysis</option>
-              <option value="dynamic">Dynamic - Column-Based</option>
-              <option value="tabular">Tabular - Comprehensive Data Extraction</option>
-              <option value="custom">Custom - User-Defined Template</option>
-            </select>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Select the type of analysis prompt to use
-            </div>
+          <!-- Prompt Configuration Tabs -->
+          <div class="re-prompt-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 16px;">
+            <button class="re-prompt-tab re-prompt-tab-active" data-tab="selection" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500;">
+              🎯 Prompt Selection
+            </button>
+            <button class="re-prompt-tab" data-tab="default" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+              📄 Default Prompt
+            </button>
+            <button class="re-prompt-tab" data-tab="dynamic" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+              🔄 Dynamic Prompt
+            </button>
+            <button class="re-prompt-tab" data-tab="tabular" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+              📊 Tabular Configuration
+            </button>
           </div>
+          
+          <!-- Prompt Selection Tab -->
+          <div id="re-prompt-selection-tab" class="re-prompt-tab-content">
+            <div class="re-form-group">
+              <label class="re-form-label">Active Prompt Type</label>
+              <select class="re-form-input" id="re-prompt-type-select">
+                <option value="default">Default - Standard Analysis</option>
+                <option value="dynamic">Dynamic - Column-Based</option>
+                <option value="tabular">Tabular - Comprehensive Data Extraction</option>
+                <option value="custom">Custom - User-Defined Template</option>
+              </select>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Select which prompt type to use for analysis
+              </div>
+            </div>
 
-          <div class="re-form-group" id="re-prompt-description">
-            <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
-              Standard real estate investment analysis with basic property data extraction
+            <div class="re-form-group" id="re-prompt-description">
+              <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+                Standard real estate investment analysis with basic property data extraction
+              </div>
+            </div>
+            
+            <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
+              <label class="re-form-label">Custom Prompt Template</label>
+              <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
+                        placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
+                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Variables: {PROPERTY_URL}, {DATE}
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
+                <div>💾</div>
+                <span>Save Selection</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-current-prompt">
+                <div>👁️</div>
+                <span>Preview Current</span>
+              </button>
             </div>
           </div>
           
-          <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
-            <label class="re-form-label">Custom Prompt Template</label>
-            <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
-                      placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
-                      style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Variables: {PROPERTY_URL}, {DATE}
+          <!-- Default Prompt Tab -->
+          <div id="re-prompt-default-tab" class="re-prompt-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Default Analysis Prompt</label>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+                Customize the standard property analysis prompt template
+              </div>
+              <textarea id="re-default-prompt-template" class="re-form-input" rows="15" 
+                        placeholder="Enter your default analysis prompt..."
+                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Available variables: {PROPERTY_URL}, {DATE}
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">
+                <div>💾</div>
+                <span>Save Default Prompt</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">
+                <div>🔄</div>
+                <span>Reset to Default</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">
+                <div>👁️</div>
+                <span>Preview</span>
+              </button>
             </div>
           </div>
           
-          <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt">
+          <!-- Dynamic Prompt Tab -->
+          <div id="re-prompt-dynamic-tab" class="re-prompt-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Dynamic Prompt Template</label>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+                Template for column-based dynamic prompts. Use {{COLUMNS}} where you want the selected columns to be inserted.
+              </div>
+              <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="12" 
+                        placeholder="Enter your dynamic prompt template..."
+                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Available variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+              </div>
+            </div>
+            
+            <div class="re-form-group">
+              <label class="re-form-label">Column Selection for Dynamic Prompt</label>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+                Choose which data points to include in the dynamic prompt
+              </div>
+              <div id="re-dynamic-columns-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px;">
+                <!-- Dynamic columns will be populated here -->
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">
+                <div>💾</div>
+                <span>Save Dynamic Prompt</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">
+                <div>🔄</div>
+                <span>Reset to Default</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">
+                <div>👁️</div>
+                <span>Preview Dynamic</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Tabular Configuration Tab (Enhanced) -->
+          <div id="re-prompt-tabular-tab" class="re-prompt-tab-content" style="display: none;">
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 12px; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+              📊 This tab redirects to the comprehensive Tabular Data Configuration section below, which includes prompt template editing, column management, and custom column creation.
+            </div>
+            
+            <button class="re-btn re-btn-primary re-btn-full" id="re-goto-tabular-config">
+              <div>📊</div>
+              <span>Go to Tabular Configuration</span>
+            </button>
+          </div>
+          
+          <!-- Global Prompt Actions -->
+          <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--chatgpt-border-light);">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-prompts">
               <div>💾</div>
-              <span>Save Settings</span>
+              <span>Save All Prompts</span>
             </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-prompts">
               <div>🔄</div>
-              <span>Reset to Default</span>
+              <span>Reset All to Default</span>
             </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-prompt">
-              <div>👁️</div>
-              <span>Preview</span>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-export-prompts">
+              <div>📤</div>
+              <span>Export Prompts</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-import-prompts">
+              <div>📥</div>
+              <span>Import Prompts</span>
             </button>
           </div>
         </div>
@@ -3660,6 +3779,9 @@ Or enter your own property URL:`);
       previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
     
+    // Enhanced prompt configuration event listeners
+    this.setupPromptConfigurationEvents();
+    
     // Column configuration event listeners
     this.setupColumnConfigurationEvents();
   }
@@ -3827,6 +3949,533 @@ Or enter your own property URL:`);
   previewCustomPrompt() {
     // This method is kept for backward compatibility
     this.previewPrompt();
+  }
+
+  // Enhanced Prompt Configuration Management
+  setupPromptConfigurationEvents() {
+    // Prompt configuration tab switching
+    this.setupPromptTabs();
+    
+    // Default prompt management
+    const saveDefaultBtn = this.panel.querySelector('#re-save-default-prompt');
+    const resetDefaultBtn = this.panel.querySelector('#re-reset-default-prompt');
+    const previewDefaultBtn = this.panel.querySelector('#re-preview-default-prompt');
+    
+    if (saveDefaultBtn) {
+      saveDefaultBtn.addEventListener('click', () => this.saveDefaultPrompt());
+    }
+    
+    if (resetDefaultBtn) {
+      resetDefaultBtn.addEventListener('click', () => this.resetDefaultPrompt());
+    }
+    
+    if (previewDefaultBtn) {
+      previewDefaultBtn.addEventListener('click', () => this.previewDefaultPrompt());
+    }
+    
+    // Dynamic prompt management
+    const saveDynamicBtn = this.panel.querySelector('#re-save-dynamic-prompt');
+    const resetDynamicBtn = this.panel.querySelector('#re-reset-dynamic-prompt');
+    const previewDynamicBtn = this.panel.querySelector('#re-preview-dynamic-prompt');
+    
+    if (saveDynamicBtn) {
+      saveDynamicBtn.addEventListener('click', () => this.saveDynamicPrompt());
+    }
+    
+    if (resetDynamicBtn) {
+      resetDynamicBtn.addEventListener('click', () => this.resetDynamicPrompt());
+    }
+    
+    if (previewDynamicBtn) {
+      previewDynamicBtn.addEventListener('click', () => this.previewDynamicPrompt());
+    }
+    
+    // Prompt selection management
+    const saveSelectionBtn = this.panel.querySelector('#re-save-prompt-selection');
+    const previewCurrentBtn = this.panel.querySelector('#re-preview-current-prompt');
+    
+    if (saveSelectionBtn) {
+      saveSelectionBtn.addEventListener('click', () => this.savePromptSettings());
+    }
+    
+    if (previewCurrentBtn) {
+      previewCurrentBtn.addEventListener('click', () => this.previewPrompt());
+    }
+    
+    // Global prompt actions
+    const saveAllPromptsBtn = this.panel.querySelector('#re-save-all-prompts');
+    const resetAllPromptsBtn = this.panel.querySelector('#re-reset-all-prompts');
+    const exportPromptsBtn = this.panel.querySelector('#re-export-prompts');
+    const importPromptsBtn = this.panel.querySelector('#re-import-prompts');
+    const gotoTabularBtn = this.panel.querySelector('#re-goto-tabular-config');
+    
+    if (saveAllPromptsBtn) {
+      saveAllPromptsBtn.addEventListener('click', () => this.saveAllPrompts());
+    }
+    
+    if (resetAllPromptsBtn) {
+      resetAllPromptsBtn.addEventListener('click', () => this.resetAllPrompts());
+    }
+    
+    if (exportPromptsBtn) {
+      exportPromptsBtn.addEventListener('click', () => this.exportPrompts());
+    }
+    
+    if (importPromptsBtn) {
+      importPromptsBtn.addEventListener('click', () => this.importPrompts());
+    }
+    
+    if (gotoTabularBtn) {
+      gotoTabularBtn.addEventListener('click', () => this.scrollToTabularConfig());
+    }
+  }
+
+  setupPromptTabs() {
+    const tabs = this.panel.querySelectorAll('.re-prompt-tab');
+    const tabContents = this.panel.querySelectorAll('.re-prompt-tab-content');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+        
+        // Update tab styles
+        tabs.forEach(t => {
+          t.classList.remove('re-prompt-tab-active');
+          t.style.borderBottomColor = 'transparent';
+          t.style.fontWeight = 'normal';
+        });
+        
+        tab.classList.add('re-prompt-tab-active');
+        tab.style.borderBottomColor = 'var(--chatgpt-accent)';
+        tab.style.fontWeight = '500';
+        
+        // Show/hide content
+        tabContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-prompt-${targetTab}-tab`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to tabs
+          if (targetTab === 'default') {
+            this.loadDefaultPrompt();
+          } else if (targetTab === 'dynamic') {
+            this.loadDynamicPrompt();
+          }
+        }
+      });
+    });
+  }
+
+  // Default Prompt Management
+  async loadDefaultPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['defaultPromptTemplate']),
+        { defaultPromptTemplate: null }
+      );
+      
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (templateTextarea) {
+        if (result.defaultPromptTemplate) {
+          templateTextarea.value = result.defaultPromptTemplate;
+        } else {
+          // Load built-in default template
+          templateTextarea.value = getDefaultPromptTemplate();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to load default prompt:', error);
+    }
+  }
+
+  async saveDefaultPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ defaultPromptTemplate: template || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Default prompt template saved successfully!');
+      console.log('💾 Default prompt template saved');
+      
+    } catch (error) {
+      console.error('Failed to save default prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save default prompt template');
+    }
+  }
+
+  async resetDefaultPrompt() {
+    if (confirm('Are you sure you want to reset the default prompt template?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['defaultPromptTemplate']),
+          null
+        );
+        
+        // Reload with built-in default
+        this.loadDefaultPrompt();
+        
+        this.showChatGPTMessage('success', 'Default prompt template reset');
+        console.log('🔄 Default prompt template reset');
+        
+      } catch (error) {
+        console.error('Failed to reset default prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset default prompt template');
+      }
+    }
+  }
+
+  async previewDefaultPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, 'default prompt');
+      
+    } catch (error) {
+      console.error('Failed to preview default prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to preview default prompt');
+    }
+  }
+
+  // Dynamic Prompt Management
+  async loadDynamicPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+        { dynamicPromptTemplate: null, dynamicPromptColumns: null }
+      );
+      
+      // Load template
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (templateTextarea) {
+        if (result.dynamicPromptTemplate) {
+          templateTextarea.value = result.dynamicPromptTemplate;
+        } else {
+          // Load built-in dynamic template
+          templateTextarea.value = getDefaultDynamicPromptTemplate();
+        }
+      }
+      
+      // Load and render column selection
+      await this.loadDynamicColumnsSelection(result.dynamicPromptColumns);
+      
+    } catch (error) {
+      console.error('Failed to load dynamic prompt:', error);
+    }
+  }
+
+  async loadDynamicColumnsSelection(savedColumns) {
+    try {
+      const container = this.panel.querySelector('#re-dynamic-columns-container');
+      if (!container) return;
+      
+      // Get all available columns
+      const allColumns = getTabularDataColumns();
+      const customColumns = await this.getCustomColumns();
+      const availableColumns = [...allColumns, ...customColumns];
+      
+      // Create column checkboxes
+      container.innerHTML = '';
+      
+      availableColumns.forEach(column => {
+        const isEnabled = savedColumns ? 
+          savedColumns.includes(column.id) : 
+          column.enabled !== false; // Default to enabled unless explicitly disabled
+        
+        const columnDiv = document.createElement('div');
+        columnDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding: 4px 8px; border-radius: 4px; transition: background-color 0.2s;';
+        columnDiv.innerHTML = `
+          <input type="checkbox" id="dynamic-col-${column.id}" ${isEnabled ? 'checked' : ''} 
+                 style="margin: 0;" data-column-id="${column.id}">
+          <label for="dynamic-col-${column.id}" style="flex: 1; font-size: 12px; cursor: pointer; margin: 0;">
+            ${column.name}
+            ${column.required ? '<span style="color: var(--chatgpt-accent); font-size: 10px;">[REQUIRED]</span>' : ''}
+            ${column.isCalculated ? '<span style="color: var(--chatgpt-text-secondary); font-size: 10px;">[CALCULATED]</span>' : ''}
+          </label>
+        `;
+        
+        // Add hover effect
+        columnDiv.addEventListener('mouseenter', () => {
+          columnDiv.style.backgroundColor = 'var(--chatgpt-hover-bg)';
+        });
+        columnDiv.addEventListener('mouseleave', () => {
+          columnDiv.style.backgroundColor = 'transparent';
+        });
+        
+        container.appendChild(columnDiv);
+      });
+      
+    } catch (error) {
+      console.error('Failed to load dynamic columns selection:', error);
+    }
+  }
+
+  async saveDynamicPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      // Get selected columns
+      const selectedColumns = Array.from(this.panel.querySelectorAll('#re-dynamic-columns-container input[type="checkbox"]:checked'))
+        .map(cb => cb.dataset.columnId);
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ 
+          dynamicPromptTemplate: template || null,
+          dynamicPromptColumns: selectedColumns
+        }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Dynamic prompt configuration saved successfully!');
+      console.log('💾 Dynamic prompt configuration saved');
+      
+    } catch (error) {
+      console.error('Failed to save dynamic prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save dynamic prompt configuration');
+    }
+  }
+
+  async resetDynamicPrompt() {
+    if (confirm('Are you sure you want to reset the dynamic prompt configuration?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+          null
+        );
+        
+        // Reload with defaults
+        this.loadDynamicPrompt();
+        
+        this.showChatGPTMessage('success', 'Dynamic prompt configuration reset');
+        console.log('🔄 Dynamic prompt configuration reset');
+        
+      } catch (error) {
+        console.error('Failed to reset dynamic prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset dynamic prompt configuration');
+      }
+    }
+  }
+
+  async previewDynamicPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Get selected columns
+      const selectedColumns = Array.from(this.panel.querySelectorAll('#re-dynamic-columns-container input[type="checkbox"]:checked'))
+        .map(cb => cb.dataset.columnId);
+      
+      // Generate columns section
+      let columnsSection = 'No columns selected';
+      if (selectedColumns.length > 0) {
+        const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+        const enabledColumns = allColumns.filter(col => selectedColumns.includes(col.id));
+        columnsSection = generateColumnsSectionForPrompt(enabledColumns);
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{\{COLUMNS\}\}/g, columnsSection)
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `dynamic prompt (${selectedColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview dynamic prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to preview dynamic prompt');
+    }
+  }
+
+  // Global Prompt Management
+  async saveAllPrompts() {
+    try {
+      // Save all prompt configurations
+      await this.saveDefaultPrompt();
+      await this.saveDynamicPrompt();
+      await this.saveTabularTemplate();
+      await this.savePromptSettings();
+      
+      this.showChatGPTMessage('success', 'All prompt configurations saved successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save all prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to save all prompt configurations');
+    }
+  }
+
+  async resetAllPrompts() {
+    if (confirm('Are you sure you want to reset ALL prompt configurations to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove([
+            'defaultPromptTemplate',
+            'dynamicPromptTemplate', 
+            'dynamicPromptColumns',
+            'tabularPromptTemplate',
+            'customPrompt',
+            'promptType'
+          ]),
+          null
+        );
+        
+        // Reload all tabs
+        this.loadDefaultPrompt();
+        this.loadDynamicPrompt();
+        this.loadTabularTemplate();
+        this.loadPromptSettings();
+        
+        this.showChatGPTMessage('success', 'All prompt configurations reset to default');
+        
+      } catch (error) {
+        console.error('Failed to reset all prompts:', error);
+        this.showChatGPTMessage('error', 'Failed to reset all prompt configurations');
+      }
+    }
+  }
+
+  async exportPrompts() {
+    try {
+      // Get all prompt configurations
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get([
+          'defaultPromptTemplate',
+          'dynamicPromptTemplate',
+          'dynamicPromptColumns', 
+          'tabularPromptTemplate',
+          'customPrompt',
+          'promptType',
+          'customColumns',
+          'tabularColumnConfiguration'
+        ]),
+        {}
+      );
+      
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        version: '2.0.0',
+        prompts: result
+      };
+      
+      // Create and download file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `re-analyzer-prompts-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      this.showChatGPTMessage('success', 'Prompt configurations exported successfully!');
+      
+    } catch (error) {
+      console.error('Failed to export prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to export prompt configurations');
+    }
+  }
+
+  async importPrompts() {
+    try {
+      // Create file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = async (event) => {
+        try {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const text = await file.text();
+          const importData = JSON.parse(text);
+          
+          if (!importData.prompts) {
+            throw new Error('Invalid prompt configuration file');
+          }
+          
+          // Confirm import
+          if (!confirm('This will overwrite your current prompt configurations. Continue?')) {
+            return;
+          }
+          
+          // Save imported data
+          await safeChromeFall(
+            () => chrome.storage.local.set(importData.prompts),
+            null
+          );
+          
+          // Reload all configurations
+          this.loadDefaultPrompt();
+          this.loadDynamicPrompt();
+          this.loadTabularTemplate();
+          this.loadPromptSettings();
+          this.loadTabularColumns();
+          this.loadCustomColumns();
+          
+          this.showChatGPTMessage('success', 'Prompt configurations imported successfully!');
+          
+        } catch (error) {
+          console.error('Failed to import prompts:', error);
+          this.showChatGPTMessage('error', 'Failed to import prompt configurations');
+        }
+      };
+      
+      input.click();
+      
+    } catch (error) {
+      console.error('Failed to import prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to import prompt configurations');
+    }
+  }
+
+  scrollToTabularConfig() {
+    const tabularSection = this.panel.querySelector('#re-tabular-columns-section');
+    if (tabularSection) {
+      // Show the tabular section first
+      tabularSection.style.display = 'block';
+      
+      // Scroll to it
+      tabularSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
+      // Switch to settings tab if not already there
+      this.switchTab('settings');
+      
+      this.showChatGPTMessage('success', 'Scrolled to Tabular Data Configuration');
+    }
   }
 
   // Enhanced Tabular Configuration Methods
@@ -5516,6 +6165,32 @@ Analysis Date: {DATE}
 Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
 }
 
+// Default dynamic prompt template with column placeholders
+function getDefaultDynamicPromptTemplate() {
+  return `You are a professional real estate analyst. Please analyze the provided property listing and extract the following specific data points for investment analysis.
+
+**PROPERTY ANALYSIS REQUEST:**
+
+Please extract the following information from the property listing:
+
+{{COLUMNS}}
+
+**INSTRUCTIONS:**
+- Provide accurate, specific data for each requested field
+- Use "N/A" if information is not available in the listing
+- Include currency symbols for monetary values ($)
+- Use consistent formats for dates, percentages, and numbers
+- Focus on extracting factual data rather than subjective assessments
+
+**OUTPUT FORMAT:**
+Please organize your response with clear labels for each data point, making it easy to extract the specific information requested.
+
+Property URL: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Thank you for providing accurate, structured data for investment analysis.`;
+}
+
 // Default tabular prompt template with placeholder for columns
 function getDefaultTabularPromptTemplate() {
   return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
@@ -5785,6 +6460,20 @@ function generateColumnsSectionForPrompt(columns) {
   return sections.join('\n\n');
 }
 
+// Helper function to get custom columns statically (for use in non-UI contexts)
+async function getCustomColumnsStatic() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['customColumns']),
+      { customColumns: [] }
+    );
+    return result.customColumns || [];
+  } catch (error) {
+    console.error('Failed to get custom columns:', error);
+    return [];
+  }
+}
+
 // Function to get the selected prompt based on user preference
 async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
   try {
@@ -5840,13 +6529,48 @@ async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) 
         return getTabularDataExtractionPrompt();
         
       case 'dynamic':
+        // Check if user has custom dynamic template
+        const dynamicResult = await safeChromeFall(
+          () => chrome.storage.local.get(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+          { dynamicPromptTemplate: null, dynamicPromptColumns: null }
+        );
+        
+        if (dynamicResult.dynamicPromptTemplate) {
+          // Get enabled columns
+          const enabledColumns = dynamicResult.dynamicPromptColumns || [];
+          
+          // Generate columns section
+          let columnsSection = '';
+          if (enabledColumns.length > 0) {
+            const allColumns = [...getTabularDataColumns(), ...await getCustomColumnsStatic()];
+            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+            columnsSection = generateColumnsSectionForPrompt(selectedColumns);
+          }
+          
+          // Replace template placeholders
+          return dynamicResult.dynamicPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+        }
+        
+        // Fallback to default dynamic generation
         return await generateDynamicPrompt();
+        
       case 'custom':
         return customPrompt || getDefaultPromptTemplate();
+        
       case 'default':
       default:
-        // Check if user has custom prompt set, otherwise use dynamic
-        return customPrompt || await generateDynamicPrompt();
+        // Check if user has custom default template
+        const defaultResult = await safeChromeFall(
+          () => chrome.storage.local.get(['defaultPromptTemplate']),
+          { defaultPromptTemplate: null }
+        );
+        
+        if (defaultResult.defaultPromptTemplate) {
+          return defaultResult.defaultPromptTemplate;
+        }
+        
+        // Check if user has custom prompt set, otherwise use built-in default
+        return customPrompt || getDefaultPromptTemplate();
     }
   } catch (error) {
     console.error('Error selecting prompt:', error);
