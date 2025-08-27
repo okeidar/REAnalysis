@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Helper Extension",
-  "version": "1.1.2",
-  "description": "A Chrome extension that works exclusively on ChatGPT",
+  "name": "RE Analyzer - ChatGPT Embedded",
+  "version": "2.0.0",
+  "description": "Real Estate Property Analyzer embedded directly in ChatGPT for seamless property analysis",
   "permissions": [
     "activeTab",
     "storage",
@@ -21,16 +21,12 @@
         "https://chat.openai.com/*"
       ],
       "js": ["content.js"],
-      "css": ["styles.css"],
+      "css": ["embedded-styles.css"],
       "run_at": "document_end"
     }
   ],
   "background": {
     "service_worker": "background.js"
-  },
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "ChatGPT Helper"
   },
   "icons": {
     "16": "icons/icon16.png",
@@ -40,7 +36,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["docx.min.js"],
+      "resources": ["docx.min.js", "embedded-ui.html", "embedded-styles.css"],
       "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
     }
   ]

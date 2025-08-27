@@ -1,5 +1,16 @@
-// Content script for ChatGPT Helper Extension
-console.log('ChatGPT Helper Extension loaded on:', window.location.href);
+// Content script for RE Analyzer Embedded Extension
+console.log('🏠 RE Analyzer Embedded v2.0 loaded on:', window.location.href);
+
+// Embedded UI state management
+let embeddedUI = null;
+let isUIInitialized = false;
+let currentPropertyAnalysis = null;
+let uiSettings = {
+  position: 'right',
+  compactMode: false,
+  autoShow: true,
+  showNotifications: true
+};
 
 // Function to check if extension context is still valid
 function isExtensionContextValid() {
@@ -51,6 +62,1711 @@ let promptSplittingState = {
 function isChatGPTSite() {
   return window.location.hostname === 'chatgpt.com' || 
          window.location.hostname === 'chat.openai.com';
+}
+
+// ============================================================================
+// EMBEDDED UI IMPLEMENTATION
+// ============================================================================
+
+// Main embedded UI class
+class REAnalyzerEmbeddedUI {
+  constructor() {
+    this.fab = null;
+    this.panel = null;
+    this.isVisible = false;
+    this.currentTab = 'analyzer';
+    this.dragState = { isDragging: false, startX: 0, startY: 0 };
+    this.analysisTimer = null;
+    this.analysisStartTime = 0;
+    
+    this.initialize();
+  }
+
+  async initialize() {
+    try {
+      console.log('🚀 Initializing RE Analyzer Embedded UI...');
+      
+      // Load settings
+      await this.loadSettings();
+      
+      // Create UI elements
+      this.createFloatingActionButton();
+      this.createEmbeddedPanel();
+      
+      // Set up event listeners
+      this.setupEventListeners();
+      
+      // Set up adaptive positioning
+      this.setupAdaptivePositioning();
+      
+      // Set up keyboard shortcuts
+      this.setupKeyboardShortcuts();
+      
+      // Initialize status
+      this.updateConnectionStatus();
+      
+      // Load initial data
+      await this.loadPropertyData();
+      
+      console.log('✅ RE Analyzer Embedded UI initialized successfully');
+      isUIInitialized = true;
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize embedded UI:', error);
+    }
+  }
+
+  async loadSettings() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['embeddedUISettings']),
+        { embeddedUISettings: {} }
+      );
+      
+      if (result.embeddedUISettings) {
+        uiSettings = { ...uiSettings, ...result.embeddedUISettings };
+      }
+      
+      console.log('📋 Loaded UI settings:', uiSettings);
+    } catch (error) {
+      console.warn('Failed to load UI settings:', error);
+    }
+  }
+
+  createFloatingActionButton() {
+    // Remove existing FAB if it exists
+    const existingFab = document.getElementById('re-analyzer-fab');
+    if (existingFab) {
+      existingFab.remove();
+    }
+
+    // Create FAB
+    this.fab = document.createElement('div');
+    this.fab.id = 're-analyzer-fab';
+    this.fab.className = 're-fab';
+    this.fab.title = 'RE Analyzer';
+    this.fab.innerHTML = `
+      <div class="re-fab-icon">🏠</div>
+      <div class="re-fab-notification" id="re-fab-notification"></div>
+    `;
+
+    // Add to page
+    document.body.appendChild(this.fab);
+
+    // FAB click handler
+    this.fab.addEventListener('click', () => {
+      this.togglePanel();
+    });
+
+    console.log('🎯 Created floating action button');
+  }
+
+  createEmbeddedPanel() {
+    // Remove existing panel if it exists
+    const existingPanel = document.getElementById('re-analyzer-panel');
+    if (existingPanel) {
+      existingPanel.remove();
+    }
+
+    // Load the embedded UI HTML content
+    this.panel = document.createElement('div');
+    this.panel.id = 're-analyzer-panel';
+    this.panel.className = `re-panel re-panel-collapsed re-panel-${uiSettings.position}`;
+    
+    // Set initial content - this will be loaded from embedded-ui.html structure
+    this.panel.innerHTML = this.getEmbeddedPanelHTML();
+
+    // Add to page
+    document.body.appendChild(this.panel);
+
+    // Apply compact mode if enabled
+    if (uiSettings.compactMode) {
+      document.body.classList.add('re-compact-mode');
+    }
+
+    console.log('🎨 Created embedded panel');
+  }
+
+  getEmbeddedPanelHTML() {
+    return `
+      <!-- Panel Header -->
+      <div class="re-panel-header">
+        <div class="re-panel-title">
+          <span class="re-logo">🏠</span>
+          <span class="re-title">RE Analyzer</span>
+          <span class="re-version">v2.0</span>
+        </div>
+        <div class="re-panel-actions">
+          <button id="re-minimize-btn" class="re-btn re-btn-icon" title="Minimize">
+            <span>−</span>
+          </button>
+          <button id="re-close-btn" class="re-btn re-btn-icon" title="Close">
+            <span>×</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="re-tab-nav" id="re-tab-nav">
+        <button class="re-tab-btn re-tab-active" data-tab="analyzer">
+          <span class="re-tab-icon">🔍</span>
+          <span class="re-tab-label">Analyzer</span>
+        </button>
+        <button class="re-tab-btn" data-tab="properties">
+          <span class="re-tab-icon">📊</span>
+          <span class="re-tab-label">Properties</span>
+          <span class="re-tab-notification" id="properties-notification"></span>
+        </button>
+        <button class="re-tab-btn" data-tab="settings">
+          <span class="re-tab-icon">⚙️</span>
+          <span class="re-tab-label">Settings</span>
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="re-panel-content">
+        ${this.getAnalyzerTabHTML()}
+        ${this.getPropertiesTabHTML()}
+        ${this.getSettingsTabHTML()}
+      </div>
+    `;
+  }
+
+  getAnalyzerTabHTML() {
+    return `
+      <!-- Analyzer Tab -->
+      <div id="analyzer-tab" class="re-tab-content re-tab-active">
+        <!-- Quick Actions -->
+        <div class="re-quick-actions">
+          <button id="re-paste-analyze-btn" class="re-btn re-btn-primary re-btn-large">
+            <span class="re-btn-icon">📋</span>
+            <span class="re-btn-text">Paste & Analyze</span>
+          </button>
+          <button id="re-manual-input-btn" class="re-btn re-btn-secondary">
+            <span class="re-btn-icon">✏️</span>
+            <span class="re-btn-text">Manual Input</span>
+          </button>
+        </div>
+
+        <!-- Property Input Section -->
+        <div id="re-property-input" class="re-section re-hidden">
+          <div class="re-section-header">
+            <h3>Property Analysis</h3>
+          </div>
+          <div class="re-form-group">
+            <label for="re-property-url" class="re-label">Property URL</label>
+            <div class="re-input-group">
+              <input type="text" id="re-property-url" class="re-input" 
+                     placeholder="Paste property link from Zillow, Realtor.com, etc.">
+              <button id="re-paste-btn" class="re-btn re-btn-icon" title="Paste from clipboard">
+                📋
+              </button>
+            </div>
+            <div class="re-input-validation" id="re-url-validation"></div>
+          </div>
+          <div class="re-form-actions">
+            <button id="re-analyze-btn" class="re-btn re-btn-primary">
+              <span class="re-btn-icon">🔍</span>
+              <span class="re-btn-text">Analyze Property</span>
+            </button>
+            <button id="re-clear-btn" class="re-btn re-btn-ghost">Clear</button>
+          </div>
+        </div>
+
+        <!-- Status Section -->
+        <div class="re-status-section">
+          <div id="re-status" class="re-status re-status-checking">
+            <div class="re-status-icon">
+              <div class="re-spinner"></div>
+            </div>
+            <div class="re-status-content">
+              <div class="re-status-title">Checking Connection...</div>
+              <div class="re-status-subtitle">Verifying ChatGPT access</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Progress -->
+        <div id="re-analysis-progress" class="re-progress-section re-hidden">
+          <div class="re-progress-header">
+            <h4>Analysis in Progress</h4>
+            <span class="re-progress-time" id="re-progress-time">0:00</span>
+          </div>
+          <div class="re-progress-steps">
+            <div class="re-progress-step" data-step="validate">
+              <div class="re-step-icon">⏳</div>
+              <span>Validating URL</span>
+            </div>
+            <div class="re-progress-step" data-step="send">
+              <div class="re-step-icon">⏳</div>
+              <span>Sending to ChatGPT</span>
+            </div>
+            <div class="re-progress-step" data-step="analyze">
+              <div class="re-step-icon">⏳</div>
+              <span>AI Analysis</span>
+            </div>
+            <div class="re-progress-step" data-step="save">
+              <div class="re-step-icon">⏳</div>
+              <span>Saving Results</span>
+            </div>
+          </div>
+          <div class="re-progress-tip">
+            <span class="re-tip-icon">💡</span>
+            <span>Analysis typically takes 30-60 seconds</span>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="re-messages" id="re-messages">
+          <div id="re-success-message" class="re-message re-message-success re-hidden">
+            <div class="re-message-icon">✅</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div id="re-error-message" class="re-message re-message-error re-hidden">
+            <div class="re-message-icon">❌</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div id="re-warning-message" class="re-message re-message-warning re-hidden">
+            <div class="re-message-icon">⚠️</div>
+            <div class="re-message-content"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getPropertiesTabHTML() {
+    return `
+      <!-- Properties Tab -->
+      <div id="properties-tab" class="re-tab-content">
+        <!-- Properties Overview -->
+        <div class="re-properties-overview">
+          <div class="re-overview-stats">
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-total-properties">0</span>
+              <span class="re-stat-label">Properties</span>
+            </div>
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-analyzed-count">0</span>
+              <span class="re-stat-label">Analyzed</span>
+            </div>
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-categories-count">0</span>
+              <span class="re-stat-label">Categories</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Controls -->
+        <div class="re-view-controls">
+          <div class="re-view-toggle">
+            <button class="re-view-btn re-view-active" data-view="category">
+              <span class="re-view-icon">📁</span>
+              Categories
+            </button>
+            <button class="re-view-btn" data-view="list">
+              <span class="re-view-icon">📋</span>
+              List
+            </button>
+          </div>
+          <div class="re-view-actions">
+            <button id="re-export-btn" class="re-btn re-btn-secondary re-btn-sm">
+              <span class="re-btn-icon">📄</span>
+              Export
+            </button>
+            <button id="re-manage-categories-btn" class="re-btn re-btn-ghost re-btn-sm">
+              <span class="re-btn-icon">⚙️</span>
+              Manage
+            </button>
+          </div>
+        </div>
+
+        <!-- Properties Content -->
+        <div class="re-properties-content">
+          <!-- Category View -->
+          <div id="re-category-view" class="re-view-content re-view-active">
+            <div id="re-categories-grid" class="re-categories-grid">
+              <!-- Categories will be populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- List View -->
+          <div id="re-list-view" class="re-view-content">
+            <div id="re-properties-list" class="re-properties-list">
+              <!-- Properties will be populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="re-empty-state" class="re-empty-state">
+            <div class="re-empty-icon">📄</div>
+            <h3>No properties analyzed yet</h3>
+            <p>Start by analyzing your first property in the Analyzer tab</p>
+            <button class="re-btn re-btn-primary" id="re-start-analyzing">
+              <span class="re-btn-icon">🔍</span>
+              Start Analyzing
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getSettingsTabHTML() {
+    return `
+      <!-- Settings Tab -->
+      <div id="settings-tab" class="re-tab-content">
+        <!-- Settings Overview -->
+        <div class="re-settings-overview">
+          <h2>Settings</h2>
+          <p>Configure your RE Analyzer preferences</p>
+        </div>
+
+        <!-- Settings Sections -->
+        <div class="re-settings-sections">
+          <!-- Analysis Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">🔍</span>
+              Analysis Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-auto-categorize" class="re-checkbox">
+                <span class="re-setting-title">Auto-categorize properties</span>
+              </label>
+              <p class="re-setting-description">Automatically suggest categories for new properties</p>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-show-notifications" class="re-checkbox" checked>
+                <span class="re-setting-title">Show analysis notifications</span>
+              </label>
+              <p class="re-setting-description">Display notifications when analysis is complete</p>
+            </div>
+          </div>
+
+          <!-- UI Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">🎨</span>
+              Interface Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <span class="re-setting-title">Panel Position</span>
+              </label>
+              <select id="re-panel-position" class="re-select">
+                <option value="right">Right Side</option>
+                <option value="left">Left Side</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-compact-mode" class="re-checkbox">
+                <span class="re-setting-title">Compact mode</span>
+              </label>
+              <p class="re-setting-description">Use smaller interface elements</p>
+            </div>
+          </div>
+
+          <!-- Export Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">📄</span>
+              Export Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <span class="re-setting-title">Default Export Format</span>
+              </label>
+              <select id="re-export-format" class="re-select">
+                <option value="word">Word Document</option>
+                <option value="csv">CSV Spreadsheet</option>
+                <option value="json">JSON Data</option>
+              </select>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-include-full-analysis" class="re-checkbox" checked>
+                <span class="re-setting-title">Include full analysis text</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Actions -->
+        <div class="re-settings-actions">
+          <button id="re-save-settings-btn" class="re-btn re-btn-primary">
+            <span class="re-btn-icon">💾</span>
+            Save Settings
+          </button>
+          <button id="re-reset-settings-btn" class="re-btn re-btn-ghost">
+            Reset to Defaults
+          </button>
+        </div>
+
+        <!-- Version Info -->
+        <div class="re-version-info">
+          <small>RE Analyzer v2.0.0 - Embedded UI</small>
+        </div>
+      </div>
+    `;
+  }
+
+  setupEventListeners() {
+    if (!this.panel) return;
+
+    // Panel header actions
+    const minimizeBtn = this.panel.querySelector('#re-minimize-btn');
+    const closeBtn = this.panel.querySelector('#re-close-btn');
+    
+    if (minimizeBtn) {
+      minimizeBtn.addEventListener('click', () => this.minimizePanel());
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.hidePanel());
+    }
+
+    // Tab navigation
+    const tabButtons = this.panel.querySelectorAll('.re-tab-btn');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabId = btn.getAttribute('data-tab');
+        this.switchTab(tabId);
+      });
+    });
+
+    // Analyzer tab events
+    this.setupAnalyzerEvents();
+    
+    // Properties tab events  
+    this.setupPropertiesEvents();
+    
+    // Settings tab events
+    this.setupSettingsEvents();
+
+    // Panel dragging functionality
+    this.setupPanelDragging();
+
+    console.log('🎮 Event listeners set up');
+  }
+
+  setupAnalyzerEvents() {
+    // Quick action buttons
+    const pasteAnalyzeBtn = this.panel.querySelector('#re-paste-analyze-btn');
+    const manualInputBtn = this.panel.querySelector('#re-manual-input-btn');
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    
+    if (pasteAnalyzeBtn) {
+      pasteAnalyzeBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (this.isValidPropertyLink(text)) {
+            await this.analyzeProperty(text);
+          } else {
+            this.showMessage('error', 'Clipboard does not contain a valid property link');
+          }
+        } catch (err) {
+          this.showMessage('error', 'Unable to access clipboard. Please use manual input.');
+          this.showManualInput();
+        }
+      });
+    }
+
+    if (manualInputBtn) {
+      manualInputBtn.addEventListener('click', () => {
+        this.showManualInput();
+      });
+    }
+
+    // Manual input form
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    const pasteBtn = this.panel.querySelector('#re-paste-btn');
+    const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+    const clearBtn = this.panel.querySelector('#re-clear-btn');
+
+    if (propertyUrlInput) {
+      propertyUrlInput.addEventListener('input', () => {
+        this.validatePropertyInput();
+      });
+    }
+
+    if (pasteBtn) {
+      pasteBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (propertyUrlInput) {
+            propertyUrlInput.value = text;
+            this.validatePropertyInput();
+          }
+        } catch (err) {
+          this.showMessage('error', 'Unable to paste from clipboard');
+        }
+      });
+    }
+
+    if (analyzeBtn) {
+      analyzeBtn.addEventListener('click', () => {
+        const url = propertyUrlInput ? propertyUrlInput.value.trim() : '';
+        if (url && this.isValidPropertyLink(url)) {
+          this.analyzeProperty(url);
+        } else {
+          this.showMessage('error', 'Please enter a valid property URL');
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (propertyUrlInput) {
+          propertyUrlInput.value = '';
+          this.clearValidation();
+        }
+      });
+    }
+  }
+
+  setupPropertiesEvents() {
+    // View toggle
+    const viewButtons = this.panel.querySelectorAll('.re-view-btn');
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-view');
+        this.switchPropertiesView(view);
+      });
+    });
+
+    // Action buttons
+    const exportBtn = this.panel.querySelector('#re-export-btn');
+    const manageCategoriesBtn = this.panel.querySelector('#re-manage-categories-btn');
+    const startAnalyzingBtn = this.panel.querySelector('#re-start-analyzing');
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportProperties());
+    }
+
+    if (manageCategoriesBtn) {
+      manageCategoriesBtn.addEventListener('click', () => this.manageCategories());
+    }
+
+    if (startAnalyzingBtn) {
+      startAnalyzingBtn.addEventListener('click', () => this.switchTab('analyzer'));
+    }
+  }
+
+  setupSettingsEvents() {
+    // Settings form elements
+    const panelPositionSelect = this.panel.querySelector('#re-panel-position');
+    const compactModeCheckbox = this.panel.querySelector('#re-compact-mode');
+    const saveSettingsBtn = this.panel.querySelector('#re-save-settings-btn');
+    const resetSettingsBtn = this.panel.querySelector('#re-reset-settings-btn');
+
+    if (panelPositionSelect) {
+      panelPositionSelect.value = uiSettings.position;
+      panelPositionSelect.addEventListener('change', () => {
+        this.updatePanelPosition(panelPositionSelect.value);
+      });
+    }
+
+    if (compactModeCheckbox) {
+      compactModeCheckbox.checked = uiSettings.compactMode;
+      compactModeCheckbox.addEventListener('change', () => {
+        this.toggleCompactMode(compactModeCheckbox.checked);
+      });
+    }
+
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+    }
+
+    if (resetSettingsBtn) {
+      resetSettingsBtn.addEventListener('click', () => this.resetSettings());
+    }
+  }
+
+  setupPanelDragging() {
+    const header = this.panel.querySelector('.re-panel-header');
+    if (!header) return;
+
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      const rect = this.panel.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+      
+      header.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newLeft = Math.max(0, Math.min(window.innerWidth - this.panel.offsetWidth, startLeft + deltaX));
+      const newTop = Math.max(0, Math.min(window.innerHeight - this.panel.offsetHeight, startTop + deltaY));
+      
+      this.panel.style.left = newLeft + 'px';
+      this.panel.style.top = newTop + 'px';
+      this.panel.style.right = 'auto';
+      this.panel.style.bottom = 'auto';
+      
+      // Update position setting based on where the panel ends up
+      this.updatePositionFromCoordinates(newLeft, newTop);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        header.style.cursor = 'move';
+        
+        // Save the new position
+        this.saveSettings();
+      }
+    });
+  }
+
+  // Adaptive positioning based on viewport and content
+  setupAdaptivePositioning() {
+    // Listen for window resize
+    window.addEventListener('resize', () => {
+      this.adaptToViewport();
+    });
+    
+    // Listen for ChatGPT content changes that might affect layout
+    const observer = new MutationObserver(() => {
+      this.checkForLayoutConflicts();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+    
+    // Initial adaptation
+    this.adaptToViewport();
+  }
+
+  adaptToViewport() {
+    if (!this.panel) return;
+    
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    
+    // Adjust panel size for small screens
+    if (viewport.width < 768) {
+      this.panel.classList.add('re-mobile-mode');
+      this.updatePanelPosition('bottom');
+    } else {
+      this.panel.classList.remove('re-mobile-mode');
+      
+      // Auto-position based on available space
+      if (viewport.width < 1200) {
+        // On medium screens, prefer bottom position
+        this.updatePanelPosition('bottom');
+      } else {
+        // On large screens, prefer side position
+        const preferredSide = this.detectOptimalSide();
+        this.updatePanelPosition(preferredSide);
+      }
+    }
+    
+    console.log(`📱 Adapted to viewport: ${viewport.width}x${viewport.height}`);
+  }
+
+  detectOptimalSide() {
+    // Check for conflicts with ChatGPT's sidebar and other elements
+    const chatGptSidebar = document.querySelector('[data-radix-scroll-area-viewport]');
+    const chatGptMain = document.querySelector('main');
+    
+    if (chatGptSidebar && chatGptMain) {
+      const sidebarRect = chatGptSidebar.getBoundingClientRect();
+      const mainRect = chatGptMain.getBoundingClientRect();
+      
+      // If sidebar is on the left and takes significant space, prefer right
+      if (sidebarRect.left < 100 && sidebarRect.width > 200) {
+        return 'right';
+      }
+      
+      // If main content is centered, prefer right
+      if (mainRect.left > 200) {
+        return 'right';
+      }
+    }
+    
+    // Default to right side
+    return 'right';
+  }
+
+  checkForLayoutConflicts() {
+    if (!this.panel || !this.isVisible) return;
+    
+    // Check if panel overlaps with important ChatGPT elements
+    const panelRect = this.panel.getBoundingClientRect();
+    const chatInput = document.querySelector('[data-id="root"] textarea');
+    const sendButton = document.querySelector('[data-testid="send-button"]');
+    
+    let hasConflict = false;
+    
+    if (chatInput) {
+      const inputRect = chatInput.getBoundingClientRect();
+      if (this.rectsOverlap(panelRect, inputRect)) {
+        hasConflict = true;
+      }
+    }
+    
+    if (sendButton) {
+      const buttonRect = sendButton.getBoundingClientRect();
+      if (this.rectsOverlap(panelRect, buttonRect)) {
+        hasConflict = true;
+      }
+    }
+    
+    if (hasConflict) {
+      console.log('⚠️ Layout conflict detected, adjusting position');
+      this.resolveLayoutConflict();
+    }
+  }
+
+  rectsOverlap(rect1, rect2) {
+    return !(rect1.right < rect2.left || 
+             rect1.left > rect2.right || 
+             rect1.bottom < rect2.top || 
+             rect1.top > rect2.bottom);
+  }
+
+  resolveLayoutConflict() {
+    // Try different positions to resolve conflicts
+    const positions = ['right', 'left', 'bottom'];
+    const currentPosition = uiSettings.position;
+    
+    for (const position of positions) {
+      if (position !== currentPosition) {
+        this.updatePanelPosition(position);
+        
+        // Check if conflict is resolved
+        setTimeout(() => {
+          this.checkForLayoutConflicts();
+        }, 100);
+        
+        break;
+      }
+    }
+  }
+
+  updatePositionFromCoordinates(left, top) {
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    
+    const centerX = viewport.width / 2;
+    const centerY = viewport.height / 2;
+    
+    // Determine position based on where the panel is
+    if (top > viewport.height * 0.7) {
+      uiSettings.position = 'bottom';
+    } else if (left < centerX) {
+      uiSettings.position = 'left';
+    } else {
+      uiSettings.position = 'right';
+    }
+  }
+
+  // Keyboard shortcuts setup
+  setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Only handle shortcuts when not typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+      
+      // Ctrl/Cmd + Shift + R: Toggle RE Analyzer
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        this.togglePanel();
+        console.log('⌨️ Toggled panel via keyboard shortcut');
+      }
+      
+      // Ctrl/Cmd + Shift + A: Focus on analyzer tab
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        this.showPanel();
+        this.switchTab('analyzer');
+        console.log('⌨️ Switched to analyzer via keyboard shortcut');
+      }
+      
+      // Ctrl/Cmd + Shift + P: Focus on properties tab  
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        this.showPanel();
+        this.switchTab('properties');
+        console.log('⌨️ Switched to properties via keyboard shortcut');
+      }
+      
+      // Escape: Close panel
+      if (e.key === 'Escape' && this.isVisible) {
+        e.preventDefault();
+        this.hidePanel();
+        console.log('⌨️ Closed panel via Escape key');
+      }
+      
+      // Ctrl/Cmd + Shift + V: Paste and analyze
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        this.quickPasteAndAnalyze();
+        console.log('⌨️ Quick paste and analyze via keyboard shortcut');
+      }
+    });
+    
+    console.log('⌨️ Keyboard shortcuts enabled');
+  }
+
+  async quickPasteAndAnalyze() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (this.isValidPropertyLink(text)) {
+        this.showPanel();
+        this.switchTab('analyzer');
+        await this.analyzeProperty(text);
+      } else {
+        this.showMessage('error', 'Clipboard does not contain a valid property link');
+      }
+    } catch (err) {
+      this.showMessage('error', 'Unable to access clipboard');
+    }
+  }
+
+  // UI Control Methods
+  showPanel() {
+    if (!this.panel) return;
+    
+    this.panel.classList.remove('re-panel-collapsed');
+    this.panel.classList.add('re-panel-expanded', 're-panel-entering');
+    this.isVisible = true;
+    
+    // Remove entrance animation class after animation completes
+    setTimeout(() => {
+      this.panel.classList.remove('re-panel-entering');
+    }, 300);
+    
+    console.log('👁️ Panel shown');
+  }
+
+  hidePanel() {
+    if (!this.panel) return;
+    
+    this.panel.classList.remove('re-panel-expanded');
+    this.panel.classList.add('re-panel-collapsed');
+    this.isVisible = false;
+    
+    console.log('👁️ Panel hidden');
+  }
+
+  togglePanel() {
+    if (this.isVisible) {
+      this.hidePanel();
+    } else {
+      this.showPanel();
+    }
+  }
+
+  minimizePanel() {
+    if (!this.panel) return;
+    
+    if (this.panel.classList.contains('re-panel-minimized')) {
+      this.panel.classList.remove('re-panel-minimized');
+    } else {
+      this.panel.classList.add('re-panel-minimized');
+    }
+  }
+
+  switchTab(tabId) {
+    if (!this.panel) return;
+    
+    // Update tab buttons
+    const tabButtons = this.panel.querySelectorAll('.re-tab-btn');
+    tabButtons.forEach(btn => {
+      if (btn.getAttribute('data-tab') === tabId) {
+        btn.classList.add('re-tab-active');
+      } else {
+        btn.classList.remove('re-tab-active');
+      }
+    });
+    
+    // Update tab content
+    const tabContents = this.panel.querySelectorAll('.re-tab-content');
+    tabContents.forEach(content => {
+      if (content.id === `${tabId}-tab`) {
+        content.classList.add('re-tab-active');
+      } else {
+        content.classList.remove('re-tab-active');
+      }
+    });
+    
+    this.currentTab = tabId;
+    
+    // Tab-specific logic
+    if (tabId === 'properties') {
+      this.loadPropertyData();
+    } else if (tabId === 'analyzer') {
+      this.updateConnectionStatus();
+    }
+    
+    console.log(`📑 Switched to ${tabId} tab`);
+  }
+
+  // Helper methods for UI functionality will be added in the next part...
+  
+  showManualInput() {
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    if (propertyInput) {
+      propertyInput.classList.remove('re-hidden');
+    }
+  }
+
+  isValidPropertyLink(url) {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.toLowerCase();
+      
+      const propertyDomains = [
+        'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+        'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com'
+      ];
+      
+      return propertyDomains.some(domain => hostname.includes(domain));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  validatePropertyInput() {
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    const validation = this.panel.querySelector('#re-url-validation');
+    
+    if (!propertyUrlInput || !validation) return;
+    
+    const url = propertyUrlInput.value.trim();
+    
+    if (!url) {
+      validation.textContent = '';
+      validation.className = 're-input-validation';
+      return;
+    }
+    
+    if (this.isValidPropertyLink(url)) {
+      validation.textContent = '✅ Valid property URL';
+      validation.className = 're-input-validation re-valid';
+    } else {
+      validation.textContent = '❌ Please enter a valid property URL from a supported site';
+      validation.className = 're-input-validation re-invalid';
+    }
+  }
+
+  clearValidation() {
+    const validation = this.panel.querySelector('#re-url-validation');
+    if (validation) {
+      validation.textContent = '';
+      validation.className = 're-input-validation';
+    }
+  }
+
+  showMessage(type, message) {
+    const messageElement = this.panel.querySelector(`#re-${type}-message`);
+    const messageContent = messageElement?.querySelector('.re-message-content');
+    
+    if (messageElement && messageContent) {
+      // Hide all messages first
+      const allMessages = this.panel.querySelectorAll('.re-message');
+      allMessages.forEach(msg => msg.classList.remove('re-show'));
+      
+      // Show the specific message
+      messageContent.textContent = message;
+      messageElement.classList.add('re-show');
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        messageElement.classList.remove('re-show');
+      }, 5000);
+    }
+  }
+
+  updateConnectionStatus() {
+    const statusElement = this.panel.querySelector('#re-status');
+    const statusIcon = statusElement?.querySelector('.re-status-icon');
+    const statusTitle = statusElement?.querySelector('.re-status-title');
+    const statusSubtitle = statusElement?.querySelector('.re-status-subtitle');
+    
+    if (!statusElement) return;
+    
+    // Check if we're on ChatGPT
+    if (isChatGPTSite()) {
+      statusElement.className = 're-status re-status-connected';
+      if (statusIcon) statusIcon.innerHTML = '✅';
+      if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+    } else {
+      statusElement.className = 're-status re-status-error';
+      if (statusIcon) statusIcon.innerHTML = '❌';
+      if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+    }
+  }
+
+  async analyzeProperty(url) {
+    try {
+      console.log('🔍 Starting property analysis:', url);
+      
+      // Show progress
+      this.showAnalysisProgress();
+      
+      // Start timer
+      this.analysisStartTime = Date.now();
+      this.analysisTimer = setInterval(() => {
+        this.updateAnalysisTimer();
+      }, 1000);
+      
+      // Update progress steps
+      this.updateAnalysisStep('validate', 'completed');
+      this.updateAnalysisStep('send', 'active');
+      
+      // Use existing analysis functionality from the original content script
+      const response = await this.sendAnalysisToBackground(url);
+      
+      if (response && response.success) {
+        this.updateAnalysisStep('send', 'completed');
+        this.updateAnalysisStep('analyze', 'active');
+        
+        // Simulate analysis time
+        setTimeout(() => {
+          this.updateAnalysisStep('analyze', 'completed');
+          this.updateAnalysisStep('save', 'completed');
+          this.completeAnalysis();
+          this.showMessage('success', 'Property analysis completed successfully!');
+        }, 2000);
+        
+      } else {
+        throw new Error(response?.error || 'Analysis failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Analysis failed:', error);
+      this.hideAnalysisProgress();
+      this.showMessage('error', `Analysis failed: ${error.message}`);
+    }
+  }
+
+  async sendAnalysisToBackground(url) {
+    try {
+      // Use the existing insertPropertyAnalysisPrompt function from the original content script
+      console.log('🔗 Connecting to existing analysis functionality...');
+      
+      // Store the URL in the embedded UI context
+      currentPropertyAnalysis = { url, startTime: Date.now() };
+      
+      // Call the existing insertPropertyAnalysisPrompt function
+      const result = await insertPropertyAnalysisPrompt(url);
+      
+      return { success: result, result };
+    } catch (error) {
+      console.error('❌ Analysis integration failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  showAnalysisProgress() {
+    const progressSection = this.panel.querySelector('#re-analysis-progress');
+    if (progressSection) {
+      progressSection.classList.remove('re-hidden');
+    }
+  }
+
+  hideAnalysisProgress() {
+    const progressSection = this.panel.querySelector('#re-analysis-progress');
+    if (progressSection) {
+      progressSection.classList.add('re-hidden');
+    }
+    
+    if (this.analysisTimer) {
+      clearInterval(this.analysisTimer);
+      this.analysisTimer = null;
+    }
+  }
+
+  updateAnalysisTimer() {
+    const timeElement = this.panel.querySelector('#re-progress-time');
+    if (timeElement && this.analysisStartTime) {
+      const elapsed = Math.floor((Date.now() - this.analysisStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      timeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }
+
+  updateAnalysisStep(step, status) {
+    const stepElement = this.panel.querySelector(`[data-step="${step}"]`);
+    const stepIcon = stepElement?.querySelector('.re-step-icon');
+    
+    if (!stepElement || !stepIcon) return;
+    
+    // Remove previous status classes
+    stepElement.classList.remove('re-active', 're-completed');
+    
+    switch (status) {
+      case 'active':
+        stepElement.classList.add('re-active');
+        stepIcon.textContent = '⏳';
+        break;
+      case 'completed':
+        stepElement.classList.add('re-completed');
+        stepIcon.textContent = '✅';
+        break;
+      default:
+        stepIcon.textContent = '⏳';
+    }
+  }
+
+  completeAnalysis() {
+    this.hideAnalysisProgress();
+    
+    // Show notification on FAB
+    this.showFabNotification();
+    
+    // Auto-switch to properties tab if enabled
+    if (uiSettings.autoShow) {
+      setTimeout(() => {
+        this.switchTab('properties');
+      }, 1000);
+    }
+  }
+
+  showFabNotification() {
+    const notification = document.querySelector('#re-fab-notification');
+    if (notification) {
+      notification.classList.add('re-show');
+      notification.textContent = '1';
+    }
+  }
+
+  hideFabNotification() {
+    const notification = document.querySelector('#re-fab-notification');
+    if (notification) {
+      notification.classList.remove('re-show');
+    }
+  }
+
+  async loadPropertyData() {
+    try {
+      // Load property history from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      console.log(`📚 Loaded ${properties.length} properties from storage`);
+      
+      // Count analyzed properties (those with analysis data)
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      
+      // Get unique categories/domains
+      const domains = [...new Set(properties.map(p => p.domain))];
+      const categories = domains.length || 5; // Default to 5 categories
+      
+      // Update stats
+      this.updatePropertiesStats(properties.length, analyzedCount, categories);
+      
+      // Show properties or empty state
+      if (properties.length > 0) {
+        this.displayProperties(properties);
+        this.hideEmptyState();
+      } else {
+        this.showEmptyState();
+      }
+      
+      // Update notifications
+      this.updatePropertiesNotifications(properties);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property data:', error);
+      this.updatePropertiesStats(0, 0, 5);
+      this.showEmptyState();
+    }
+  }
+
+  updatePropertiesStats(total, analyzed, categories) {
+    const totalElement = this.panel.querySelector('#re-total-properties');
+    const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+    const categoriesElement = this.panel.querySelector('#re-categories-count');
+    
+    if (totalElement) totalElement.textContent = total.toString();
+    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
+    if (categoriesElement) categoriesElement.textContent = categories.toString();
+  }
+
+  showEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-state');
+    const categoryView = this.panel.querySelector('#re-category-view');
+    const listView = this.panel.querySelector('#re-list-view');
+    
+    if (emptyState) emptyState.style.display = 'block';
+    if (categoryView) categoryView.style.display = 'none';
+    if (listView) listView.style.display = 'none';
+  }
+
+  hideEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+  }
+
+  displayProperties(properties) {
+    // Display properties in both category and list views
+    this.displayCategoryView(properties);
+    this.displayListView(properties);
+  }
+
+  displayCategoryView(properties) {
+    const categoriesGrid = this.panel.querySelector('#re-categories-grid');
+    if (!categoriesGrid) return;
+
+    // Group properties by domain
+    const groupedProperties = properties.reduce((groups, property) => {
+      const domain = property.domain || 'unknown';
+      if (!groups[domain]) {
+        groups[domain] = [];
+      }
+      groups[domain].push(property);
+      return groups;
+    }, {});
+
+    // Clear existing content
+    categoriesGrid.innerHTML = '';
+
+    // Create category cards
+    Object.entries(groupedProperties).forEach(([domain, domainProperties]) => {
+      const analyzedCount = domainProperties.filter(p => p.analysis && p.analysis.extractedData).length;
+      
+      const categoryCard = document.createElement('div');
+      categoryCard.className = 're-category-card';
+      categoryCard.innerHTML = `
+        <div class="re-category-header">
+          <h4>${this.getDomainDisplayName(domain)}</h4>
+          <span class="re-category-count">${domainProperties.length}</span>
+        </div>
+        <div class="re-category-stats">
+          <span class="re-analyzed">${analyzedCount} analyzed</span>
+          <span class="re-pending">${domainProperties.length - analyzedCount} pending</span>
+        </div>
+        <div class="re-category-actions">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewCategoryProperties('${domain}')">
+            View All
+          </button>
+        </div>
+      `;
+      
+      categoriesGrid.appendChild(categoryCard);
+    });
+  }
+
+  displayListView(properties) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+
+    // Clear existing content
+    propertiesList.innerHTML = '';
+
+    // Sort properties by timestamp (newest first)
+    const sortedProperties = [...properties].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Create property items
+    sortedProperties.forEach(property => {
+      const hasAnalysis = property.analysis && property.analysis.extractedData;
+      const analysisDate = property.analysisTimestamp ? new Date(property.analysisTimestamp).toLocaleDateString() : '';
+      
+      const propertyItem = document.createElement('div');
+      propertyItem.className = `re-property-item ${hasAnalysis ? 're-analyzed' : 're-pending'}`;
+      propertyItem.innerHTML = `
+        <div class="re-property-content">
+          <div class="re-property-header">
+            <h5 class="re-property-title">${this.getPropertyTitle(property)}</h5>
+            <span class="re-property-status ${hasAnalysis ? 're-status-analyzed' : 're-status-pending'}">
+              ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
+            </span>
+          </div>
+          <div class="re-property-details">
+            <span class="re-property-domain">${property.domain}</span>
+            <span class="re-property-date">${property.date || 'Unknown date'}</span>
+            ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
+          </div>
+          <div class="re-property-actions">
+            <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+              View
+            </button>
+            ${hasAnalysis ? `
+              <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+                Export
+              </button>
+            ` : `
+              <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+                Analyze
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+      
+      propertiesList.appendChild(propertyItem);
+    });
+  }
+
+  getDomainDisplayName(domain) {
+    const domainNames = {
+      'zillow.com': 'Zillow',
+      'realtor.com': 'Realtor.com',
+      'redfin.com': 'Redfin',
+      'homes.com': 'Homes.com',
+      'trulia.com': 'Trulia',
+      'apartments.com': 'Apartments.com',
+      'rent.com': 'Rent.com',
+      'unknown': 'Other Sources'
+    };
+    
+    return domainNames[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
+  }
+
+  getPropertyTitle(property) {
+    // Try to extract a title from the URL or use a generic title
+    try {
+      const url = new URL(property.url);
+      const pathParts = url.pathname.split('/').filter(part => part);
+      
+      // Look for property-specific identifiers in the URL
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.length > 5) {
+          return lastPart.replace(/-/g, ' ').replace(/_/g, ' ');
+        }
+      }
+      
+      return `Property on ${property.domain}`;
+    } catch (e) {
+      return `Property #${property.url.slice(-8)}`;
+    }
+  }
+
+  updatePropertiesNotifications(properties) {
+    // Update tab notification for new properties
+    const recentProperties = properties.filter(p => 
+      (Date.now() - p.timestamp) < 24 * 60 * 60 * 1000 && // Within 24 hours
+      (!p.analysis || !p.analysis.extractedData) // Not yet analyzed
+    );
+    
+    const notification = this.panel.querySelector('#properties-notification');
+    if (notification && recentProperties.length > 0) {
+      notification.textContent = recentProperties.length.toString();
+      notification.style.display = 'flex';
+    } else if (notification) {
+      notification.style.display = 'none';
+    }
+  }
+
+  // Property action methods
+  viewProperty(url) {
+    console.log('📖 View property:', url);
+    // This could open a detailed view modal or navigate to the property
+    window.open(url, '_blank');
+  }
+
+  viewCategoryProperties(domain) {
+    console.log('📁 View category:', domain);
+    // Switch to list view and filter by domain
+    this.switchPropertiesView('list');
+    // TODO: Implement domain filtering
+  }
+
+  async analyzeExistingProperty(url) {
+    console.log('🔄 Re-analyze property:', url);
+    // Switch to analyzer tab and pre-fill the URL
+    this.switchTab('analyzer');
+    
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    if (propertyUrlInput) {
+      propertyUrlInput.value = url;
+      this.showManualInput();
+      this.validatePropertyInput();
+    }
+  }
+
+  exportProperty(url) {
+    console.log('📄 Export property:', url);
+    // This would implement property export functionality
+    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  switchPropertiesView(view) {
+    const viewButtons = this.panel.querySelectorAll('.re-view-btn');
+    const categoryView = this.panel.querySelector('#re-category-view');
+    const listView = this.panel.querySelector('#re-list-view');
+    
+    // Update button states
+    viewButtons.forEach(btn => {
+      if (btn.getAttribute('data-view') === view) {
+        btn.classList.add('re-view-active');
+      } else {
+        btn.classList.remove('re-view-active');
+      }
+    });
+    
+    // Update view visibility
+    if (view === 'category') {
+      if (categoryView) categoryView.classList.add('re-view-active');
+      if (listView) listView.classList.remove('re-view-active');
+    } else {
+      if (listView) listView.classList.add('re-view-active');
+      if (categoryView) categoryView.classList.remove('re-view-active');
+    }
+  }
+
+  updatePanelPosition(position) {
+    if (!this.panel) return;
+    
+    // Remove old position classes
+    this.panel.classList.remove('re-panel-right', 're-panel-left', 're-panel-bottom');
+    
+    // Add new position class
+    this.panel.classList.add(`re-panel-${position}`);
+    
+    uiSettings.position = position;
+    this.saveSettings();
+  }
+
+  toggleCompactMode(enabled) {
+    if (enabled) {
+      document.body.classList.add('re-compact-mode');
+    } else {
+      document.body.classList.remove('re-compact-mode');
+    }
+    
+    uiSettings.compactMode = enabled;
+    this.saveSettings();
+  }
+
+  async saveSettings() {
+    try {
+      await safeChromeFall(
+        () => chrome.storage.local.set({ embeddedUISettings: uiSettings }),
+        null
+      );
+      
+      this.showMessage('success', 'Settings saved successfully!');
+      console.log('💾 Settings saved:', uiSettings);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      this.showMessage('error', 'Failed to save settings');
+    }
+  }
+
+  resetSettings() {
+    uiSettings = {
+      position: 'right',
+      compactMode: false,
+      autoShow: true,
+      showNotifications: true
+    };
+    
+    // Update UI elements
+    const panelPositionSelect = this.panel.querySelector('#re-panel-position');
+    const compactModeCheckbox = this.panel.querySelector('#re-compact-mode');
+    
+    if (panelPositionSelect) panelPositionSelect.value = 'right';
+    if (compactModeCheckbox) compactModeCheckbox.checked = false;
+    
+    this.updatePanelPosition('right');
+    this.toggleCompactMode(false);
+    
+    this.showMessage('success', 'Settings reset to defaults');
+  }
+
+  exportProperties() {
+    // Placeholder for export functionality
+    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  manageCategories() {
+    // Placeholder for category management
+    this.showMessage('warning', 'Category management will be implemented in the next update');
+  }
+
+  // Cleanup method
+  destroy() {
+    if (this.fab) {
+      this.fab.remove();
+    }
+    
+    if (this.panel) {
+      this.panel.remove();
+    }
+    
+    if (this.analysisTimer) {
+      clearInterval(this.analysisTimer);
+    }
+    
+    document.body.classList.remove('re-compact-mode');
+    
+    console.log('🧹 Embedded UI destroyed');
+  }
+}
+
+// Load embedded styles
+function loadEmbeddedStyles() {
+  // Inject embedded styles
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('embedded-styles.css');
+  document.head.appendChild(link);
+  console.log('📄 Embedded styles loaded');
+}
+
+// ============================================================================
+// CONTEXTUAL INTEGRATION
+// ============================================================================
+
+// Detect if we're on a property page
+function isPropertyPage() {
+  const url = window.location.href;
+  const hostname = window.location.hostname.toLowerCase();
+  
+  const propertyDomains = [
+    'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+    'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com'
+  ];
+  
+  return propertyDomains.some(domain => hostname.includes(domain));
+}
+
+// Add contextual quick action button on property pages
+function addPropertyPageIntegration() {
+  if (!isPropertyPage()) return;
+  
+  console.log('🏠 Property page detected, adding quick action button');
+  
+  // Remove existing button if present
+  const existingButton = document.getElementById('re-quick-action');
+  if (existingButton) {
+    existingButton.remove();
+  }
+  
+  // Create quick action button
+  const quickAction = document.createElement('div');
+  quickAction.id = 're-quick-action';
+  quickAction.className = 're-quick-action-btn';
+  quickAction.innerHTML = `
+    <div class="re-quick-icon">🔍</div>
+    <div class="re-quick-text">Analyze with ChatGPT</div>
+  `;
+  
+  // Add click handler
+  quickAction.addEventListener('click', () => {
+    // Open ChatGPT with this property URL
+    const currentUrl = window.location.href;
+    const chatGptUrl = `https://chatgpt.com/?q=${encodeURIComponent(`Analyze this property: ${currentUrl}`)}`;
+    window.open(chatGptUrl, '_blank');
+  });
+  
+  // Add to page
+  document.body.appendChild(quickAction);
+  
+  // Add styles for quick action button
+  if (!document.getElementById('re-quick-action-styles')) {
+    const style = document.createElement('style');
+    style.id = 're-quick-action-styles';
+    style.textContent = `
+      .re-quick-action-btn {
+        position: fixed;
+        top: 120px;
+        right: 24px;
+        background: #10a37f;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        z-index: 999999;
+        box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+        transition: all 0.3s ease;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      
+      .re-quick-action-btn:hover {
+        background: #0d8a69;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 163, 127, 0.4);
+      }
+      
+      .re-quick-icon {
+        font-size: 16px;
+      }
+      
+      @media (max-width: 768px) {
+        .re-quick-action-btn {
+          right: 16px;
+          top: 80px;
+          padding: 10px 14px;
+          font-size: 13px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+// Initialize embedded UI when on ChatGPT
+if (isChatGPTSite()) {
+  // Load styles first
+  loadEmbeddedStyles();
+  
+  // Wait for page to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        embeddedUI = new REAnalyzerEmbeddedUI();
+      }, 1000);
+    });
+  } else {
+    // Page already loaded
+    setTimeout(() => {
+      embeddedUI = new REAnalyzerEmbeddedUI();
+    }, 1000);
+  }
+} else {
+  // Add contextual integration on property pages
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(addPropertyPageIntegration, 1000);
+    });
+  } else {
+    setTimeout(addPropertyPageIntegration, 1000);
+  }
 }
 
 // Initialize settings on load

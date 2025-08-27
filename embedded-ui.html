@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RE Analyzer - Embedded UI</title>
+</head>
+<body>
+    <!-- Floating Action Button -->
+    <div id="re-analyzer-fab" class="re-fab" title="RE Analyzer">
+        <div class="re-fab-icon">🏠</div>
+        <div class="re-fab-notification" id="re-fab-notification"></div>
+    </div>
+
+    <!-- Main Embedded Panel -->
+    <div id="re-analyzer-panel" class="re-panel re-panel-collapsed">
+        <!-- Panel Header -->
+        <div class="re-panel-header">
+            <div class="re-panel-title">
+                <span class="re-logo">🏠</span>
+                <span class="re-title">RE Analyzer</span>
+                <span class="re-version">v2.0</span>
+            </div>
+            <div class="re-panel-actions">
+                <button id="re-minimize-btn" class="re-btn re-btn-icon" title="Minimize">
+                    <span>−</span>
+                </button>
+                <button id="re-close-btn" class="re-btn re-btn-icon" title="Close">
+                    <span>×</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="re-tab-nav" id="re-tab-nav">
+            <button class="re-tab-btn re-tab-active" data-tab="analyzer">
+                <span class="re-tab-icon">🔍</span>
+                <span class="re-tab-label">Analyzer</span>
+            </button>
+            <button class="re-tab-btn" data-tab="properties">
+                <span class="re-tab-icon">📊</span>
+                <span class="re-tab-label">Properties</span>
+                <span class="re-tab-notification" id="properties-notification"></span>
+            </button>
+            <button class="re-tab-btn" data-tab="settings">
+                <span class="re-tab-icon">⚙️</span>
+                <span class="re-tab-label">Settings</span>
+            </button>
+        </div>
+
+        <!-- Panel Content -->
+        <div class="re-panel-content">
+            <!-- Analyzer Tab -->
+            <div id="analyzer-tab" class="re-tab-content re-tab-active">
+                <!-- Quick Actions -->
+                <div class="re-quick-actions">
+                    <button id="re-paste-analyze-btn" class="re-btn re-btn-primary re-btn-large">
+                        <span class="re-btn-icon">📋</span>
+                        <span class="re-btn-text">Paste & Analyze</span>
+                    </button>
+                    <button id="re-manual-input-btn" class="re-btn re-btn-secondary">
+                        <span class="re-btn-icon">✏️</span>
+                        <span class="re-btn-text">Manual Input</span>
+                    </button>
+                </div>
+
+                <!-- Property Input Section -->
+                <div id="re-property-input" class="re-section re-hidden">
+                    <div class="re-section-header">
+                        <h3>Property Analysis</h3>
+                    </div>
+                    <div class="re-form-group">
+                        <label for="re-property-url" class="re-label">Property URL</label>
+                        <div class="re-input-group">
+                            <input type="text" id="re-property-url" class="re-input" 
+                                   placeholder="Paste property link from Zillow, Realtor.com, etc.">
+                            <button id="re-paste-btn" class="re-btn re-btn-icon" title="Paste from clipboard">
+                                📋
+                            </button>
+                        </div>
+                        <div class="re-input-validation" id="re-url-validation"></div>
+                    </div>
+                    <div class="re-form-actions">
+                        <button id="re-analyze-btn" class="re-btn re-btn-primary">
+                            <span class="re-btn-icon">🔍</span>
+                            <span class="re-btn-text">Analyze Property</span>
+                        </button>
+                        <button id="re-clear-btn" class="re-btn re-btn-ghost">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Status Section -->
+                <div class="re-status-section">
+                    <div id="re-status" class="re-status re-status-checking">
+                        <div class="re-status-icon">
+                            <div class="re-spinner"></div>
+                        </div>
+                        <div class="re-status-content">
+                            <div class="re-status-title">Checking Connection...</div>
+                            <div class="re-status-subtitle">Verifying ChatGPT access</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Progress -->
+                <div id="re-analysis-progress" class="re-progress-section re-hidden">
+                    <div class="re-progress-header">
+                        <h4>Analysis in Progress</h4>
+                        <span class="re-progress-time" id="re-progress-time">0:00</span>
+                    </div>
+                    <div class="re-progress-steps">
+                        <div class="re-progress-step" data-step="validate">
+                            <div class="re-step-icon">⏳</div>
+                            <span>Validating URL</span>
+                        </div>
+                        <div class="re-progress-step" data-step="send">
+                            <div class="re-step-icon">⏳</div>
+                            <span>Sending to ChatGPT</span>
+                        </div>
+                        <div class="re-progress-step" data-step="analyze">
+                            <div class="re-step-icon">⏳</div>
+                            <span>AI Analysis</span>
+                        </div>
+                        <div class="re-progress-step" data-step="save">
+                            <div class="re-step-icon">⏳</div>
+                            <span>Saving Results</span>
+                        </div>
+                    </div>
+                    <div class="re-progress-tip">
+                        <span class="re-tip-icon">💡</span>
+                        <span>Analysis typically takes 30-60 seconds</span>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div class="re-messages" id="re-messages">
+                    <div id="re-success-message" class="re-message re-message-success re-hidden">
+                        <div class="re-message-icon">✅</div>
+                        <div class="re-message-content"></div>
+                    </div>
+                    <div id="re-error-message" class="re-message re-message-error re-hidden">
+                        <div class="re-message-icon">❌</div>
+                        <div class="re-message-content"></div>
+                    </div>
+                    <div id="re-warning-message" class="re-message re-message-warning re-hidden">
+                        <div class="re-message-icon">⚠️</div>
+                        <div class="re-message-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Properties Tab -->
+            <div id="properties-tab" class="re-tab-content">
+                <!-- Properties Overview -->
+                <div class="re-properties-overview">
+                    <div class="re-overview-stats">
+                        <div class="re-stat-item">
+                            <span class="re-stat-number" id="re-total-properties">0</span>
+                            <span class="re-stat-label">Properties</span>
+                        </div>
+                        <div class="re-stat-item">
+                            <span class="re-stat-number" id="re-analyzed-count">0</span>
+                            <span class="re-stat-label">Analyzed</span>
+                        </div>
+                        <div class="re-stat-item">
+                            <span class="re-stat-number" id="re-categories-count">0</span>
+                            <span class="re-stat-label">Categories</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View Controls -->
+                <div class="re-view-controls">
+                    <div class="re-view-toggle">
+                        <button class="re-view-btn re-view-active" data-view="category">
+                            <span class="re-view-icon">📁</span>
+                            Categories
+                        </button>
+                        <button class="re-view-btn" data-view="list">
+                            <span class="re-view-icon">📋</span>
+                            List
+                        </button>
+                    </div>
+                    <div class="re-view-actions">
+                        <button id="re-export-btn" class="re-btn re-btn-secondary re-btn-sm">
+                            <span class="re-btn-icon">📄</span>
+                            Export
+                        </button>
+                        <button id="re-manage-categories-btn" class="re-btn re-btn-ghost re-btn-sm">
+                            <span class="re-btn-icon">⚙️</span>
+                            Manage
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Properties Content -->
+                <div class="re-properties-content">
+                    <!-- Category View -->
+                    <div id="re-category-view" class="re-view-content re-view-active">
+                        <div id="re-categories-grid" class="re-categories-grid">
+                            <!-- Categories will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- List View -->
+                    <div id="re-list-view" class="re-view-content">
+                        <div id="re-properties-list" class="re-properties-list">
+                            <!-- Properties will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="re-empty-state" class="re-empty-state">
+                        <div class="re-empty-icon">📄</div>
+                        <h3>No properties analyzed yet</h3>
+                        <p>Start by analyzing your first property in the Analyzer tab</p>
+                        <button class="re-btn re-btn-primary" onclick="switchToTab('analyzer')">
+                            <span class="re-btn-icon">🔍</span>
+                            Start Analyzing
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="re-tab-content">
+                <!-- Settings Overview -->
+                <div class="re-settings-overview">
+                    <h2>Settings</h2>
+                    <p>Configure your RE Analyzer preferences</p>
+                </div>
+
+                <!-- Settings Sections -->
+                <div class="re-settings-sections">
+                    <!-- Analysis Settings -->
+                    <div class="re-settings-section">
+                        <h3>
+                            <span class="re-settings-icon">🔍</span>
+                            Analysis Settings
+                        </h3>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <input type="checkbox" id="re-auto-categorize" class="re-checkbox">
+                                <span class="re-setting-title">Auto-categorize properties</span>
+                            </label>
+                            <p class="re-setting-description">Automatically suggest categories for new properties</p>
+                        </div>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <input type="checkbox" id="re-show-notifications" class="re-checkbox" checked>
+                                <span class="re-setting-title">Show analysis notifications</span>
+                            </label>
+                            <p class="re-setting-description">Display notifications when analysis is complete</p>
+                        </div>
+                    </div>
+
+                    <!-- UI Settings -->
+                    <div class="re-settings-section">
+                        <h3>
+                            <span class="re-settings-icon">🎨</span>
+                            Interface Settings
+                        </h3>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <span class="re-setting-title">Panel Position</span>
+                            </label>
+                            <select id="re-panel-position" class="re-select">
+                                <option value="right">Right Side</option>
+                                <option value="left">Left Side</option>
+                                <option value="bottom">Bottom</option>
+                            </select>
+                        </div>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <input type="checkbox" id="re-compact-mode" class="re-checkbox">
+                                <span class="re-setting-title">Compact mode</span>
+                            </label>
+                            <p class="re-setting-description">Use smaller interface elements</p>
+                        </div>
+                    </div>
+
+                    <!-- Export Settings -->
+                    <div class="re-settings-section">
+                        <h3>
+                            <span class="re-settings-icon">📄</span>
+                            Export Settings
+                        </h3>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <span class="re-setting-title">Default Export Format</span>
+                            </label>
+                            <select id="re-export-format" class="re-select">
+                                <option value="word">Word Document</option>
+                                <option value="csv">CSV Spreadsheet</option>
+                                <option value="json">JSON Data</option>
+                            </select>
+                        </div>
+                        <div class="re-setting-item">
+                            <label class="re-setting-label">
+                                <input type="checkbox" id="re-include-full-analysis" class="re-checkbox" checked>
+                                <span class="re-setting-title">Include full analysis text</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Actions -->
+                <div class="re-settings-actions">
+                    <button id="re-save-settings-btn" class="re-btn re-btn-primary">
+                        <span class="re-btn-icon">💾</span>
+                        Save Settings
+                    </button>
+                    <button id="re-reset-settings-btn" class="re-btn re-btn-ghost">
+                        Reset to Defaults
+                    </button>
+                </div>
+
+                <!-- Version Info -->
+                <div class="re-version-info">
+                    <small>RE Analyzer v2.0.0 - Embedded UI</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading the embedded JavaScript will be done via content script injection -->
+</body>
+</html>
