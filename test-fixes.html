@@ -279,6 +279,7 @@ async setupCustomPromptSettings() {
                 <li>If buttons don't work, check console for errors or messages like:<br>
                     <code>🔍 Event delegation: viewProperty clicked for: [url]</code></li>
                 <li>Verify custom prompt editing works in settings</li>
+                <li><strong>Debug incomplete responses:</strong> Run <code>checkProgressiveTracking()</code> in console to see real-time saving</li>
             </ol>
             
             <p><strong>Expected Console Messages:</strong></p>
@@ -302,6 +303,12 @@ async setupCustomPromptSettings() {
 📝 Final response length: [number]
 📊 Response quality indicators: [quality info]
 ✅ Response appears complete - processing now
+
+💾 PROGRESSIVE SAVE triggered: [save info]
+✅ Progressive save #1 successful for: [url]
+💾 PROGRESSIVE SAVE triggered: [save info]
+✅ Progressive save #2 successful for: [url]
+🧹 Cleaning up progressive tracking for: [url]
             </div>
             
             <p><strong>Context Invalidation Handling:</strong></p>

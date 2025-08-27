@@ -174,10 +174,56 @@ function isContextInvalidationError(err) {
   return invalidationMessages.some(msg => err.message.includes(msg));
 }
 
+// Progressive response saving function
+function saveProgressiveResponse(messageText, propertyUrl, saveCount) {
+  console.log(`💾 Saving progressive response #${saveCount} for:`, propertyUrl);
+  
+  // Extract analysis data from current response
+  const analysisData = extractPropertyAnalysisData(messageText);
+  
+  if (analysisData && analysisData.fullResponse) {
+    console.log(`📊 Progressive save #${saveCount} analysis data:`, {
+      fullResponseLength: analysisData.fullResponse.length,
+      extractedDataKeys: Object.keys(analysisData.extractedData || {}),
+      timestamp: new Date().toLocaleTimeString()
+    });
+    
+    // Save with progressive flag to indicate it's an interim save
+    analysisData.progressive = true;
+    analysisData.saveCount = saveCount;
+    analysisData.progressiveTimestamp = Date.now();
+    
+    // Send to background script for saving
+    safeChromeFall(() => {
+      return chrome.runtime.sendMessage({
+        action: 'savePropertyAnalysis',
+        propertyUrl: propertyUrl,
+        sessionId: `progressive_${Date.now()}_${saveCount}`,
+        analysisData: analysisData
+      });
+    }).then(response => {
+      if (response && response.success) {
+        console.log(`✅ Progressive save #${saveCount} successful for:`, propertyUrl);
+      }
+    }).catch(err => {
+      console.error(`❌ Progressive save #${saveCount} failed:`, err);
+    });
+  } else {
+    console.log(`⚠️ Progressive save #${saveCount} skipped - no extractable data yet`);
+  }
+}
+
 // Global variable to track current property analysis (already declared above with embedded UI variables)
 
 // Track processed messages per property URL to prevent cross-contamination
 let processedMessagesPerProperty = new Map();
+
+// Continuous response tracking for progressive saving
+let continuousResponseTracker = {
+  activeTracking: new Map(), // url -> {lastLength, lastSaved, saveCount, maxLength}
+  saveInterval: 2000, // Save every 2 seconds if response is growing
+  minLengthDifference: 200 // Save if response grew by 200+ characters
+};
 
 // Prompt splitting state management
 let promptSplittingState = {
@@ -6645,6 +6691,17 @@ function setupResponseMonitor() {
           console.error('❌ Failed to save split prompt analysis:', err);
         });
         
+        // Clean up progressive tracking for prompt splitting
+        if (promptSplittingState.pendingPropertyLink && 
+            continuousResponseTracker.activeTracking.has(promptSplittingState.pendingPropertyLink)) {
+          const tracking = continuousResponseTracker.activeTracking.get(promptSplittingState.pendingPropertyLink);
+          console.log('🧹 Cleaning up progressive tracking for prompt splitting:', promptSplittingState.pendingPropertyLink, {
+            totalSaves: tracking.saveCount,
+            maxLength: tracking.maxLength
+          });
+          continuousResponseTracker.activeTracking.delete(promptSplittingState.pendingPropertyLink);
+        }
+        
         // Reset prompt splitting state
         resetPromptSplittingState();
         return; // Exit early - we've handled this response
@@ -6782,6 +6839,16 @@ function setupResponseMonitor() {
         
         // Reset the current analysis tracking
         currentPropertyAnalysis = null;
+        
+        // Clean up progressive tracking for this property
+        if (propertyUrl && continuousResponseTracker.activeTracking.has(propertyUrl)) {
+          const tracking = continuousResponseTracker.activeTracking.get(propertyUrl);
+          console.log('🧹 Cleaning up progressive tracking for:', propertyUrl, {
+            totalSaves: tracking.saveCount,
+            maxLength: tracking.maxLength
+          });
+          continuousResponseTracker.activeTracking.delete(propertyUrl);
+        }
       } else {
         console.log('⚠️ No extractable data found in completed response');
         console.log('📝 Response preview:', messageText.substring(0, 500) + '...');
@@ -6913,6 +6980,61 @@ function setupResponseMonitor() {
         hasContent: messageText.length > 10
       });
       
+      // CRITICAL DEBUG: Track response growth in real-time
+      if (currentPropertyAnalysis) {
+        console.log('🔍 RESPONSE TRACKING:', {
+          propertyUrl: currentPropertyAnalysis.url,
+          currentLength: messageText.length,
+          timestamp: new Date().toLocaleTimeString(),
+          isStreaming: isResponseStreaming(),
+          phase: promptSplittingState.currentPhase
+        });
+        
+        // PROGRESSIVE SAVING: Save response incrementally as it grows
+        const url = currentPropertyAnalysis.url;
+        const currentLength = messageText.length;
+        const now = Date.now();
+        
+        if (!continuousResponseTracker.activeTracking.has(url)) {
+          continuousResponseTracker.activeTracking.set(url, {
+            lastLength: 0,
+            lastSaved: 0,
+            saveCount: 0,
+            maxLength: 0,
+            lastSaveTime: now
+          });
+        }
+        
+        const tracking = continuousResponseTracker.activeTracking.get(url);
+        tracking.maxLength = Math.max(tracking.maxLength, currentLength);
+        
+        // Save if response has grown significantly OR enough time has passed
+        const lengthGrowth = currentLength - tracking.lastSaved;
+        const timeSinceLastSave = now - tracking.lastSaveTime;
+        
+        if (currentLength > 500 && // Minimum length threshold
+            (lengthGrowth >= continuousResponseTracker.minLengthDifference || 
+             timeSinceLastSave >= continuousResponseTracker.saveInterval) &&
+            currentLength > tracking.lastSaved) {
+          
+          console.log('💾 PROGRESSIVE SAVE triggered:', {
+            url: url,
+            currentLength: currentLength,
+            previousSaved: tracking.lastSaved,
+            growth: lengthGrowth,
+            saveCount: tracking.saveCount + 1
+          });
+          
+          // Save this version of the response
+          saveProgressiveResponse(messageText, url, tracking.saveCount + 1);
+          
+          // Update tracking
+          tracking.lastSaved = currentLength;
+          tracking.saveCount++;
+          tracking.lastSaveTime = now;
+        }
+      }
+      
       // Debug logging for all messages when waiting for confirmation
       if (promptSplittingState.currentPhase === 'waiting_confirmation') {
         console.log('📨 New message detected while waiting for confirmation:');
@@ -6945,6 +7067,46 @@ function setupResponseMonitor() {
         console.log('🎯 Found SECOND response in prompt splitting (ACTUAL ANALYSIS):', messageText.substring(0, 100));
         console.log('📊 Response length:', messageText.length);
         console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+        
+        // PROGRESSIVE SAVING for prompt splitting responses too
+        const url = promptSplittingState.pendingPropertyLink;
+        const currentLength = messageText.length;
+        const now = Date.now();
+        
+        if (!continuousResponseTracker.activeTracking.has(url)) {
+          continuousResponseTracker.activeTracking.set(url, {
+            lastLength: 0,
+            lastSaved: 0,
+            saveCount: 0,
+            maxLength: 0,
+            lastSaveTime: now
+          });
+        }
+        
+        const tracking = continuousResponseTracker.activeTracking.get(url);
+        tracking.maxLength = Math.max(tracking.maxLength, currentLength);
+        
+        const lengthGrowth = currentLength - tracking.lastSaved;
+        const timeSinceLastSave = now - tracking.lastSaveTime;
+        
+        if (currentLength > 500 && 
+            (lengthGrowth >= continuousResponseTracker.minLengthDifference || 
+             timeSinceLastSave >= continuousResponseTracker.saveInterval) &&
+            currentLength > tracking.lastSaved) {
+          
+          console.log('💾 PROGRESSIVE SAVE (Prompt Splitting) triggered:', {
+            url: url,
+            currentLength: currentLength,
+            growth: lengthGrowth,
+            saveCount: tracking.saveCount + 1
+          });
+          
+          saveProgressiveResponse(messageText, url, tracking.saveCount + 1);
+          
+          tracking.lastSaved = currentLength;
+          tracking.saveCount++;
+          tracking.lastSaveTime = now;
+        }
         
         // Process this as the analysis response immediately
         processCompletedResponse(messageText, promptSplittingState.pendingPropertyLink);
@@ -7926,6 +8088,31 @@ window.diagnoseProblem = function() {
     messagesFound: messages.length,
     keywordMatches: messages.length > 0 ? keywordMatches : [],
     extractionResult: messages.length > 0 ? result : null
+  };
+};
+
+// Debug function to check progressive tracking status
+window.checkProgressiveTracking = function() {
+  console.log('🔍 Progressive Tracking Status:');
+  console.log('📊 Active tracking entries:', continuousResponseTracker.activeTracking.size);
+  
+  for (const [url, tracking] of continuousResponseTracker.activeTracking.entries()) {
+    console.log(`📄 ${url}:`, {
+      saveCount: tracking.saveCount,
+      maxLength: tracking.maxLength,
+      lastSaved: tracking.lastSaved,
+      timeSinceLastSave: Date.now() - tracking.lastSaveTime
+    });
+  }
+  
+  console.log('🎯 Current property analysis:', currentPropertyAnalysis?.url || 'None');
+  console.log('📝 Prompt splitting state:', promptSplittingState.currentPhase);
+  console.log('🔗 Pending property link:', promptSplittingState.pendingPropertyLink);
+  
+  return {
+    activeTracking: Array.from(continuousResponseTracker.activeTracking.entries()),
+    currentPropertyAnalysis: currentPropertyAnalysis,
+    promptSplittingState: promptSplittingState
   };
 };
 
