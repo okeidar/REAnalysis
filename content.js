@@ -1,5 +1,23 @@
-// Content script for ChatGPT Helper Extension
-console.log('ChatGPT Helper Extension loaded on:', window.location.href);
+// Content script for RE Analyzer Embedded Extension
+console.log('🏠 RE Analyzer Embedded v2.0 loaded on:', window.location.href);
+
+// Prevent multiple script execution
+if (window.reAnalyzerLoaded) {
+  console.log('🏠 RE Analyzer already loaded, skipping initialization');
+} else {
+  window.reAnalyzerLoaded = true;
+
+// Embedded UI state management
+let embeddedUI = null;
+let isUIInitialized = false;
+let currentPropertyAnalysis = null;
+let uiSettings = {
+  position: 'right',
+  compactMode: false,
+  autoShow: true,
+  showNotifications: true,
+  allowAnyUrl: false
+};
 
 // Function to check if extension context is still valid
 function isExtensionContextValid() {
@@ -30,8 +48,7 @@ function safeChromeFall(apiCall, fallbackValue = null) {
   }
 }
 
-// Global variable to track current property analysis
-let currentPropertyAnalysis = null;
+// Global variable to track current property analysis (already declared above with embedded UI variables)
 
 // Track processed messages per property URL to prevent cross-contamination
 let processedMessagesPerProperty = new Map();
@@ -52,6 +69,3030 @@ function isChatGPTSite() {
   return window.location.hostname === 'chatgpt.com' || 
          window.location.hostname === 'chat.openai.com';
 }
+
+// ============================================================================
+// EMBEDDED UI IMPLEMENTATION
+// ============================================================================
+
+// Main embedded UI class
+class REAnalyzerEmbeddedUI {
+  constructor() {
+    this.fab = null;
+    this.panel = null;
+    this.isVisible = false;
+    this.currentTab = 'analyzer';
+    this.dragState = { isDragging: false, startX: 0, startY: 0 };
+    this.analysisTimer = null;
+    this.analysisStartTime = 0;
+    
+    this.initialize();
+  }
+
+  async initialize() {
+    try {
+      console.log('🚀 Initializing RE Analyzer Embedded UI...');
+      
+      // Load settings
+      await this.loadSettings();
+      
+      // Create UI elements
+      this.createFloatingActionButton();
+      this.createEmbeddedPanel();
+      
+      // Set up event listeners
+      this.setupEventListeners();
+      
+      // Set up adaptive positioning
+      this.setupAdaptivePositioning();
+      
+      // Set up keyboard shortcuts
+      this.setupKeyboardShortcuts();
+      
+      // Initialize status
+      this.updateChatGPTConnectionStatus();
+      
+      // Check extension context and warn user if needed
+      this.checkExtensionContext();
+      
+      // Load initial data
+      await this.loadChatGPTPropertyData();
+      
+      console.log('✅ RE Analyzer ChatGPT Native UI initialized successfully');
+      isUIInitialized = true;
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize embedded UI:', error);
+    }
+  }
+
+  async loadSettings() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['embeddedUISettings']),
+        null
+      );
+      
+      let settingsLoaded = false;
+      
+      if (result && result.embeddedUISettings) {
+        uiSettings = { ...uiSettings, ...result.embeddedUISettings };
+        settingsLoaded = true;
+        console.log('📋 Loaded UI settings from extension storage:', uiSettings);
+      } else {
+        // Fallback to localStorage if extension context is invalidated
+        try {
+          const localSettings = localStorage.getItem('reAnalyzerSettings');
+          if (localSettings) {
+            const parsedSettings = JSON.parse(localSettings);
+            uiSettings = { ...uiSettings, ...parsedSettings };
+            settingsLoaded = true;
+            console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+          }
+        } catch (localError) {
+          console.warn('Failed to load settings from localStorage:', localError);
+        }
+      }
+      
+      if (!settingsLoaded) {
+        console.log('📋 Using default UI settings:', uiSettings);
+      }
+      
+    } catch (error) {
+      console.warn('Failed to load UI settings:', error);
+    }
+  }
+
+  createFloatingActionButton() {
+    // Remove existing FAB if it exists
+    const existingFab = document.getElementById('re-analyzer-toggle');
+    if (existingFab) {
+      existingFab.remove();
+    }
+
+    // Create ChatGPT-style floating toggle
+    this.fab = document.createElement('button');
+    this.fab.id = 're-analyzer-toggle';
+    this.fab.className = 're-floating-toggle re-chatgpt-native';
+    this.fab.title = 'RE Analyzer';
+    this.fab.innerHTML = '🏠';
+
+    // Add to page
+    document.body.appendChild(this.fab);
+
+    // FAB click handler
+    this.fab.addEventListener('click', () => {
+      this.togglePanel();
+    });
+
+    console.log('🎯 Created ChatGPT-style floating toggle');
+  }
+
+  createEmbeddedPanel() {
+    // Remove existing panel if it exists
+    const existingPanel = document.getElementById('re-analyzer-sidebar');
+    if (existingPanel) {
+      existingPanel.remove();
+    }
+
+    // Create ChatGPT-style sidebar container
+    this.panel = document.createElement('div');
+    this.panel.id = 're-analyzer-sidebar';
+    this.panel.className = 're-sidebar-container re-chatgpt-native';
+    
+    // Set native ChatGPT-style content
+    this.panel.innerHTML = this.getChatGPTNativeSidebarHTML();
+
+    // Add to page
+    document.body.appendChild(this.panel);
+
+    // Apply compact mode if enabled
+    if (uiSettings.compactMode) {
+      this.panel.classList.add('re-compact');
+    }
+
+    console.log('🎨 Created ChatGPT-style native sidebar');
+  }
+
+  getChatGPTNativeSidebarHTML() {
+    return `
+      <!-- Sidebar Header -->
+      <div class="re-sidebar-header">
+        <div class="re-sidebar-header-content">
+          <div class="re-sidebar-title">
+            <div class="re-sidebar-logo">🏠</div>
+            <span>RE Analyzer</span>
+          </div>
+          <button class="re-sidebar-close" id="re-sidebar-close" title="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Navigation -->
+      <div class="re-sidebar-nav">
+        <button class="re-nav-item re-nav-active" data-tab="analyzer" id="re-nav-analyzer">
+          <div class="re-nav-icon">🔍</div>
+          <div class="re-nav-label">Analyzer</div>
+        </button>
+        <button class="re-nav-item" data-tab="properties" id="re-nav-properties">
+          <div class="re-nav-icon">📊</div>
+          <div class="re-nav-label">Properties</div>
+          <div class="re-nav-badge re-hidden" id="re-properties-badge">0</div>
+        </button>
+        <button class="re-nav-item" data-tab="settings" id="re-nav-settings">
+          <div class="re-nav-icon">⚙️</div>
+          <div class="re-nav-label">Settings</div>
+        </button>
+      </div>
+
+      <!-- Sidebar Content -->
+      <div class="re-sidebar-content">
+        ${this.getChatGPTAnalyzerHTML()}
+        ${this.getChatGPTPropertiesHTML()}
+        ${this.getChatGPTSettingsHTML()}
+      </div>
+    `;
+  }
+
+  getChatGPTAnalyzerHTML() {
+    return `
+      <!-- Analyzer Section -->
+      <div class="re-section" id="re-analyzer-section">
+        <!-- Connection Status -->
+        <div class="re-status" id="re-connection-status">
+          <div class="re-status-icon">⏳</div>
+          <div class="re-status-content">
+            <div class="re-status-title">Checking Connection...</div>
+            <div class="re-status-subtitle">Verifying ChatGPT access</div>
+          </div>
+        </div>
+
+        <!-- Quick Action -->
+        <div class="re-section">
+          <button class="re-btn re-btn-primary re-btn-full re-btn-lg" id="re-quick-analyze">
+            <div>📋</div>
+            <span>Paste & Analyze Property</span>
+          </button>
+        </div>
+
+        <!-- Manual Input -->
+        <div class="re-section" id="re-manual-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Property Analysis</div>
+            <div class="re-section-subtitle">Enter a property URL from any major real estate website</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Property URL</label>
+            <div class="re-input-group">
+              <input type="text" class="re-form-input" id="re-property-input" 
+                     placeholder="https://zillow.com/property/...">
+              <div class="re-input-addon" id="re-paste-addon" title="Paste from clipboard">📋</div>
+            </div>
+            <div class="re-form-validation" id="re-input-validation"></div>
+          </div>
+
+          <div class="re-form-group">
+            <button class="re-btn re-btn-primary re-btn-full" id="re-analyze-btn">
+              <div>🔍</div>
+              <span>Analyze Property</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Analysis Progress -->
+        <div class="re-progress re-hidden" id="re-analysis-progress">
+          <div class="re-progress-header">
+            <div class="re-progress-title">Analysis in Progress</div>
+            <div class="re-progress-time" id="re-progress-timer">0:00</div>
+          </div>
+          <div class="re-progress-steps">
+            <div class="re-progress-step" data-step="validate">
+              <div class="re-step-icon">⏳</div>
+              <span>Validating URL</span>
+            </div>
+            <div class="re-progress-step" data-step="send">
+              <div class="re-step-icon">⏳</div>
+              <span>Sending to ChatGPT</span>
+            </div>
+            <div class="re-progress-step" data-step="analyze">
+              <div class="re-step-icon">⏳</div>
+              <span>AI Analysis</span>
+            </div>
+            <div class="re-progress-step" data-step="save">
+              <div class="re-step-icon">⏳</div>
+              <span>Saving Results</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="re-messages-container">
+          <div class="re-message re-message-success re-hidden" id="re-success-msg">
+            <div class="re-message-icon">✅</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div class="re-message re-message-error re-hidden" id="re-error-msg">
+            <div class="re-message-icon">❌</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div class="re-message re-message-warning re-hidden" id="re-warning-msg">
+            <div class="re-message-icon">⚠️</div>
+            <div class="re-message-content"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getChatGPTPropertiesHTML() {
+    return `
+      <!-- Properties Section -->
+      <div class="re-section re-hidden" id="re-properties-section">
+        <!-- Properties Stats -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Property Portfolio</div>
+            <div class="re-section-subtitle">Your analyzed properties and insights</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-total-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Total</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-analyzed-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Analyzed</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-sources-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Sources</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Properties List -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Recent Properties</div>
+          </div>
+          
+          <div id="re-properties-list">
+            <!-- Properties will be populated here -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="re-empty-properties" class="re-hidden" style="text-align: center; padding: 32px 16px; color: var(--chatgpt-text-secondary);">
+            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">📄</div>
+            <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No Properties Yet</div>
+            <div style="font-size: 14px; line-height: 1.4; margin-bottom: 20px;">Start by analyzing your first property using the tool above</div>
+            <button class="re-btn re-btn-primary" id="re-start-first-analysis">
+              <div>🔍</div>
+              <span>Analyze First Property</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getChatGPTSettingsHTML() {
+    return `
+      <!-- Settings Section -->
+      <div class="re-section re-hidden" id="re-settings-section">
+        <!-- Interface Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Interface</div>
+            <div class="re-section-subtitle">Customize your RE Analyzer experience</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Panel Position</label>
+            <select class="re-form-input" id="re-position-select">
+              <option value="left">Left Side</option>
+              <option value="right">Right Side</option>
+              <option value="bottom">Bottom</option>
+            </select>
+          </div>
+
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
+              <span class="re-form-label" style="margin: 0;">Compact Mode</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Use smaller interface elements to save space
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Analysis</div>
+            <div class="re-section-subtitle">Configure analysis behavior</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Automatically switch to Properties tab after analysis
+            </div>
+          </div>
+
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Show Notifications</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Display notifications when analysis completes
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Data Management</div>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
+              <div>📄</div>
+              <span>Export All Properties</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
+              <div>🧪</div>
+              <span>Test Analysis</span>
+            </button>
+            <label class="re-setting-item" style="margin: 8px 0; font-size: 14px; cursor: pointer;">
+              <input type="checkbox" id="re-allow-any-url" style="margin-right: 8px;">
+              <span>Allow any URL (bypass domain validation)</span>
+            </label>
+            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
+              <div>🗑️</div>
+              <span>Clear All Data</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Version Info -->
+        <div style="text-align: center; padding: 16px; color: var(--chatgpt-text-tertiary); font-size: 12px;">
+          RE Analyzer v2.0.0 - Native Integration
+        </div>
+      </div>
+    `;
+  }
+
+  getAnalyzerTabHTML() {
+    return `
+      <!-- Analyzer Tab -->
+      <div id="analyzer-tab" class="re-tab-content re-tab-active">
+        <!-- Quick Actions -->
+        <div class="re-quick-actions">
+          <button id="re-paste-analyze-btn" class="re-btn re-btn-primary re-btn-large">
+            <span class="re-btn-icon">📋</span>
+            <span class="re-btn-text">Paste & Analyze</span>
+          </button>
+          <button id="re-manual-input-btn" class="re-btn re-btn-secondary">
+            <span class="re-btn-icon">✏️</span>
+            <span class="re-btn-text">Manual Input</span>
+          </button>
+        </div>
+
+        <!-- Property Input Section -->
+        <div id="re-property-input" class="re-section re-hidden">
+          <div class="re-section-header">
+            <h3>Property Analysis</h3>
+          </div>
+          <div class="re-form-group">
+            <label for="re-property-url" class="re-label">Property URL</label>
+            <div class="re-input-group">
+              <input type="text" id="re-property-url" class="re-input" 
+                     placeholder="Paste property link from Zillow, Realtor.com, etc.">
+              <button id="re-paste-btn" class="re-btn re-btn-icon" title="Paste from clipboard">
+                📋
+              </button>
+            </div>
+            <div class="re-input-validation" id="re-url-validation"></div>
+          </div>
+          <div class="re-form-actions">
+            <button id="re-analyze-btn" class="re-btn re-btn-primary">
+              <span class="re-btn-icon">🔍</span>
+              <span class="re-btn-text">Analyze Property</span>
+            </button>
+            <button id="re-clear-btn" class="re-btn re-btn-ghost">Clear</button>
+          </div>
+        </div>
+
+        <!-- Status Section -->
+        <div class="re-status-section">
+          <div id="re-status" class="re-status re-status-checking">
+            <div class="re-status-icon">
+              <div class="re-spinner"></div>
+            </div>
+            <div class="re-status-content">
+              <div class="re-status-title">Checking Connection...</div>
+              <div class="re-status-subtitle">Verifying ChatGPT access</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Progress -->
+        <div id="re-analysis-progress" class="re-progress-section re-hidden">
+          <div class="re-progress-header">
+            <h4>Analysis in Progress</h4>
+            <span class="re-progress-time" id="re-progress-time">0:00</span>
+          </div>
+          <div class="re-progress-steps">
+            <div class="re-progress-step" data-step="validate">
+              <div class="re-step-icon">⏳</div>
+              <span>Validating URL</span>
+            </div>
+            <div class="re-progress-step" data-step="send">
+              <div class="re-step-icon">⏳</div>
+              <span>Sending to ChatGPT</span>
+            </div>
+            <div class="re-progress-step" data-step="analyze">
+              <div class="re-step-icon">⏳</div>
+              <span>AI Analysis</span>
+            </div>
+            <div class="re-progress-step" data-step="save">
+              <div class="re-step-icon">⏳</div>
+              <span>Saving Results</span>
+            </div>
+          </div>
+          <div class="re-progress-tip">
+            <span class="re-tip-icon">💡</span>
+            <span>Analysis typically takes 30-60 seconds</span>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="re-messages" id="re-messages">
+          <div id="re-success-message" class="re-message re-message-success re-hidden">
+            <div class="re-message-icon">✅</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div id="re-error-message" class="re-message re-message-error re-hidden">
+            <div class="re-message-icon">❌</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div id="re-warning-message" class="re-message re-message-warning re-hidden">
+            <div class="re-message-icon">⚠️</div>
+            <div class="re-message-content"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getPropertiesTabHTML() {
+    return `
+      <!-- Properties Tab -->
+      <div id="properties-tab" class="re-tab-content">
+        <!-- Properties Overview -->
+        <div class="re-properties-overview">
+          <div class="re-overview-stats">
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-total-properties">0</span>
+              <span class="re-stat-label">Properties</span>
+            </div>
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-analyzed-count">0</span>
+              <span class="re-stat-label">Analyzed</span>
+            </div>
+            <div class="re-stat-item">
+              <span class="re-stat-number" id="re-categories-count">0</span>
+              <span class="re-stat-label">Categories</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Controls -->
+        <div class="re-view-controls">
+          <div class="re-view-toggle">
+            <button class="re-view-btn re-view-active" data-view="category">
+              <span class="re-view-icon">📁</span>
+              Categories
+            </button>
+            <button class="re-view-btn" data-view="list">
+              <span class="re-view-icon">📋</span>
+              List
+            </button>
+          </div>
+          <div class="re-view-actions">
+            <button id="re-export-btn" class="re-btn re-btn-secondary re-btn-sm">
+              <span class="re-btn-icon">📄</span>
+              Export
+            </button>
+            <button id="re-manage-categories-btn" class="re-btn re-btn-ghost re-btn-sm">
+              <span class="re-btn-icon">⚙️</span>
+              Manage
+            </button>
+          </div>
+        </div>
+
+        <!-- Properties Content -->
+        <div class="re-properties-content">
+          <!-- Category View -->
+          <div id="re-category-view" class="re-view-content re-view-active">
+            <div id="re-categories-grid" class="re-categories-grid">
+              <!-- Categories will be populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- List View -->
+          <div id="re-list-view" class="re-view-content">
+            <div id="re-properties-list" class="re-properties-list">
+              <!-- Properties will be populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="re-empty-state" class="re-empty-state">
+            <div class="re-empty-icon">📄</div>
+            <h3>No properties analyzed yet</h3>
+            <p>Start by analyzing your first property in the Analyzer tab</p>
+            <button class="re-btn re-btn-primary" id="re-start-analyzing">
+              <span class="re-btn-icon">🔍</span>
+              Start Analyzing
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getSettingsTabHTML() {
+    return `
+      <!-- Settings Tab -->
+      <div id="settings-tab" class="re-tab-content">
+        <!-- Settings Overview -->
+        <div class="re-settings-overview">
+          <h2>Settings</h2>
+          <p>Configure your RE Analyzer preferences</p>
+        </div>
+
+        <!-- Settings Sections -->
+        <div class="re-settings-sections">
+          <!-- Analysis Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">🔍</span>
+              Analysis Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-auto-categorize" class="re-checkbox">
+                <span class="re-setting-title">Auto-categorize properties</span>
+              </label>
+              <p class="re-setting-description">Automatically suggest categories for new properties</p>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-show-notifications" class="re-checkbox" checked>
+                <span class="re-setting-title">Show analysis notifications</span>
+              </label>
+              <p class="re-setting-description">Display notifications when analysis is complete</p>
+            </div>
+          </div>
+
+          <!-- UI Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">🎨</span>
+              Interface Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <span class="re-setting-title">Panel Position</span>
+              </label>
+              <select id="re-panel-position" class="re-select">
+                <option value="right">Right Side</option>
+                <option value="left">Left Side</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-compact-mode" class="re-checkbox">
+                <span class="re-setting-title">Compact mode</span>
+              </label>
+              <p class="re-setting-description">Use smaller interface elements</p>
+            </div>
+          </div>
+
+          <!-- Export Settings -->
+          <div class="re-settings-section">
+            <h3>
+              <span class="re-settings-icon">📄</span>
+              Export Settings
+            </h3>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <span class="re-setting-title">Default Export Format</span>
+              </label>
+              <select id="re-export-format" class="re-select">
+                <option value="word">Word Document</option>
+                <option value="csv">CSV Spreadsheet</option>
+                <option value="json">JSON Data</option>
+              </select>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-include-full-analysis" class="re-checkbox" checked>
+                <span class="re-setting-title">Include full analysis text</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Actions -->
+        <div class="re-settings-actions">
+          <button id="re-save-settings-btn" class="re-btn re-btn-primary">
+            <span class="re-btn-icon">💾</span>
+            Save Settings
+          </button>
+          <button id="re-reset-settings-btn" class="re-btn re-btn-ghost">
+            Reset to Defaults
+          </button>
+        </div>
+
+        <!-- Version Info -->
+        <div class="re-version-info">
+          <small>RE Analyzer v2.0.0 - Embedded UI</small>
+        </div>
+      </div>
+    `;
+  }
+
+  setupEventListeners() {
+    if (!this.panel) return;
+
+    // Sidebar close button
+    const closeBtn = this.panel.querySelector('#re-sidebar-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.hidePanel());
+    }
+
+    // Navigation items
+    const navItems = this.panel.querySelectorAll('.re-nav-item');
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
+        this.switchTab(tabId);
+      });
+    });
+
+    // Analyzer events
+    this.setupChatGPTAnalyzerEvents();
+    
+    // Properties events  
+    this.setupChatGPTPropertiesEvents();
+    
+    // Settings events
+    this.setupChatGPTSettingsEvents();
+
+    console.log('🎮 ChatGPT-style event listeners set up');
+  }
+
+  setupChatGPTAnalyzerEvents() {
+    // Quick analyze button
+    const quickAnalyzeBtn = this.panel.querySelector('#re-quick-analyze');
+    if (quickAnalyzeBtn) {
+      quickAnalyzeBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (this.isValidPropertyLink(text)) {
+            await this.analyzeProperty(text);
+          } else {
+            this.showChatGPTMessage('error', 'Clipboard does not contain a valid property link');
+          }
+        } catch (err) {
+          this.showChatGPTMessage('error', 'Unable to access clipboard. Please use manual input below.');
+        }
+      });
+    }
+
+    // Manual input elements
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    const pasteAddon = this.panel.querySelector('#re-paste-addon');
+    const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+
+    if (propertyInput) {
+      propertyInput.addEventListener('input', () => {
+        this.validateChatGPTInput();
+      });
+    }
+
+    if (pasteAddon) {
+      pasteAddon.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (propertyInput) {
+            propertyInput.value = text;
+            this.validateChatGPTInput();
+          }
+        } catch (err) {
+          this.showChatGPTMessage('error', 'Unable to paste from clipboard');
+        }
+      });
+    }
+
+    if (analyzeBtn) {
+      analyzeBtn.addEventListener('click', () => {
+        const url = propertyInput ? propertyInput.value.trim() : '';
+        if (url && this.isValidPropertyLink(url)) {
+          this.analyzeProperty(url);
+        } else {
+          this.showChatGPTMessage('error', 'Please enter a valid property URL');
+        }
+      });
+    }
+  }
+
+  setupChatGPTPropertiesEvents() {
+    // Start first analysis button
+    const startBtn = this.panel.querySelector('#re-start-first-analysis');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        this.switchTab('analyzer');
+      });
+    }
+  }
+
+  setupChatGPTSettingsEvents() {
+    // Position selector
+    const positionSelect = this.panel.querySelector('#re-position-select');
+    if (positionSelect) {
+      positionSelect.value = uiSettings.position;
+      positionSelect.addEventListener('change', () => {
+        this.updatePanelPosition(positionSelect.value);
+      });
+    }
+
+    // Settings toggles
+    const compactToggle = this.panel.querySelector('#re-compact-toggle');
+    const autoShowToggle = this.panel.querySelector('#re-auto-show-toggle');
+    const notificationsToggle = this.panel.querySelector('#re-notifications-toggle');
+
+    if (compactToggle) {
+      compactToggle.checked = uiSettings.compactMode;
+      compactToggle.addEventListener('change', () => {
+        this.toggleCompactMode(compactToggle.checked);
+      });
+    }
+
+    if (autoShowToggle) {
+      autoShowToggle.checked = uiSettings.autoShow;
+      autoShowToggle.addEventListener('change', () => {
+        uiSettings.autoShow = autoShowToggle.checked;
+        this.saveSettings();
+      });
+    }
+
+    if (notificationsToggle) {
+      notificationsToggle.checked = uiSettings.showNotifications;
+      notificationsToggle.addEventListener('change', () => {
+        uiSettings.showNotifications = notificationsToggle.checked;
+        this.saveSettings();
+      });
+    }
+
+    // Action buttons
+    const exportBtn = this.panel.querySelector('#re-export-all');
+    const testBtn = this.panel.querySelector('#re-test-analysis');
+    const clearBtn = this.panel.querySelector('#re-clear-data');
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportAllProperties());
+    }
+
+    if (testBtn) {
+      testBtn.addEventListener('click', () => this.testAnalysis());
+    }
+    
+    // Bypass URL validation checkbox
+    const allowAnyUrlCheckbox = this.panel.querySelector('#re-allow-any-url');
+    if (allowAnyUrlCheckbox) {
+      // Load saved setting
+      allowAnyUrlCheckbox.checked = uiSettings.allowAnyUrl || false;
+      
+      allowAnyUrlCheckbox.addEventListener('change', () => {
+        uiSettings.allowAnyUrl = allowAnyUrlCheckbox.checked;
+        this.saveSettings();
+        console.log('🔓 Allow any URL setting:', allowAnyUrlCheckbox.checked);
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.clearAllData());
+    }
+  }
+
+  setupAnalyzerEvents() {
+    // Quick action buttons
+    const pasteAnalyzeBtn = this.panel.querySelector('#re-paste-analyze-btn');
+    const manualInputBtn = this.panel.querySelector('#re-manual-input-btn');
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    
+    if (pasteAnalyzeBtn) {
+      pasteAnalyzeBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (this.isValidPropertyLink(text)) {
+            await this.analyzeProperty(text);
+          } else {
+            this.showMessage('error', 'Clipboard does not contain a valid property link');
+          }
+        } catch (err) {
+          this.showMessage('error', 'Unable to access clipboard. Please use manual input.');
+          this.showManualInput();
+        }
+      });
+    }
+
+    if (manualInputBtn) {
+      manualInputBtn.addEventListener('click', () => {
+        this.showManualInput();
+      });
+    }
+
+    // Manual input form
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    const pasteBtn = this.panel.querySelector('#re-paste-btn');
+    const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+    const clearBtn = this.panel.querySelector('#re-clear-btn');
+
+    if (propertyUrlInput) {
+      propertyUrlInput.addEventListener('input', () => {
+        this.validatePropertyInput();
+      });
+    }
+
+    if (pasteBtn) {
+      pasteBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (propertyUrlInput) {
+            propertyUrlInput.value = text;
+            this.validatePropertyInput();
+          }
+        } catch (err) {
+          this.showMessage('error', 'Unable to paste from clipboard');
+        }
+      });
+    }
+
+    if (analyzeBtn) {
+      analyzeBtn.addEventListener('click', () => {
+        const url = propertyUrlInput ? propertyUrlInput.value.trim() : '';
+        if (url && this.isValidPropertyLink(url)) {
+          this.analyzeProperty(url);
+        } else {
+          this.showMessage('error', 'Please enter a valid property URL');
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (propertyUrlInput) {
+          propertyUrlInput.value = '';
+          this.clearValidation();
+        }
+      });
+    }
+  }
+
+  setupPropertiesEvents() {
+    // View toggle
+    const viewButtons = this.panel.querySelectorAll('.re-view-btn');
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-view');
+        this.switchPropertiesView(view);
+      });
+    });
+
+    // Action buttons
+    const exportBtn = this.panel.querySelector('#re-export-btn');
+    const manageCategoriesBtn = this.panel.querySelector('#re-manage-categories-btn');
+    const startAnalyzingBtn = this.panel.querySelector('#re-start-analyzing');
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportProperties());
+    }
+
+    if (manageCategoriesBtn) {
+      manageCategoriesBtn.addEventListener('click', () => this.manageCategories());
+    }
+
+    if (startAnalyzingBtn) {
+      startAnalyzingBtn.addEventListener('click', () => this.switchTab('analyzer'));
+    }
+  }
+
+  setupSettingsEvents() {
+    // Settings form elements
+    const panelPositionSelect = this.panel.querySelector('#re-panel-position');
+    const compactModeCheckbox = this.panel.querySelector('#re-compact-mode');
+    const saveSettingsBtn = this.panel.querySelector('#re-save-settings-btn');
+    const resetSettingsBtn = this.panel.querySelector('#re-reset-settings-btn');
+
+    if (panelPositionSelect) {
+      panelPositionSelect.value = uiSettings.position;
+      panelPositionSelect.addEventListener('change', () => {
+        this.updatePanelPosition(panelPositionSelect.value);
+      });
+    }
+
+    if (compactModeCheckbox) {
+      compactModeCheckbox.checked = uiSettings.compactMode;
+      compactModeCheckbox.addEventListener('change', () => {
+        this.toggleCompactMode(compactModeCheckbox.checked);
+      });
+    }
+
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener('click', () => this.saveSettings());
+    }
+
+    if (resetSettingsBtn) {
+      resetSettingsBtn.addEventListener('click', () => this.resetSettings());
+    }
+  }
+
+  setupPanelDragging() {
+    const header = this.panel.querySelector('.re-panel-header');
+    if (!header) return;
+
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    header.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      
+      const rect = this.panel.getBoundingClientRect();
+      startLeft = rect.left;
+      startTop = rect.top;
+      
+      header.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      const newLeft = Math.max(0, Math.min(window.innerWidth - this.panel.offsetWidth, startLeft + deltaX));
+      const newTop = Math.max(0, Math.min(window.innerHeight - this.panel.offsetHeight, startTop + deltaY));
+      
+      this.panel.style.left = newLeft + 'px';
+      this.panel.style.top = newTop + 'px';
+      this.panel.style.right = 'auto';
+      this.panel.style.bottom = 'auto';
+      
+      // Update position setting based on where the panel ends up
+      this.updatePositionFromCoordinates(newLeft, newTop);
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        header.style.cursor = 'move';
+        
+        // Save the new position
+        this.saveSettings();
+      }
+    });
+  }
+
+  // Adaptive positioning based on viewport and content
+  setupAdaptivePositioning() {
+    // Listen for window resize
+    window.addEventListener('resize', () => {
+      this.adaptToViewport();
+    });
+    
+    // Listen for ChatGPT content changes that might affect layout
+    const observer = new MutationObserver(() => {
+      this.checkForLayoutConflicts();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style']
+    });
+    
+    // Initial adaptation
+    this.adaptToViewport();
+  }
+
+  adaptToViewport() {
+    if (!this.panel) return;
+    
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    
+    // For ChatGPT-style sidebar, we don't need to change position as much
+    // Just adjust for mobile
+    if (viewport.width < 768) {
+      this.panel.classList.add('re-mobile-mode');
+      // Don't call updatePanelPosition to avoid saving settings repeatedly
+      uiSettings.position = 'mobile';
+    } else {
+      this.panel.classList.remove('re-mobile-mode');
+      // Restore position without saving
+      if (uiSettings.position === 'mobile') {
+        uiSettings.position = 'left'; // Default for ChatGPT-style sidebar
+      }
+    }
+    
+    console.log(`📱 Adapted to viewport: ${viewport.width}x${viewport.height}`);
+  }
+
+  detectOptimalSide() {
+    // Check for conflicts with ChatGPT's sidebar and other elements
+    const chatGptSidebar = document.querySelector('[data-radix-scroll-area-viewport]');
+    const chatGptMain = document.querySelector('main');
+    
+    if (chatGptSidebar && chatGptMain) {
+      const sidebarRect = chatGptSidebar.getBoundingClientRect();
+      const mainRect = chatGptMain.getBoundingClientRect();
+      
+      // If sidebar is on the left and takes significant space, prefer right
+      if (sidebarRect.left < 100 && sidebarRect.width > 200) {
+        return 'right';
+      }
+      
+      // If main content is centered, prefer right
+      if (mainRect.left > 200) {
+        return 'right';
+      }
+    }
+    
+    // Default to right side
+    return 'right';
+  }
+
+  checkForLayoutConflicts() {
+    if (!this.panel || !this.isVisible) return;
+    
+    // Check if panel overlaps with important ChatGPT elements
+    const panelRect = this.panel.getBoundingClientRect();
+    const chatInput = document.querySelector('[data-id="root"] textarea');
+    const sendButton = document.querySelector('[data-testid="send-button"]');
+    
+    let hasConflict = false;
+    
+    if (chatInput) {
+      const inputRect = chatInput.getBoundingClientRect();
+      if (this.rectsOverlap(panelRect, inputRect)) {
+        hasConflict = true;
+      }
+    }
+    
+    if (sendButton) {
+      const buttonRect = sendButton.getBoundingClientRect();
+      if (this.rectsOverlap(panelRect, buttonRect)) {
+        hasConflict = true;
+      }
+    }
+    
+    if (hasConflict) {
+      console.log('⚠️ Layout conflict detected, adjusting position');
+      this.resolveLayoutConflict();
+    }
+  }
+
+  rectsOverlap(rect1, rect2) {
+    return !(rect1.right < rect2.left || 
+             rect1.left > rect2.right || 
+             rect1.bottom < rect2.top || 
+             rect1.top > rect2.bottom);
+  }
+
+  resolveLayoutConflict() {
+    // Try different positions to resolve conflicts
+    const positions = ['right', 'left', 'bottom'];
+    const currentPosition = uiSettings.position;
+    
+    for (const position of positions) {
+      if (position !== currentPosition) {
+        this.updatePanelPosition(position);
+        
+        // Check if conflict is resolved
+        setTimeout(() => {
+          this.checkForLayoutConflicts();
+        }, 100);
+        
+        break;
+      }
+    }
+  }
+
+  updatePositionFromCoordinates(left, top) {
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+    
+    const centerX = viewport.width / 2;
+    const centerY = viewport.height / 2;
+    
+    // Determine position based on where the panel is
+    if (top > viewport.height * 0.7) {
+      uiSettings.position = 'bottom';
+    } else if (left < centerX) {
+      uiSettings.position = 'left';
+    } else {
+      uiSettings.position = 'right';
+    }
+  }
+
+  // Keyboard shortcuts setup
+  setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Only handle shortcuts when not typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+      
+      // Ctrl/Cmd + Shift + R: Toggle RE Analyzer
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        this.togglePanel();
+        console.log('⌨️ Toggled panel via keyboard shortcut');
+      }
+      
+      // Ctrl/Cmd + Shift + A: Focus on analyzer tab
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        this.showPanel();
+        this.switchTab('analyzer');
+        console.log('⌨️ Switched to analyzer via keyboard shortcut');
+      }
+      
+      // Ctrl/Cmd + Shift + P: Focus on properties tab  
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        this.showPanel();
+        this.switchTab('properties');
+        console.log('⌨️ Switched to properties via keyboard shortcut');
+      }
+      
+      // Escape: Close panel
+      if (e.key === 'Escape' && this.isVisible) {
+        e.preventDefault();
+        this.hidePanel();
+        console.log('⌨️ Closed panel via Escape key');
+      }
+      
+      // Ctrl/Cmd + Shift + V: Paste and analyze
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        this.quickPasteAndAnalyze();
+        console.log('⌨️ Quick paste and analyze via keyboard shortcut');
+      }
+    });
+    
+    console.log('⌨️ Keyboard shortcuts enabled');
+  }
+
+  async quickPasteAndAnalyze() {
+    try {
+      const text = await navigator.clipboard.readText();
+      const cleanText = text.trim();
+      
+      if (!cleanText) {
+        this.showChatGPTMessage('error', 'Clipboard is empty');
+        return;
+      }
+      
+      try {
+        if (this.isValidPropertyLink(cleanText)) {
+          this.showPanel();
+          this.switchTab('analyzer');
+          await this.analyzeProperty(cleanText);
+        } else {
+          this.showChatGPTMessage('error', 'Clipboard does not contain a valid property link');
+        }
+      } catch (validationError) {
+        console.error('❌ Validation error in quick paste:', validationError);
+        this.showChatGPTMessage('error', 'Invalid URL format in clipboard');
+      }
+    } catch (err) {
+      console.error('❌ Clipboard access error:', err);
+      this.showChatGPTMessage('error', 'Unable to access clipboard');
+    }
+  }
+
+  // UI Control Methods
+  showPanel() {
+    if (!this.panel) return;
+    
+    this.panel.classList.add('re-sidebar-open');
+    this.isVisible = true;
+    
+    // Update notification
+    if (this.fab) {
+      this.fab.classList.remove('re-has-notification');
+    }
+    
+    console.log('👁️ ChatGPT-style sidebar shown');
+  }
+
+  hidePanel() {
+    if (!this.panel) return;
+    
+    this.panel.classList.remove('re-sidebar-open');
+    this.isVisible = false;
+    
+    console.log('👁️ ChatGPT-style sidebar hidden');
+  }
+
+  togglePanel() {
+    if (this.isVisible) {
+      this.hidePanel();
+    } else {
+      this.showPanel();
+    }
+  }
+
+  minimizePanel() {
+    if (!this.panel) return;
+    
+    if (this.panel.classList.contains('re-panel-minimized')) {
+      this.panel.classList.remove('re-panel-minimized');
+    } else {
+      this.panel.classList.add('re-panel-minimized');
+    }
+  }
+
+  switchTab(tabId) {
+    if (!this.panel) return;
+    
+    // Update navigation items
+    const navItems = this.panel.querySelectorAll('.re-nav-item');
+    navItems.forEach(item => {
+      if (item.getAttribute('data-tab') === tabId) {
+        item.classList.add('re-nav-active');
+      } else {
+        item.classList.remove('re-nav-active');
+      }
+    });
+    
+    // Update section visibility
+    const sections = ['analyzer', 'properties', 'settings'];
+    sections.forEach(section => {
+      const sectionElement = this.panel.querySelector(`#re-${section}-section`);
+      if (sectionElement) {
+        if (section === tabId) {
+          sectionElement.classList.remove('re-hidden');
+        } else {
+          sectionElement.classList.add('re-hidden');
+        }
+      }
+    });
+    
+    this.currentTab = tabId;
+    
+    // Tab-specific logic
+    if (tabId === 'properties') {
+      this.loadChatGPTPropertyData();
+    } else if (tabId === 'analyzer') {
+      this.updateChatGPTConnectionStatus();
+    }
+    
+    console.log(`📑 Switched to ChatGPT-style ${tabId} section`);
+  }
+
+  // ChatGPT-style helper methods
+  validateChatGPTInput() {
+    const input = this.panel.querySelector('#re-property-input');
+    const validation = this.panel.querySelector('#re-input-validation');
+    
+    if (!input || !validation) return;
+    
+    const url = input.value.trim();
+    
+    if (!url) {
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      return;
+    }
+    
+    // Only validate if the input looks like it might be a complete URL
+    // This prevents errors while user is still typing
+    if (url.length < 5 || (!url.includes('.') && !url.startsWith('http'))) {
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      return;
+    }
+    
+    try {
+      if (this.isValidPropertyLink(url)) {
+        validation.textContent = '✓ Valid property URL';
+        validation.className = 're-form-validation re-valid';
+      } else {
+        validation.textContent = '⚠ Please enter a valid property URL from a supported site';
+        validation.className = 're-form-validation re-invalid';
+      }
+    } catch (error) {
+      // Don't show validation errors while user is still typing
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      console.log('⏸️ Validation skipped for incomplete input:', url);
+    }
+  }
+
+  showChatGPTMessage(type, message) {
+    const messageElement = this.panel.querySelector(`#re-${type}-msg`);
+    const messageContent = messageElement?.querySelector('.re-message-content');
+    
+    if (messageElement && messageContent) {
+      // Hide all messages first
+      const allMessages = this.panel.querySelectorAll('.re-message');
+      allMessages.forEach(msg => msg.classList.add('re-hidden'));
+      
+      // Show the specific message
+      messageContent.textContent = message;
+      messageElement.classList.remove('re-hidden');
+      messageElement.classList.add('re-fade-in');
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        messageElement.classList.add('re-hidden');
+        messageElement.classList.remove('re-fade-in');
+      }, 5000);
+    }
+  }
+
+  updateChatGPTConnectionStatus() {
+    const statusElement = this.panel.querySelector('#re-connection-status');
+    const statusIcon = statusElement?.querySelector('.re-status-icon');
+    const statusTitle = statusElement?.querySelector('.re-status-title');
+    const statusSubtitle = statusElement?.querySelector('.re-status-subtitle');
+    
+    if (!statusElement) return;
+    
+    // Check if we're on ChatGPT
+    if (isChatGPTSite()) {
+      statusElement.className = 're-status re-status-connected';
+      if (statusIcon) statusIcon.textContent = '✅';
+      if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+    } else {
+      statusElement.className = 're-status re-status-error';
+      if (statusIcon) statusIcon.textContent = '❌';
+      if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+    }
+  }
+
+  async loadChatGPTPropertyData() {
+    try {
+      // Load property history from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        null
+      );
+      
+      let properties = [];
+      
+      if (result && result.propertyHistory) {
+        properties = result.propertyHistory;
+        console.log(`📚 Loaded ${properties.length} properties from extension storage`);
+      } else {
+        // If extension context is invalidated, show a message but continue with empty state
+        console.log('📚 Extension context invalidated, showing empty property state');
+        this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+      }
+      
+      // Update stats
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      const sources = [...new Set(properties.map(p => p.domain))].length;
+      
+      this.updateChatGPTStats(properties.length, analyzedCount, sources);
+      
+      // Show properties or empty state
+      if (properties.length > 0) {
+        this.displayChatGPTProperties(properties);
+        this.hideChatGPTEmptyState();
+      } else {
+        this.showChatGPTEmptyState();
+      }
+      
+      // Update badge
+      this.updatePropertiesBadge(properties.length);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property data:', error);
+      this.updateChatGPTStats(0, 0, 0);
+      this.showChatGPTEmptyState();
+    }
+  }
+
+  updateChatGPTStats(total, analyzed, sources) {
+    const totalElement = this.panel.querySelector('#re-total-count');
+    const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+    const sourcesElement = this.panel.querySelector('#re-sources-count');
+    
+    if (totalElement) totalElement.textContent = total.toString();
+    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
+    if (sourcesElement) sourcesElement.textContent = sources.toString();
+  }
+
+  displayChatGPTProperties(properties) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+
+    // Clear existing content
+    propertiesList.innerHTML = '';
+
+    // Sort properties by timestamp (newest first)
+    const sortedProperties = [...properties].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Show only the most recent 10 properties in the sidebar
+    const recentProperties = sortedProperties.slice(0, 10);
+
+    recentProperties.forEach(property => {
+      const hasAnalysis = property.analysis && property.analysis.extractedData;
+      const domain = this.getDomainDisplayName(property.domain);
+      const title = this.getPropertyTitle(property);
+      
+      const propertyCard = document.createElement('div');
+      propertyCard.className = 're-property-card';
+      propertyCard.innerHTML = `
+        <div class="re-property-header">
+          <div class="re-property-title">${title}</div>
+          <div class="re-property-status ${hasAnalysis ? 're-analyzed' : 're-pending'}">
+            ${hasAnalysis ? '✅' : '⏳'}
+          </div>
+        </div>
+        <div class="re-property-meta">
+          <div class="re-property-domain">${domain}</div>
+          <div>${property.date || 'Unknown date'}</div>
+        </div>
+        <div class="re-property-actions">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+            View Analysis
+          </button>
+          ${hasAnalysis ? `
+            <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+              Export
+            </button>
+          ` : `
+            <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+              Analyze
+            </button>
+          `}
+        </div>
+      `;
+      
+      propertiesList.appendChild(propertyCard);
+    });
+
+    // Add "View All" button if there are more properties
+    if (properties.length > 10) {
+      const viewAllCard = document.createElement('div');
+      viewAllCard.style.textAlign = 'center';
+      viewAllCard.style.padding = '16px';
+      viewAllCard.innerHTML = `
+        <div style="color: var(--chatgpt-text-secondary); font-size: 14px; margin-bottom: 8px;">
+          ${properties.length - 10} more properties
+        </div>
+        <button class="re-btn re-btn-ghost re-btn-sm">
+          View All Properties
+        </button>
+      `;
+      propertiesList.appendChild(viewAllCard);
+    }
+  }
+
+  showChatGPTEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-properties');
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    
+    if (emptyState) emptyState.classList.remove('re-hidden');
+    if (propertiesList) propertiesList.innerHTML = '';
+  }
+
+  hideChatGPTEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-properties');
+    if (emptyState) emptyState.classList.add('re-hidden');
+  }
+
+  updatePropertiesBadge(count) {
+    const badge = this.panel.querySelector('#re-properties-badge');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count.toString();
+        badge.classList.remove('re-hidden');
+      } else {
+        badge.classList.add('re-hidden');
+      }
+    }
+  }
+
+  exportAllProperties() {
+    this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  async testAnalysis() {
+    console.log('🧪 Testing analysis functionality...');
+    
+    const testUrls = [
+      'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/',
+      'https://www.realtor.com/realestateandhomes-detail/123-Main-St_Anytown_CA_12345',
+      'https://www.redfin.com/CA/Anytown/123-Main-St-12345/home/123456789'
+    ];
+    
+    try {
+      // First test if we can find the input field
+      const inputField = findChatGPTInput();
+      if (!inputField) {
+        this.showChatGPTMessage('error', 'Could not find ChatGPT input field. Please make sure the page is fully loaded.');
+        return;
+      }
+      
+      this.showChatGPTMessage('success', 'ChatGPT input field found successfully!');
+      console.log('✅ Found input field:', inputField);
+      
+      // Show which input field was found
+      const fieldInfo = inputField.tagName + (inputField.getAttribute('data-id') ? `[data-id="${inputField.getAttribute('data-id')}"]` : '') + (inputField.placeholder ? ` placeholder="${inputField.placeholder}"` : '');
+      console.log('📋 Field details:', fieldInfo);
+      
+      // Let user choose a test URL
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, or 5):
+1. Zillow Test URL
+2. Realtor.com Test URL  
+3. Redfin Test URL
+4. Monitor ChatGPT responses (for debugging)
+5. Debug saved analysis data
+      
+Or enter your own property URL:`);
+      
+      let urlToTest;
+      
+      // Special debugging option
+      if (testUrl === '4') {
+        this.showChatGPTMessage('info', 'Now monitoring ChatGPT responses. Check console for detailed logs about what responses are being detected and saved.');
+        console.log('🔍 RESPONSE MONITORING ACTIVATED');
+        console.log('🔍 Send a property link to ChatGPT and watch the console for:');
+        console.log('🔍 - "FIRST response (confirmation)" - this should NOT be saved');
+        console.log('🔍 - "SECOND response (analysis)" - this SHOULD be saved');
+        return;
+      }
+      
+      // Special debug option to inspect saved data
+      if (testUrl === '5') {
+        this.debugSavedAnalyses();
+        return;
+      }
+      if (testUrl === '1') {
+        urlToTest = testUrls[0];
+      } else if (testUrl === '2') {
+        urlToTest = testUrls[1];
+      } else if (testUrl === '3') {
+        urlToTest = testUrls[2];
+      } else if (testUrl && testUrl.trim()) {
+        urlToTest = testUrl.trim();
+        // If it doesn't start with http, add https://
+        if (!urlToTest.startsWith('http')) {
+          urlToTest = 'https://' + urlToTest;
+        }
+      } else {
+        this.showChatGPTMessage('warning', 'Test cancelled');
+        return;
+      }
+      
+      // Test URL validation first
+      console.log('🧪 Testing URL validation for:', urlToTest);
+      const isValid = this.isValidPropertyLink(urlToTest);
+      
+      if (!isValid) {
+        this.showChatGPTMessage('error', `URL validation failed for: ${urlToTest}. Check console for details.`);
+        console.log('❌ The URL did not pass validation. This is likely why analysis is not working.');
+        console.log('💡 Try adding the domain to the supported domains list or use a different property site.');
+        return;
+      } else {
+        this.showChatGPTMessage('success', `URL validation passed for: ${urlToTest}`);
+      }
+      
+      // Test the analysis with the selected URL
+      console.log('🔍 Testing analysis with:', urlToTest);
+      this.showChatGPTMessage('info', `Testing analysis with: ${urlToTest}`);
+      
+      await this.analyzeProperty(urlToTest);
+      
+    } catch (error) {
+      console.error('❌ Test failed:', error);
+      this.showChatGPTMessage('error', `Test failed: ${error.message}`);
+    }
+  }
+
+  clearAllData() {
+    if (confirm('Are you sure you want to clear all property data? This action cannot be undone.')) {
+      safeChromeFall(
+        () => chrome.storage.local.remove(['propertyHistory']),
+        null
+      ).then(() => {
+        this.showChatGPTMessage('success', 'All property data has been cleared');
+        this.loadChatGPTPropertyData();
+      });
+    }
+  }
+
+  checkExtensionContext() {
+    if (!isExtensionContextValid()) {
+      console.warn('⚠️ Extension context invalidated during initialization');
+      this.showChatGPTMessage('warning', 'Extension was updated. Please reload the page for full functionality.');
+      
+      // Add a reload button to the warning message
+      setTimeout(() => {
+        const warningMsg = this.panel.querySelector('#re-warning-msg');
+        if (warningMsg && !warningMsg.classList.contains('re-hidden')) {
+          const reloadBtn = document.createElement('button');
+          reloadBtn.className = 're-btn re-btn-secondary re-btn-sm';
+          reloadBtn.innerHTML = '<span>🔄</span><span>Reload Page</span>';
+          reloadBtn.style.marginTop = '8px';
+          reloadBtn.onclick = () => window.location.reload();
+          
+          const content = warningMsg.querySelector('.re-message-content');
+          if (content) {
+            content.appendChild(reloadBtn);
+          }
+        }
+      }, 100);
+    }
+  }
+
+  // Helper methods for UI functionality will be added in the next part...
+  
+  showManualInput() {
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    if (propertyInput) {
+      propertyInput.classList.remove('re-hidden');
+    }
+  }
+
+  isValidPropertyLink(url) {
+    try {
+      // Check if URL is empty, null, or undefined
+      if (!url || typeof url !== 'string' || url.trim().length === 0) {
+        console.log('❌ Empty or invalid URL provided');
+        return false;
+      }
+      
+      // Clean the URL
+      url = url.trim();
+      
+      // Check if bypass is enabled
+      const allowAnyUrl = this.panel?.querySelector('#re-allow-any-url')?.checked;
+      if (allowAnyUrl) {
+        console.log('🔓 URL validation bypassed - allowing any URL');
+        // Still need to validate it's a proper URL format for bypass mode
+        try {
+          new URL(url);
+          return true;
+        } catch (e) {
+          // Try adding https:// if it doesn't have a protocol
+          try {
+            new URL('https://' + url);
+            return true;
+          } catch (e2) {
+            console.log('❌ Invalid URL format even with bypass enabled');
+            return false;
+          }
+        }
+      }
+      
+      // Try to construct URL, add https:// if missing
+      let urlObj;
+      try {
+        urlObj = new URL(url);
+      } catch (e) {
+        // If URL construction fails, try adding https://
+        try {
+          urlObj = new URL('https://' + url);
+          console.log('🔧 Added https:// prefix to URL');
+        } catch (e2) {
+          console.log('❌ Invalid URL format:', url);
+          return false;
+        }
+      }
+      
+      const hostname = urlObj.hostname.toLowerCase();
+      
+      console.log('🔍 Validating URL:', url);
+      console.log('🌐 Hostname:', hostname);
+      
+      const propertyDomains = [
+        // Major US platforms
+        'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+        'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com',
+        'compass.com', 'coldwellbanker.com', 'century21.com', 'remax.com',
+        'kw.com', 'sothebysrealty.com', 'movoto.com', 'homefinder.com',
+        'crexi.com', 'propertyradar.com', 'rocketmortgage.com',
+        
+        // International platforms
+        'rightmove.co.uk', 'zoopla.co.uk', 'onthemarket.com', 'primelocation.com',
+        'realestate.com.au', 'domain.com.au', 'realtor.ca', 'royallepage.ca',
+        'centris.ca', 'mls.ca', 'immoweb.be', 'immobilienscout24.de',
+        'leboncoin.fr', 'seloger.com', 'logic-immo.com', 'bienici.com',
+        'idealista.com', 'fotocasa.es', 'habitaclia.com', 'yapo.cl',
+        'mercadolibre.com', 'olx.com', 'trovit.com', 'mitula.com',
+        'kyero.com', 'thinkspain.com', 'greekpropertyportal.com',
+        
+        // Israeli platforms
+        'yad2.co.il', 'madlan.co.il',
+        
+        // Greek platforms
+        'spitogatos.gr', 'green-acres.gr',
+        
+        // Cyprus platforms
+        'zyprus.com', 'bazaraki.com',
+        
+        // Regional/Local platforms
+        'mls.com', 'mlslistings.com', 'paragonrels.com', 'northstarmlscom',
+        'matrix.neren.com', 'flexmls.com', 'carets.com', 'listhub.com',
+        'propertyshark.com', 'streeteasy.com', 'renthop.com', 'zumper.com',
+        'forrent.com', 'apartmentguide.com', 'rentals.com', 'apartments24.com'
+      ];
+      
+      const isValid = propertyDomains.some(domain => hostname.includes(domain)) || 
+                     hostname.includes('mls') || // Generic MLS sites
+                     hostname.includes('realty') || // Realty sites
+                     hostname.includes('property') || // Property sites
+                     hostname.includes('real-estate') || // Real estate sites
+                     hostname.includes('homes') || // Homes sites
+                     hostname.includes('rent'); // Rental sites
+      
+      console.log('✅ URL validation result:', isValid);
+      
+      if (!isValid) {
+        console.log('❌ URL not recognized as property listing site');
+        console.log('🔍 Supported domains include:', propertyDomains.slice(0, 5).join(', '), '+ many more');
+      }
+      
+      return isValid;
+    } catch (e) {
+      console.error('❌ URL validation error:', e);
+      return false;
+    }
+  }
+
+  validatePropertyInput() {
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    const validation = this.panel.querySelector('#re-url-validation');
+    
+    if (!propertyUrlInput || !validation) return;
+    
+    const url = propertyUrlInput.value.trim();
+    
+    if (!url) {
+      validation.textContent = '';
+      validation.className = 're-input-validation';
+      return;
+    }
+    
+    if (this.isValidPropertyLink(url)) {
+      validation.textContent = '✅ Valid property URL';
+      validation.className = 're-input-validation re-valid';
+    } else {
+      validation.textContent = '❌ Please enter a valid property URL from a supported site';
+      validation.className = 're-input-validation re-invalid';
+    }
+  }
+
+  clearValidation() {
+    const validation = this.panel.querySelector('#re-url-validation');
+    if (validation) {
+      validation.textContent = '';
+      validation.className = 're-input-validation';
+    }
+  }
+
+  showMessage(type, message) {
+    const messageElement = this.panel.querySelector(`#re-${type}-message`);
+    const messageContent = messageElement?.querySelector('.re-message-content');
+    
+    if (messageElement && messageContent) {
+      // Hide all messages first
+      const allMessages = this.panel.querySelectorAll('.re-message');
+      allMessages.forEach(msg => msg.classList.remove('re-show'));
+      
+      // Show the specific message
+      messageContent.textContent = message;
+      messageElement.classList.add('re-show');
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        messageElement.classList.remove('re-show');
+      }, 5000);
+    }
+  }
+
+  updateConnectionStatus() {
+    const statusElement = this.panel.querySelector('#re-status');
+    const statusIcon = statusElement?.querySelector('.re-status-icon');
+    const statusTitle = statusElement?.querySelector('.re-status-title');
+    const statusSubtitle = statusElement?.querySelector('.re-status-subtitle');
+    
+    if (!statusElement) return;
+    
+    // Check if we're on ChatGPT
+    if (isChatGPTSite()) {
+      statusElement.className = 're-status re-status-connected';
+      if (statusIcon) statusIcon.innerHTML = '✅';
+      if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+    } else {
+      statusElement.className = 're-status re-status-error';
+      if (statusIcon) statusIcon.innerHTML = '❌';
+      if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+    }
+  }
+
+  async analyzeProperty(url) {
+    try {
+      console.log('🔍 Starting property analysis:', url);
+      
+      // Show progress
+      this.showAnalysisProgress();
+      
+      // Start timer
+      this.analysisStartTime = Date.now();
+      this.analysisTimer = setInterval(() => {
+        this.updateAnalysisTimer();
+      }, 1000);
+      
+      // Update progress steps
+      this.updateAnalysisStep('validate', 'completed');
+      this.updateAnalysisStep('send', 'active');
+      
+      // Use existing analysis functionality from the original content script
+      const response = await this.sendAnalysisToBackground(url);
+      
+      if (response && response.success) {
+        this.updateAnalysisStep('send', 'completed');
+        this.updateAnalysisStep('analyze', 'active');
+        
+        // Simulate analysis time
+        setTimeout(() => {
+          this.updateAnalysisStep('analyze', 'completed');
+          this.updateAnalysisStep('save', 'completed');
+          this.completeAnalysis();
+          this.showMessage('success', 'Property analysis completed successfully!');
+        }, 2000);
+        
+      } else {
+        throw new Error(response?.error || 'Analysis failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Analysis failed:', error);
+      this.hideAnalysisProgress();
+      this.showMessage('error', `Analysis failed: ${error.message}`);
+    }
+  }
+
+  async sendAnalysisToBackground(url) {
+    try {
+      // Check extension context before analysis
+      if (!isExtensionContextValid()) {
+        throw new Error('Extension context invalidated. Please reload the page.');
+      }
+      
+      // First, test if we can find the ChatGPT input field
+      console.log('🔍 Testing ChatGPT input field detection...');
+      const testInput = findChatGPTInput();
+      if (!testInput) {
+        throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page and it has loaded completely.');
+      }
+      console.log('✅ ChatGPT input field found:', testInput);
+      
+      // Use the existing insertPropertyAnalysisPrompt function from the original content script
+      console.log('🔗 Connecting to existing analysis functionality...');
+      
+      // Store the URL in the embedded UI context
+      currentPropertyAnalysis = { url, startTime: Date.now() };
+      
+      // Call the existing insertPropertyAnalysisPrompt function
+      const result = await insertPropertyAnalysisPrompt(url);
+      
+      if (!result) {
+        throw new Error('Failed to insert property analysis prompt into ChatGPT');
+      }
+      
+      return { success: result, result };
+    } catch (error) {
+      console.error('❌ Analysis integration failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  showAnalysisProgress() {
+    const progressSection = this.panel.querySelector('#re-analysis-progress');
+    if (progressSection) {
+      progressSection.classList.remove('re-hidden');
+    }
+  }
+
+  hideAnalysisProgress() {
+    const progressSection = this.panel.querySelector('#re-analysis-progress');
+    if (progressSection) {
+      progressSection.classList.add('re-hidden');
+    }
+    
+    if (this.analysisTimer) {
+      clearInterval(this.analysisTimer);
+      this.analysisTimer = null;
+    }
+  }
+
+  updateAnalysisTimer() {
+    const timeElement = this.panel.querySelector('#re-progress-time');
+    if (timeElement && this.analysisStartTime) {
+      const elapsed = Math.floor((Date.now() - this.analysisStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      timeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+  }
+
+  updateAnalysisStep(step, status) {
+    const stepElement = this.panel.querySelector(`[data-step="${step}"]`);
+    const stepIcon = stepElement?.querySelector('.re-step-icon');
+    
+    if (!stepElement || !stepIcon) return;
+    
+    // Remove previous status classes
+    stepElement.classList.remove('re-active', 're-completed');
+    
+    switch (status) {
+      case 'active':
+        stepElement.classList.add('re-active');
+        stepIcon.textContent = '⏳';
+        break;
+      case 'completed':
+        stepElement.classList.add('re-completed');
+        stepIcon.textContent = '✅';
+        break;
+      default:
+        stepIcon.textContent = '⏳';
+    }
+  }
+
+  completeAnalysis() {
+    this.hideAnalysisProgress();
+    
+    // Show notification on FAB
+    this.showFabNotification();
+    
+    // Auto-switch to properties tab if enabled
+    if (uiSettings.autoShow) {
+      setTimeout(() => {
+        this.switchTab('properties');
+      }, 1000);
+    }
+  }
+
+  showFabNotification() {
+    const notification = document.querySelector('#re-fab-notification');
+    if (notification) {
+      notification.classList.add('re-show');
+      notification.textContent = '1';
+    }
+  }
+
+  hideFabNotification() {
+    const notification = document.querySelector('#re-fab-notification');
+    if (notification) {
+      notification.classList.remove('re-show');
+    }
+  }
+
+  async loadPropertyData() {
+    try {
+      // Load property history from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      console.log(`📚 Loaded ${properties.length} properties from storage`);
+      
+      // Count analyzed properties (those with analysis data)
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      
+      // Get unique categories/domains
+      const domains = [...new Set(properties.map(p => p.domain))];
+      const categories = domains.length || 5; // Default to 5 categories
+      
+      // Update stats
+      this.updatePropertiesStats(properties.length, analyzedCount, categories);
+      
+      // Show properties or empty state
+      if (properties.length > 0) {
+        this.displayProperties(properties);
+        this.hideEmptyState();
+      } else {
+        this.showEmptyState();
+      }
+      
+      // Update notifications
+      this.updatePropertiesNotifications(properties);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property data:', error);
+      this.updatePropertiesStats(0, 0, 5);
+      this.showEmptyState();
+    }
+  }
+
+  updatePropertiesStats(total, analyzed, categories) {
+    const totalElement = this.panel.querySelector('#re-total-properties');
+    const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+    const categoriesElement = this.panel.querySelector('#re-categories-count');
+    
+    if (totalElement) totalElement.textContent = total.toString();
+    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
+    if (categoriesElement) categoriesElement.textContent = categories.toString();
+  }
+
+  showEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-state');
+    const categoryView = this.panel.querySelector('#re-category-view');
+    const listView = this.panel.querySelector('#re-list-view');
+    
+    if (emptyState) emptyState.style.display = 'block';
+    if (categoryView) categoryView.style.display = 'none';
+    if (listView) listView.style.display = 'none';
+  }
+
+  hideEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+  }
+
+  displayProperties(properties) {
+    // Display properties in both category and list views
+    this.displayCategoryView(properties);
+    this.displayListView(properties);
+  }
+
+  displayCategoryView(properties) {
+    const categoriesGrid = this.panel.querySelector('#re-categories-grid');
+    if (!categoriesGrid) return;
+
+    // Group properties by domain
+    const groupedProperties = properties.reduce((groups, property) => {
+      const domain = property.domain || 'unknown';
+      if (!groups[domain]) {
+        groups[domain] = [];
+      }
+      groups[domain].push(property);
+      return groups;
+    }, {});
+
+    // Clear existing content
+    categoriesGrid.innerHTML = '';
+
+    // Create category cards
+    Object.entries(groupedProperties).forEach(([domain, domainProperties]) => {
+      const analyzedCount = domainProperties.filter(p => p.analysis && p.analysis.extractedData).length;
+      
+      const categoryCard = document.createElement('div');
+      categoryCard.className = 're-category-card';
+      categoryCard.innerHTML = `
+        <div class="re-category-header">
+          <h4>${this.getDomainDisplayName(domain)}</h4>
+          <span class="re-category-count">${domainProperties.length}</span>
+        </div>
+        <div class="re-category-stats">
+          <span class="re-analyzed">${analyzedCount} analyzed</span>
+          <span class="re-pending">${domainProperties.length - analyzedCount} pending</span>
+        </div>
+        <div class="re-category-actions">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewCategoryProperties('${domain}')">
+            View All
+          </button>
+        </div>
+      `;
+      
+      categoriesGrid.appendChild(categoryCard);
+    });
+  }
+
+  displayListView(properties) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+
+    // Clear existing content
+    propertiesList.innerHTML = '';
+
+    // Sort properties by timestamp (newest first)
+    const sortedProperties = [...properties].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Create property items
+    sortedProperties.forEach(property => {
+      const hasAnalysis = property.analysis && property.analysis.extractedData;
+      const analysisDate = property.analysisTimestamp ? new Date(property.analysisTimestamp).toLocaleDateString() : '';
+      
+      const propertyItem = document.createElement('div');
+      propertyItem.className = `re-property-item ${hasAnalysis ? 're-analyzed' : 're-pending'}`;
+      propertyItem.innerHTML = `
+        <div class="re-property-content">
+          <div class="re-property-header">
+            <h5 class="re-property-title">${this.getPropertyTitle(property)}</h5>
+            <span class="re-property-status ${hasAnalysis ? 're-status-analyzed' : 're-status-pending'}">
+              ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
+            </span>
+          </div>
+          <div class="re-property-details">
+            <span class="re-property-domain">${property.domain}</span>
+            <span class="re-property-date">${property.date || 'Unknown date'}</span>
+            ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
+          </div>
+          <div class="re-property-actions">
+            <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+              View
+            </button>
+            ${hasAnalysis ? `
+              <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+                Export
+              </button>
+            ` : `
+              <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+                Analyze
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+      
+      propertiesList.appendChild(propertyItem);
+    });
+  }
+
+  getDomainDisplayName(domain) {
+    const domainNames = {
+      'zillow.com': 'Zillow',
+      'realtor.com': 'Realtor.com',
+      'redfin.com': 'Redfin',
+      'homes.com': 'Homes.com',
+      'trulia.com': 'Trulia',
+      'apartments.com': 'Apartments.com',
+      'rent.com': 'Rent.com',
+      'unknown': 'Other Sources'
+    };
+    
+    return domainNames[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
+  }
+
+  getPropertyTitle(property) {
+    // Try to extract a title from the URL or use a generic title
+    try {
+      const url = new URL(property.url);
+      const pathParts = url.pathname.split('/').filter(part => part);
+      
+      // Look for property-specific identifiers in the URL
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.length > 5) {
+          return lastPart.replace(/-/g, ' ').replace(/_/g, ' ');
+        }
+      }
+      
+      return `Property on ${property.domain}`;
+    } catch (e) {
+      return `Property #${property.url.slice(-8)}`;
+    }
+  }
+
+  updatePropertiesNotifications(properties) {
+    // Update tab notification for new properties
+    const recentProperties = properties.filter(p => 
+      (Date.now() - p.timestamp) < 24 * 60 * 60 * 1000 && // Within 24 hours
+      (!p.analysis || !p.analysis.extractedData) // Not yet analyzed
+    );
+    
+    const notification = this.panel.querySelector('#properties-notification');
+    if (notification && recentProperties.length > 0) {
+      notification.textContent = recentProperties.length.toString();
+      notification.style.display = 'flex';
+    } else if (notification) {
+      notification.style.display = 'none';
+    }
+  }
+
+  // Property action methods
+  async viewProperty(url) {
+    console.log('📖 View saved analysis for property:', url);
+    
+    try {
+      // Load property data from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (!property) {
+        this.showChatGPTMessage('error', 'Property not found in saved data');
+        return;
+      }
+      
+      // Debug what analysis data we have
+      console.log('🔍 DEBUG: Property found:', property.url);
+      console.log('🔍 DEBUG: Has analysis object:', !!property.analysis);
+      console.log('🔍 DEBUG: Analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
+      console.log('🔍 DEBUG: Has fullResponse:', !!(property.analysis?.fullResponse));
+      console.log('🔍 DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
+      console.log('🔍 DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 200) || 'No fullResponse');
+      console.log('🔍 DEBUG: All analysis data:', property.analysis);
+      
+      if (!property.analysis) {
+        this.showChatGPTMessage('warning', 'No analysis data found for this property. Click "Analyze" to generate analysis.');
+        return;
+      }
+      
+      if (!property.analysis.fullResponse && !property.analysis.fullAnalysis) {
+        this.showChatGPTMessage('warning', 'No saved ChatGPT response found for this property. The analysis may not have completed properly. Try analyzing again.');
+        console.log('🔍 DEBUG: Available analysis fields:', Object.keys(property.analysis));
+        return;
+      }
+      
+      // Show the saved ChatGPT analysis in a modal
+      this.showAnalysisModal(property);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property analysis:', error);
+      this.showChatGPTMessage('error', 'Failed to load saved analysis');
+    }
+  }
+
+  showAnalysisModal(property) {
+    console.log('🖼️ Showing analysis modal for:', property.url);
+    
+    // Remove existing modal if any
+    const existingModal = document.querySelector('#re-analysis-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Create modal HTML
+    const modal = document.createElement('div');
+    modal.id = 're-analysis-modal';
+    modal.className = 're-modal-overlay';
+    
+    const analysisData = property.analysis;
+    const extractedData = analysisData.extractedData || {};
+    
+    // Format the analysis data for display
+    const propertyDetails = this.formatPropertyDetails(extractedData);
+    const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
+    
+    modal.innerHTML = `
+      <div class="re-modal">
+        <div class="re-modal-header">
+          <h3>Saved ChatGPT Analysis</h3>
+          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+        </div>
+        
+        <div class="re-modal-content">
+          <!-- Property URL -->
+          <div class="re-analysis-section">
+            <h4>🔗 Property</h4>
+            <a href="${property.url}" target="_blank" class="re-property-link">${property.url}</a>
+          </div>
+          
+          <!-- Extracted Data -->
+          ${propertyDetails ? `
+            <div class="re-analysis-section">
+              <h4>📊 Extracted Key Data</h4>
+              <div class="re-property-grid">
+                ${propertyDetails}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Full Analysis -->
+          <div class="re-analysis-section">
+            <h4>🤖 Full ChatGPT Analysis</h4>
+            <div class="re-analysis-text">
+              ${this.formatAnalysisText(analysisText)}
+            </div>
+          </div>
+          
+          <!-- Analysis Metadata -->
+          <div class="re-analysis-section">
+            <h4>📅 Analysis Details</h4>
+            <div class="re-analysis-meta">
+              <div><strong>Date:</strong> ${property.date || 'Unknown'}</div>
+              <div><strong>Domain:</strong> ${property.domain || 'Unknown'}</div>
+              <div><strong>Data Points:</strong> ${Object.keys(extractedData).length}</div>
+              <div><strong>Analysis Length:</strong> ${analysisText.length} characters</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="re-modal-footer">
+          <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+            📋 Copy Analysis
+          </button>
+          <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
+            🔗 Open Original Listing
+          </button>
+          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Add modal styles if they don't exist
+    this.addModalStyles();
+    
+    // Add modal to page
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    console.log('✅ Analysis modal displayed');
+  }
+
+  formatPropertyDetails(extractedData) {
+    const details = [];
+    
+    // Key property details
+    const fields = [
+      { key: 'price', label: '💰 Price', format: (val) => val },
+      { key: 'bedrooms', label: '🛏️ Bedrooms', format: (val) => val },
+      { key: 'bathrooms', label: '🚿 Bathrooms', format: (val) => val },
+      { key: 'squareFeet', label: '📐 Sq Ft', format: (val) => val },
+      { key: 'yearBuilt', label: '🏗️ Year Built', format: (val) => val },
+      { key: 'propertyType', label: '🏠 Type', format: (val) => val },
+      { key: 'neighborhood', label: '📍 Neighborhood', format: (val) => val },
+      { key: 'locationScore', label: '⭐ Location Score', format: (val) => val },
+      { key: 'estimatedRentalIncome', label: '💵 Est. Rental Income', format: (val) => val }
+    ];
+    
+    fields.forEach(field => {
+      if (extractedData[field.key]) {
+        details.push(`
+          <div class="re-property-detail">
+            <span class="re-detail-label">${field.label}</span>
+            <span class="re-detail-value">${field.format(extractedData[field.key])}</span>
+          </div>
+        `);
+      }
+    });
+    
+    return details.join('');
+  }
+
+  formatAnalysisText(text) {
+    // Basic formatting to make the analysis more readable
+    return text
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>')
+      .replace(/$/, '</p>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+      .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Italic text
+  }
+
+  addModalStyles() {
+    // Check if styles already exist
+    if (document.querySelector('#re-modal-styles')) {
+      return;
+    }
+    
+    const styles = document.createElement('style');
+    styles.id = 're-modal-styles';
+    styles.textContent = `
+      .re-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 20px;
+      }
+      
+      .re-modal {
+        background: var(--chatgpt-bg-primary, white);
+        border-radius: 12px;
+        max-width: 800px;
+        max-height: 90vh;
+        width: 100%;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .re-modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+      }
+      
+      .re-modal-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: var(--chatgpt-text-primary, #333);
+      }
+      
+      .re-modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--chatgpt-text-secondary, #666);
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+      
+      .re-modal-close:hover {
+        background: var(--chatgpt-bg-hover, #e5e5e5);
+      }
+      
+      .re-modal-content {
+        padding: 20px;
+        overflow-y: auto;
+        flex: 1;
+      }
+      
+      .re-analysis-section {
+        margin-bottom: 24px;
+      }
+      
+      .re-analysis-section h4 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: var(--chatgpt-text-primary, #333);
+        border-bottom: 2px solid var(--chatgpt-accent, #10a37f);
+        padding-bottom: 4px;
+      }
+      
+      .re-property-link {
+        color: var(--chatgpt-accent, #10a37f);
+        text-decoration: none;
+        word-break: break-all;
+        font-size: 14px;
+      }
+      
+      .re-property-link:hover {
+        text-decoration: underline;
+      }
+      
+      .re-property-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      
+      .re-property-detail {
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .re-detail-label {
+        font-size: 12px;
+        color: var(--chatgpt-text-secondary, #666);
+        font-weight: 500;
+      }
+      
+      .re-detail-value {
+        font-size: 14px;
+        color: var(--chatgpt-text-primary, #333);
+        font-weight: 600;
+      }
+      
+      .re-analysis-text {
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--chatgpt-text-primary, #333);
+        max-height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      
+      .re-analysis-text p {
+        margin: 0 0 12px 0;
+      }
+      
+      .re-analysis-text p:last-child {
+        margin-bottom: 0;
+      }
+      
+      .re-analysis-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+        font-size: 14px;
+        color: var(--chatgpt-text-secondary, #666);
+      }
+      
+      .re-modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+      }
+      
+      @media (max-width: 768px) {
+        .re-modal {
+          margin: 10px;
+          max-height: 95vh;
+        }
+        
+        .re-property-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .re-modal-footer {
+          flex-direction: column;
+        }
+      }
+    `;
+    
+    document.head.appendChild(styles);
+  }
+
+  async debugSavedAnalyses() {
+    try {
+      this.showChatGPTMessage('info', 'Debugging saved analysis data. Check console for detailed information.');
+      
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      console.log('🔍 =================================');
+      console.log('🔍 DEBUGGING SAVED ANALYSIS DATA');
+      console.log('🔍 =================================');
+      console.log('📊 Total properties in storage:', properties.length);
+      
+      if (properties.length === 0) {
+        console.log('❌ No properties found in storage');
+        return;
+      }
+      
+      properties.forEach((property, index) => {
+        console.log(`\n🏠 Property ${index + 1}:`);
+        console.log('  📍 URL:', property.url);
+        console.log('  📅 Date:', property.date);
+        console.log('  🌐 Domain:', property.domain);
+        console.log('  📊 Has analysis object:', !!property.analysis);
+        
+        if (property.analysis) {
+          console.log('  🔍 Analysis keys:', Object.keys(property.analysis));
+          console.log('  📄 Has fullResponse:', !!property.analysis.fullResponse);
+          console.log('  📏 fullResponse length:', property.analysis.fullResponse?.length || 0);
+          console.log('  📄 Has fullAnalysis:', !!property.analysis.fullAnalysis);
+          console.log('  📏 fullAnalysis length:', property.analysis.fullAnalysis?.length || 0);
+          console.log('  📊 Extracted data keys:', Object.keys(property.analysis.extractedData || {}));
+          console.log('  📄 fullResponse preview:', property.analysis.fullResponse?.substring(0, 200) || 'No fullResponse');
+          console.log('  📄 fullAnalysis preview:', property.analysis.fullAnalysis?.substring(0, 200) || 'No fullAnalysis');
+        } else {
+          console.log('  ❌ No analysis data');
+        }
+      });
+      
+      console.log('\n🔍 =================================');
+      console.log('🔍 END DEBUG INFO');
+      console.log('🔍 =================================');
+      
+    } catch (error) {
+      console.error('❌ Failed to debug saved analyses:', error);
+      this.showChatGPTMessage('error', 'Failed to load saved analysis data for debugging');
+    }
+  }
+
+  async copyAnalysisToClipboard(url) {
+    try {
+      // Load property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (property && property.analysis) {
+        const analysisText = property.analysis.fullResponse || property.analysis.fullAnalysis || 'No analysis available';
+        await navigator.clipboard.writeText(analysisText);
+        this.showChatGPTMessage('success', 'Analysis copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('❌ Failed to copy analysis:', error);
+      this.showChatGPTMessage('error', 'Failed to copy analysis to clipboard');
+    }
+  }
+
+  viewCategoryProperties(domain) {
+    console.log('📁 View category:', domain);
+    // Switch to list view and filter by domain
+    this.switchPropertiesView('list');
+    // TODO: Implement domain filtering
+  }
+
+  async analyzeExistingProperty(url) {
+    console.log('🔄 Re-analyze property:', url);
+    // Switch to analyzer tab and pre-fill the URL
+    this.switchTab('analyzer');
+    
+    const propertyUrlInput = this.panel.querySelector('#re-property-url');
+    if (propertyUrlInput) {
+      propertyUrlInput.value = url;
+      this.showManualInput();
+      this.validatePropertyInput();
+    }
+  }
+
+  exportProperty(url) {
+    console.log('📄 Export property:', url);
+    // This would implement property export functionality
+    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  switchPropertiesView(view) {
+    const viewButtons = this.panel.querySelectorAll('.re-view-btn');
+    const categoryView = this.panel.querySelector('#re-category-view');
+    const listView = this.panel.querySelector('#re-list-view');
+    
+    // Update button states
+    viewButtons.forEach(btn => {
+      if (btn.getAttribute('data-view') === view) {
+        btn.classList.add('re-view-active');
+      } else {
+        btn.classList.remove('re-view-active');
+      }
+    });
+    
+    // Update view visibility
+    if (view === 'category') {
+      if (categoryView) categoryView.classList.add('re-view-active');
+      if (listView) listView.classList.remove('re-view-active');
+    } else {
+      if (listView) listView.classList.add('re-view-active');
+      if (categoryView) categoryView.classList.remove('re-view-active');
+    }
+  }
+
+  updatePanelPosition(position) {
+    if (!this.panel) return;
+    
+    // Remove old position classes (not needed for ChatGPT-style sidebar)
+    this.panel.classList.remove('re-panel-right', 're-panel-left', 're-panel-bottom');
+    
+    // For ChatGPT-style sidebar, position is mainly handled by CSS
+    // Just update the setting
+    uiSettings.position = position;
+    
+    // Only save settings if the extension context is valid, otherwise just update locally
+    if (isExtensionContextValid()) {
+      this.saveSettings();
+    } else {
+      // Store in localStorage as fallback
+      localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      console.log('💾 Position updated in local cache:', position);
+    }
+  }
+
+  toggleCompactMode(enabled) {
+    if (enabled) {
+      document.body.classList.add('re-compact-mode');
+    } else {
+      document.body.classList.remove('re-compact-mode');
+    }
+    
+    uiSettings.compactMode = enabled;
+    this.saveSettings();
+  }
+
+  async saveSettings() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.set({ embeddedUISettings: uiSettings }),
+        null
+      );
+      
+      if (result !== null) {
+        this.showChatGPTMessage('success', 'Settings saved successfully!');
+        console.log('💾 Settings saved:', uiSettings);
+      } else {
+        console.log('💾 Settings saved to local cache (extension context invalidated)');
+        // Store settings in localStorage as fallback
+        localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      }
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      this.showChatGPTMessage('error', 'Failed to save settings');
+    }
+  }
+
+  resetSettings() {
+    uiSettings = {
+      position: 'right',
+      compactMode: false,
+      autoShow: true,
+      showNotifications: true
+    };
+    
+    // Update UI elements
+    const panelPositionSelect = this.panel.querySelector('#re-panel-position');
+    const compactModeCheckbox = this.panel.querySelector('#re-compact-mode');
+    
+    if (panelPositionSelect) panelPositionSelect.value = 'right';
+    if (compactModeCheckbox) compactModeCheckbox.checked = false;
+    
+    this.updatePanelPosition('right');
+    this.toggleCompactMode(false);
+    
+    this.showMessage('success', 'Settings reset to defaults');
+  }
+
+  exportProperties() {
+    // Placeholder for export functionality
+    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  manageCategories() {
+    // Placeholder for category management
+    this.showMessage('warning', 'Category management will be implemented in the next update');
+  }
+
+  // Cleanup method
+  destroy() {
+    if (this.fab) {
+      this.fab.remove();
+    }
+    
+    if (this.panel) {
+      this.panel.remove();
+    }
+    
+    if (this.analysisTimer) {
+      clearInterval(this.analysisTimer);
+    }
+    
+    document.body.classList.remove('re-compact-mode');
+    
+    console.log('🧹 Embedded UI destroyed');
+  }
+}
+
+// Load ChatGPT native styles
+function loadChatGPTNativeStyles() {
+  // Inject ChatGPT-style native styles
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('chatgpt-native-styles.css');
+  document.head.appendChild(link);
+  console.log('📄 ChatGPT native styles loaded');
+}
+
+// ============================================================================
+// CONTEXTUAL INTEGRATION
+// ============================================================================
+
+// Detect if we're on a property page
+function isPropertyPage() {
+  const url = window.location.href;
+  const hostname = window.location.hostname.toLowerCase();
+  
+  const propertyDomains = [
+    'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
+    'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com'
+  ];
+  
+  return propertyDomains.some(domain => hostname.includes(domain));
+}
+
+// Add contextual quick action button on property pages
+function addPropertyPageIntegration() {
+  if (!isPropertyPage()) return;
+  
+  console.log('🏠 Property page detected, adding quick action button');
+  
+  // Remove existing button if present
+  const existingButton = document.getElementById('re-quick-action');
+  if (existingButton) {
+    existingButton.remove();
+  }
+  
+  // Create quick action button
+  const quickAction = document.createElement('div');
+  quickAction.id = 're-quick-action';
+  quickAction.className = 're-quick-action-btn';
+  quickAction.innerHTML = `
+    <div class="re-quick-icon">🔍</div>
+    <div class="re-quick-text">Analyze with ChatGPT</div>
+  `;
+  
+  // Add click handler
+  quickAction.addEventListener('click', () => {
+    // Open ChatGPT with this property URL
+    const currentUrl = window.location.href;
+    const chatGptUrl = `https://chatgpt.com/?q=${encodeURIComponent(`Analyze this property: ${currentUrl}`)}`;
+    window.open(chatGptUrl, '_blank');
+  });
+  
+  // Add to page
+  document.body.appendChild(quickAction);
+  
+  // Add styles for quick action button
+  if (!document.getElementById('re-quick-action-styles')) {
+    const style = document.createElement('style');
+    style.id = 're-quick-action-styles';
+    style.textContent = `
+      .re-quick-action-btn {
+        position: fixed;
+        top: 120px;
+        right: 24px;
+        background: #10a37f;
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        z-index: 999999;
+        box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+        transition: all 0.3s ease;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      
+      .re-quick-action-btn:hover {
+        background: #0d8a69;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 163, 127, 0.4);
+      }
+      
+      .re-quick-icon {
+        font-size: 16px;
+      }
+      
+      @media (max-width: 768px) {
+        .re-quick-action-btn {
+          right: 16px;
+          top: 80px;
+          padding: 10px 14px;
+          font-size: 13px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+// Initialize embedded UI when on ChatGPT
+if (isChatGPTSite()) {
+  // Load ChatGPT native styles first
+  loadChatGPTNativeStyles();
+  
+  // Wait for page to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        embeddedUI = new REAnalyzerEmbeddedUI();
+      }, 1000);
+    });
+  } else {
+    // Page already loaded
+    setTimeout(() => {
+      embeddedUI = new REAnalyzerEmbeddedUI();
+    }, 1000);
+  }
+} else {
+  // Add contextual integration on property pages
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(addPropertyPageIntegration, 1000);
+    });
+  } else {
+    setTimeout(addPropertyPageIntegration, 1000);
+  }
+}
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'toggleEmbeddedUI') {
+    console.log('🎮 Toggle UI requested from background script');
+    if (embeddedUI && embeddedUI.togglePanel) {
+      embeddedUI.togglePanel();
+      sendResponse({ success: true });
+    } else {
+      console.warn('Embedded UI not yet initialized');
+      sendResponse({ success: false, error: 'UI not initialized' });
+    }
+    return true; // Keep message channel open for async response
+  }
+});
 
 // Initialize settings on load
 if (isChatGPTSite()) {
@@ -2981,13 +6022,32 @@ function setupResponseMonitor() {
         // is now set consistently when the property link is sent
         if (promptSplittingState.currentPhase === 'complete' || 
             promptSplittingState.currentPhase === 'sending_link') {
-          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          console.log('📝 FALLBACK: Processing response from prompt splitting flow (THIS IS THE SECOND RESPONSE TO THE PROPERTY LINK - SAVING!)...');
+          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
+          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+          console.log('📊 Response length:', messageText.length);
+          console.log('📄 Response preview:', messageText.substring(0, 300));
           
           const analysisData = extractPropertyAnalysisData(messageText);
+          console.log('🔍 Extracted analysis data preview:', {
+            extractedDataKeys: Object.keys(analysisData?.extractedData || {}),
+            hasFullResponse: !!(analysisData?.fullResponse),
+            fullResponseLength: analysisData?.fullResponse?.length || 0
+          });
+          
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse) && 
               promptSplittingState.pendingPropertyLink) {
             
-            console.log('✅ Successfully extracted analysis data from split prompt response');
+            console.log('✅ SECOND RESPONSE: Successfully extracted analysis data from split prompt response');
+            console.log('🔍 ANALYSIS DATA BEING SAVED:', {
+              url: promptSplittingState.pendingPropertyLink,
+              hasFullResponse: !!analysisData.fullResponse,
+              fullResponseLength: analysisData.fullResponse?.length || 0,
+              hasFullAnalysis: !!analysisData.fullAnalysis,
+              fullAnalysisLength: analysisData.fullAnalysis?.length || 0,
+              extractedDataKeys: Object.keys(analysisData.extractedData || {}),
+              fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
+            });
             
             // Send the analysis data with the pending property link
             safeChromeFall(() => {
@@ -3027,7 +6087,10 @@ function setupResponseMonitor() {
         
         // This will trigger the fallback logic above
         if (promptSplittingState.pendingPropertyLink) {
-          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE RESPONSE TO SAVE!)...');
+          console.log('📝 PROMPT SPLITTING: Processing response from property link (THIS IS THE SECOND RESPONSE TO SAVE!)...');
+          console.log('🎯 CRITICAL: This is the ChatGPT analysis response that should be saved!');
+          console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
+          console.log('📊 Response length:', messageText.length);
           
           const analysisData = extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
@@ -3067,6 +6130,15 @@ function setupResponseMonitor() {
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
         console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
+        console.log('🔍 ANALYSIS DATA BEING SAVED:', {
+          url: currentPropertyAnalysis.url,
+          hasFullResponse: !!analysisData.fullResponse,
+          fullResponseLength: analysisData.fullResponse?.length || 0,
+          hasFullAnalysis: !!analysisData.fullAnalysis,
+          fullAnalysisLength: analysisData.fullAnalysis?.length || 0,
+          extractedDataKeys: Object.keys(analysisData.extractedData || {}),
+          fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
+        });
         console.log('📊 Extracted data summary:', {
           propertyUrl: currentPropertyAnalysis.url,
           sessionId: currentPropertyAnalysis.sessionId,
@@ -3224,7 +6296,8 @@ function setupResponseMonitor() {
       
       // Check for prompt splitting first, regardless of property analysis session
       if (promptSplittingState.currentPhase === 'waiting_confirmation' && messageText && messageText.length > 10) {
-        console.log('🔍 Found message while waiting for confirmation (NOT SAVING - waiting for property link response):', messageText.substring(0, 100));
+        console.log('🔍 Found FIRST response while waiting for confirmation (NOT SAVING - this is just the confirmation):', messageText.substring(0, 100));
+        console.log('⚠️ IMPORTANT: This is the FIRST response (confirmation). We will save the SECOND response (after property link).');
         // Don't save this response - we only want the response AFTER the property link is sent
         // Just continue to trigger sending the property link
         processCompletedResponse(messageText, currentUrl);
@@ -3409,19 +6482,30 @@ function setupResponseMonitor() {
 
 // Function to find ChatGPT input field with more comprehensive selectors
 function findChatGPTInput() {
-  console.log('Searching for ChatGPT input field...');
+  console.log('🔍 Searching for ChatGPT input field...');
+  console.log('📍 Current URL:', window.location.href);
+  console.log('📱 Viewport:', window.innerWidth + 'x' + window.innerHeight);
+  
+  // First, let's see what input elements exist on the page
+  const allInputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+  console.log(`📋 Found ${allInputs.length} total input/editable elements on page`);
   
   // Try different selectors for ChatGPT input (updated for 2024)
   const selectors = [
-    // Most common current selectors
+    // Latest ChatGPT interface selectors (2024)
+    'textarea[data-id="root"]',
+    'div[contenteditable="true"][data-id="root"]', 
     'textarea[placeholder*="Message"]',
     'textarea[placeholder*="message"]',
-    'div[contenteditable="true"][data-testid*="composer"]',
     'div[contenteditable="true"][role="textbox"]',
     'textarea[data-testid="composer-text-input"]',
     
+    // Common modern selectors
+    'div[contenteditable="true"][data-testid*="composer"]',
+    'textarea[class*="prose"]',
+    'div[contenteditable="true"][class*="prose"]',
+    
     // Fallback selectors
-    'textarea[data-id="root"]',
     'div[contenteditable="true"]',
     '#prompt-textarea',
     'textarea',
@@ -3430,27 +6514,54 @@ function findChatGPTInput() {
     'textarea[class*="composer"]',
     'textarea[class*="input"]',
     'div[class*="composer"][contenteditable="true"]',
-    'div[class*="input"][contenteditable="true"]'
+    'div[class*="input"][contenteditable="true"]',
+    
+    // Additional modern patterns
+    'textarea[spellcheck="false"]',
+    'div[contenteditable="true"][spellcheck="false"]'
   ];
   
   for (const selector of selectors) {
     try {
       const elements = document.querySelectorAll(selector);
-      console.log(`Found ${elements.length} elements for selector: ${selector}`);
+      console.log(`🔍 Testing selector: ${selector} -> ${elements.length} elements found`);
       
-      for (const element of elements) {
+      for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+        const elementInfo = {
+          tag: element.tagName,
+          id: element.id,
+          classes: element.className,
+          placeholder: element.placeholder,
+          dataId: element.getAttribute('data-id'),
+          visible: element.offsetParent !== null,
+          disabled: element.disabled,
+          readOnly: element.readOnly,
+          display: element.style.display
+        };
+        
+        console.log(`  📍 Element ${i + 1}:`, elementInfo);
+        
         // Check if element is visible and not disabled
         if (element.offsetParent !== null && 
             !element.disabled && 
             !element.readOnly &&
             element.style.display !== 'none') {
           
-          console.log('Found suitable input element:', element);
+          console.log('✅ Found suitable input element:', element);
+          console.log('📋 Element details:', elementInfo);
           return element;
+        } else {
+          console.log('❌ Element not suitable:', {
+            visible: element.offsetParent !== null,
+            notDisabled: !element.disabled,
+            notReadOnly: !element.readOnly,
+            notHidden: element.style.display !== 'none'
+          });
         }
       }
     } catch (e) {
-      console.log(`Error with selector ${selector}:`, e);
+      console.log(`❌ Error with selector ${selector}:`, e);
     }
   }
   
@@ -4234,3 +7345,5 @@ window.testPromptSplitting = function(propertyLink) {
   console.log('🧪 Testing prompt splitting with link:', testLink);
   insertPropertyAnalysisPrompt(testLink);
 };
+
+} // End of multiple execution prevention block
