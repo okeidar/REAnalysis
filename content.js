@@ -6432,7 +6432,7 @@ function setupResponseMonitor() {
   let completionTimers = new Map(); // Timers for each property analysis
   
   // Enhanced function to detect if ChatGPT is still writing (streaming)
-  const isResponseStreaming = () => {
+  const isResponseStreaming = function() {
     console.log('🔍 Checking if ChatGPT is still streaming...');
     
     // Primary check: Look for the stop generation button (most reliable)
@@ -6549,7 +6549,7 @@ function setupResponseMonitor() {
   };
   
   // Function to process completed response
-  const processCompletedResponse = (messageText, propertyUrl) => {
+  const processCompletedResponse = function(messageText, propertyUrl) {
     console.log('🎯 Processing completed response for:', propertyUrl);
     console.log('📝 Final response length:', messageText.length);
     console.log('🔍 Current prompt splitting phase:', promptSplittingState.currentPhase);
@@ -6879,7 +6879,7 @@ function setupResponseMonitor() {
     responseBuffer.delete(propertyUrl);
   };
   
-  const checkForNewMessages = () => {
+  const checkForNewMessages = function() {
     // Comprehensive selectors for ChatGPT interface with fallbacks for interface changes
     const messageSelectors = [
       // Current primary selectors (December 2024)
@@ -6989,7 +6989,7 @@ function setupResponseMonitor() {
   };
   
   // Separate function for extraction and processing
-  const extractAndProcessMessage = (messageElement, messageCount) => {
+  const extractAndProcessMessage = function(messageElement, messageCount) {
     // ENHANCED TEXT EXTRACTION SYSTEM - Multiple robust methods
     let messageText = '';
     let extractionMethod = '';
@@ -7168,7 +7168,7 @@ function setupResponseMonitor() {
   };
   
   // Function to process the extracted message text
-  const processExtractedMessage = (messageText, extractionMethod) => {
+  const processExtractedMessage = function(messageText, extractionMethod) {
     console.log('📝 Processing extracted message:', {
       length: messageText.length,
       method: extractionMethod,
@@ -7541,7 +7541,7 @@ function setupResponseMonitor() {
   }, 3000); // Check every 3 seconds during active analysis
   
   // Cleanup function
-  return () => {
+  return function() {
     clearInterval(intervalId);
     clearInterval(contextCheckInterval);
     clearInterval(contentChecker);
