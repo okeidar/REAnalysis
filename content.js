@@ -494,377 +494,210 @@ class REAnalyzerEmbeddedUI {
       <!-- Settings Section -->
       <div class="re-section re-hidden" id="re-settings-section">
         
-        <!-- Settings Navigation -->
-        <div class="re-settings-nav" style="display: flex; gap: 8px; margin-bottom: 20px; padding: 4px; background: var(--chatgpt-surface-secondary); border-radius: 8px;">
-          <button class="re-settings-nav-btn re-settings-nav-active" data-section="basic" style="flex: 1; padding: 8px 12px; border: none; background: var(--chatgpt-surface-primary); border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
-            ⚙️ Basic Settings
-          </button>
-          <button class="re-settings-nav-btn" data-section="prompts" style="flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; cursor: pointer;">
-            💬 Analysis Prompts
-          </button>
-          <button class="re-settings-nav-btn" data-section="advanced" style="flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; cursor: pointer;">
-            🔧 Advanced
-          </button>
-        </div>
-
-        <!-- Basic Settings Section -->
-        <div id="re-basic-settings" class="re-settings-content">
-          <!-- Quick Setup -->
-          <div class="re-section" style="background: var(--chatgpt-surface-secondary); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <div class="re-section-header" style="margin-bottom: 12px;">
-              <div class="re-section-title">🚀 Quick Setup</div>
-              <div class="re-section-subtitle">Essential settings to get started</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-              <div class="re-form-group">
-                <label class="re-form-label">Analysis Type</label>
-                <select class="re-form-input" id="re-quick-prompt-type">
-                  <option value="default">📄 Standard Analysis (Recommended)</option>
-                  <option value="tabular">📊 Data Extraction (Advanced)</option>
-                  <option value="dynamic">🔄 Custom Data Points</option>
-                </select>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                  Choose how ChatGPT analyzes properties
-                </div>
-              </div>
-              
-              <div class="re-form-group">
-                <label class="re-form-label">Panel Position</label>
-                <select class="re-form-input" id="re-position-select">
-                  <option value="right">Right Side (Default)</option>
-                  <option value="left">Left Side</option>
-                  <option value="bottom">Bottom</option>
-                </select>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                  Where to show the extension panel
-                </div>
-              </div>
-            </div>
-            
-            <div style="display: flex; gap: 12px; margin-top: 16px;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
-                <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
-                <span style="font-size: 13px;">Auto-show results after analysis</span>
-              </label>
-              
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
-                <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
-                <span style="font-size: 13px;">Show notifications</span>
-              </label>
-              
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
-                <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
-                <span style="font-size: 13px;">Compact mode</span>
-              </label>
-            </div>
+        <!-- Interface Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Interface</div>
+            <div class="re-section-subtitle">Customize your RE Analyzer experience</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Panel Position</label>
+            <select class="re-form-input" id="re-position-select">
+              <option value="left">Left Side</option>
+              <option value="right">Right Side</option>
+              <option value="bottom">Bottom</option>
+            </select>
           </div>
 
-          <!-- Current Configuration Display -->
-          <div class="re-section">
-            <div class="re-section-header">
-              <div class="re-section-title">📋 Current Configuration</div>
-              <div class="re-section-subtitle">Overview of your current settings</div>
-            </div>
-            
-            <div id="re-config-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
-                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">📄</div>
-                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Prompt Type</div>
-                <div id="re-current-prompt-type" style="font-size: 11px; color: var(--chatgpt-text-secondary);">Standard Analysis</div>
-              </div>
-              
-              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
-                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">⚡</div>
-                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Quick Actions</div>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">Enabled</div>
-              </div>
-              
-              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
-                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">📊</div>
-                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Data Export</div>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">JSON & CSV</div>
-              </div>
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
+              <span class="re-form-label" style="margin: 0;">Compact Mode</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Use smaller interface elements to save space
             </div>
           </div>
         </div>
 
-        <!-- Analysis Prompts Section -->
-        <div id="re-prompts-settings" class="re-settings-content" style="display: none;">
-          <!-- Prompt Type Selector -->
-          <div class="re-section" style="background: linear-gradient(135deg, var(--chatgpt-surface-secondary), var(--chatgpt-surface-primary)); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <div class="re-section-header" style="margin-bottom: 12px;">
-              <div class="re-section-title">💬 Analysis Prompt Settings</div>
-              <div class="re-section-subtitle">Choose how ChatGPT analyzes your properties</div>
+        <!-- Analysis Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Analysis</div>
+            <div class="re-section-subtitle">Configure analysis behavior</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Automatically switch to Properties tab after analysis
+            </div>
+          </div>
+
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Show Notifications</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Display notifications when analysis completes
+            </div>
+          </div>
+        </div>
+        
+        <!-- Prompt Configuration -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Analysis Prompts</div>
+            <div class="re-section-subtitle">Choose how ChatGPT analyzes properties</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Prompt Type</label>
+            <select class="re-form-input" id="re-prompt-type-select">
+              <option value="default">Default - Standard Analysis</option>
+              <option value="dynamic">Dynamic - Column-Based</option>
+              <option value="tabular">Tabular - Data Extraction</option>
+              <option value="custom">Custom - User-Defined</option>
+            </select>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Select the type of analysis prompt to use
+            </div>
+          </div>
+
+          <div class="re-form-group" id="re-prompt-description">
+            <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+              Standard real estate investment analysis with basic property data extraction
+            </div>
+          </div>
+          
+          <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
+            <label class="re-form-label">Custom Prompt Template</label>
+            <textarea id="re-custom-prompt" class="re-form-input" rows="6" 
+                      placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
+                      style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Variables: {PROPERTY_URL}, {DATE}
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
+              <div>💾</div>
+              <span>Save</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
+              <div>🔄</div>
+              <span>Reset</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-prompt">
+              <div>👁️</div>
+              <span>Preview</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Advanced Prompt Editing -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Advanced Prompt Editing</div>
+            <div class="re-section-subtitle">Customize prompt templates</div>
+          </div>
+          
+          <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-default-prompt">
+              📄 Edit Default
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-dynamic-prompt">
+              🔄 Edit Dynamic
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-goto-tabular-config">
+              📊 Configure Tabular
+            </button>
+          </div>
+          
+          <!-- Default Prompt Editor -->
+          <div id="re-default-editor" class="re-prompt-editor" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Default Analysis Prompt</label>
+              <textarea id="re-default-prompt-template" class="re-form-input" rows="8" 
+                        placeholder="Enter your default analysis prompt..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">Preview</button>
+            </div>
+          </div>
+          
+          <!-- Dynamic Prompt Editor -->
+          <div id="re-dynamic-editor" class="re-prompt-editor" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Dynamic Prompt Template</label>
+              <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="6" 
+                        placeholder="Enter dynamic template with {{COLUMNS}} placeholder..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
             </div>
             
             <div class="re-form-group">
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px;">
-                <label class="re-prompt-option" data-type="default" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
-                  <input type="radio" name="prompt-type" value="default" style="display: none;">
-                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <div style="font-size: 20px;">📄</div>
-                    <div style="font-weight: 500;">Standard Analysis</div>
-                  </div>
-                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
-                    Comprehensive property analysis with investment insights, market analysis, and recommendations
-                  </div>
-                </label>
-                
-                <label class="re-prompt-option" data-type="tabular" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
-                  <input type="radio" name="prompt-type" value="tabular" style="display: none;">
-                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <div style="font-size: 20px;">📊</div>
-                    <div style="font-weight: 500;">Data Extraction</div>
-                  </div>
-                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
-                    Extract specific data points in structured format for spreadsheet analysis and comparison
-                  </div>
-                </label>
-                
-                <label class="re-prompt-option" data-type="dynamic" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
-                  <input type="radio" name="prompt-type" value="dynamic" style="display: none;">
-                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <div style="font-size: 20px;">🔄</div>
-                    <div style="font-weight: 500;">Custom Data Points</div>
-                  </div>
-                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
-                    Choose specific data points to extract with customizable prompt template
-                  </div>
-                </label>
+              <label class="re-form-label">Data Points</label>
+              <div id="re-dynamic-columns-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 6px; font-size: 12px;">
+                <!-- Dynamic columns will be populated here -->
               </div>
             </div>
             
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-settings">
-                <div>💾</div>
-                <span>Save Prompt Type</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-current-prompt">
-                <div>👁️</div>
-                <span>Preview Current</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Prompt Customization -->
-          <div class="re-section" id="re-prompt-customization">
-            <div class="re-section-header">
-              <div class="re-section-title">✏️ Customize Prompts</div>
-              <div class="re-section-subtitle">Edit prompt templates for different analysis types</div>
-            </div>
-            
-            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-              <button class="re-customize-btn re-customize-active" data-customize="default" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: var(--chatgpt-surface-primary); border-radius: 6px; cursor: pointer;">
-                📄 Edit Standard
-              </button>
-              <button class="re-customize-btn" data-customize="dynamic" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: transparent; border-radius: 6px; cursor: pointer;">
-                🔄 Edit Dynamic
-              </button>
-              <button class="re-customize-btn" data-customize="tabular" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: transparent; border-radius: 6px; cursor: pointer;">
-                📊 Configure Tabular
-              </button>
-            </div>
-            
-            <!-- Default Prompt Editor -->
-            <div id="re-customize-default" class="re-customize-content">
-              <div class="re-form-group">
-                <label class="re-form-label">Standard Analysis Prompt</label>
-                <textarea id="re-default-prompt-template" class="re-form-input" rows="10" 
-                          placeholder="Enter your standard analysis prompt..."
-                          style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                  Variables: {PROPERTY_URL}, {DATE}
-                </div>
-              </div>
-              
-              <div style="display: flex; gap: 8px; margin-top: 12px;">
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">
-                  <div>💾</div>
-                  <span>Save</span>
-                </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">
-                  <div>🔄</div>
-                  <span>Reset</span>
-                </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">
-                  <div>👁️</div>
-                  <span>Preview</span>
-                </button>
-              </div>
-            </div>
-            
-            <!-- Dynamic Prompt Editor -->
-            <div id="re-customize-dynamic" class="re-customize-content" style="display: none;">
-              <div class="re-form-group">
-                <label class="re-form-label">Dynamic Prompt Template</label>
-                <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="8" 
-                          placeholder="Enter your dynamic prompt template..."
-                          style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                  Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
-                </div>
-              </div>
-              
-              <div class="re-form-group">
-                <label class="re-form-label">Data Points to Extract</label>
-                <div id="re-dynamic-columns-container" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px;">
-                  <!-- Dynamic columns will be populated here -->
-                </div>
-              </div>
-              
-              <div style="display: flex; gap: 8px; margin-top: 12px;">
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">
-                  <div>💾</div>
-                  <span>Save</span>
-                </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">
-                  <div>🔄</div>
-                  <span>Reset</span>
-                </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">
-                  <div>👁️</div>
-                  <span>Preview</span>
-                </button>
-              </div>
-            </div>
-            
-            <!-- Tabular Configuration -->
-            <div id="re-customize-tabular" class="re-customize-content" style="display: none;">
-              <div style="padding: 16px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
-                <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
-                <div style="font-weight: 500; margin-bottom: 8px;">Comprehensive Tabular Configuration</div>
-                <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 16px;">
-                  The tabular data system includes advanced features like custom columns, template editing, and data export
-                </div>
-                <button class="re-btn re-btn-primary" id="re-goto-tabular-config">
-                  <div>📊</div>
-                  <span>Open Tabular Configuration</span>
-                </button>
-              </div>
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">Preview</button>
             </div>
           </div>
         </div>
 
-        <!-- Advanced Section -->
-        <div id="re-advanced-settings" class="re-settings-content" style="display: none;">
-          <!-- Import/Export -->
-          <div class="re-section">
-            <div class="re-section-header">
-              <div class="re-section-title">💾 Backup & Restore</div>
-              <div class="re-section-subtitle">Export and import your configurations</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
-                <div>📤</div>
-                <span>Export All Settings</span>
-              </button>
-              <button class="re-btn re-btn-secondary re-btn-full" id="re-import-prompts">
-                <div>📥</div>
-                <span>Import Settings</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Data Management -->
-          <div class="re-section">
-            <div class="re-section-header">
-              <div class="re-section-title">📊 Data Management</div>
-              <div class="re-section-subtitle">Export and manage your property data</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
-                <div>📄</div>
-                <span>Export Properties (JSON)</span>
-              </button>
-              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
-                <div>📊</div>
-                <span>Export to Spreadsheet (CSV)</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Developer Tools -->
-          <div class="re-section">
-            <div class="re-section-header">
-              <div class="re-section-title">🛠️ Developer Tools</div>
-              <div class="re-section-subtitle">Testing and debugging features</div>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
-                <div>🧪</div>
-                <span>Test Analysis System</span>
-              </button>
-              
-              <label class="re-setting-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; cursor: pointer;">
-                <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
-                <span style="font-size: 13px;">Allow any URL (bypass domain validation)</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Reset & Clear -->
-          <div class="re-section" style="border: 1px solid #ff6b6b; border-radius: 8px; padding: 16px;">
-            <div class="re-section-header">
-              <div class="re-section-title" style="color: #ff6b6b;">⚠️ Reset & Clear Data</div>
-              <div class="re-section-subtitle">Permanently remove data and reset settings</div>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="re-btn re-btn-ghost re-btn-full" id="re-reset-all-prompts" style="border-color: #ff6b6b; color: #ff6b6b;">
-                <div>🔄</div>
-                <span>Reset All Prompts to Default</span>
-              </button>
-              
-              <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data" style="border-color: #ff6b6b; color: #ff6b6b;">
-                <div>🗑️</div>
-                <span>Clear All Property Data</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tabular Data Configuration (Separate Section) -->
+        <!-- Tabular Data Configuration -->
         <div class="re-section" id="re-tabular-columns-section" style="display: none;">
           <div class="re-section-header">
-            <div class="re-section-title">📊 Tabular Data Configuration</div>
-            <div class="re-section-subtitle">Advanced data extraction with customizable columns and templates</div>
+            <div class="re-section-title">Tabular Data Configuration</div>
+            <div class="re-section-subtitle">Advanced data extraction settings</div>
           </div>
           
           <!-- Tabular Configuration Tabs -->
-          <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 16px;">
-            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500;">
-              📊 Data Columns
+          <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 12px;">
+            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500; font-size: 12px;">
+              📊 Columns
             </button>
-            <button class="re-tabular-tab" data-tab="prompt" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
-              📝 Prompt Template
+            <button class="re-tabular-tab" data-tab="prompt" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px;">
+              📝 Template
             </button>
-            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
-              ➕ Custom Columns
+            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px;">
+              ➕ Custom
             </button>
           </div>
           
           <!-- Data Columns Tab -->
           <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
             <div class="re-form-group">
-              <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 12px;">
-                <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
-                  Select the data points you want ChatGPT to extract when using the Tabular prompt
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">
+                  Select data points to extract
                 </div>
-                <div style="display: flex; gap: 8px;">
-                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all">
-                    <span>Select All</span>
+                <div style="display: flex; gap: 6px;">
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all" style="font-size: 11px; padding: 4px 8px;">
+                    All
                   </button>
-                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all">
-                    <span>Clear All</span>
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all" style="font-size: 11px; padding: 4px 8px;">
+                    None
                   </button>
                 </div>
               </div>
               
-              <div id="re-columns-stats" style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+              <div id="re-columns-stats" style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-bottom: 6px;">
                 Loading columns...
               </div>
             </div>
@@ -879,46 +712,28 @@ class REAnalyzerEmbeddedUI {
           <div id="re-tabular-prompt-tab" class="re-tabular-tab-content" style="display: none;">
             <div class="re-form-group">
               <label class="re-form-label">Tabular Prompt Template</label>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
-                Edit the base prompt template. Use {{COLUMNS}} where you want the selected columns to be inserted.
-              </div>
-              <textarea id="re-tabular-prompt-template" class="re-form-input" rows="12" 
-                        placeholder="Enter your tabular prompt template..."
-                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                Available variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+              <textarea id="re-tabular-prompt-template" class="re-form-input" rows="8" 
+                        placeholder="Enter tabular prompt template..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
+              <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
               </div>
             </div>
             
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">
-                <div>💾</div>
-                <span>Save Template</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">
-                <div>🔄</div>
-                <span>Reset to Default</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">
-                <div>👁️</div>
-                <span>Preview Full Prompt</span>
-              </button>
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">Preview</button>
             </div>
           </div>
           
           <!-- Custom Columns Tab -->
           <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
             <div class="re-form-group">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <div>
-                  <div style="font-weight: 500; margin-bottom: 4px;">Custom Data Columns</div>
-                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
-                    Create your own data points to request from ChatGPT
-                  </div>
-                </div>
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column">
-                  <div>➕</div>
-                  <span>Add Column</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 12px; font-weight: 500;">Custom Data Columns</div>
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column" style="font-size: 11px; padding: 4px 8px;">
+                  ➕ Add
                 </button>
               </div>
             </div>
@@ -929,63 +744,104 @@ class REAnalyzerEmbeddedUI {
             </div>
             
             <!-- Add Custom Column Form -->
-            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 8px; padding: 12px; margin-top: 12px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px; margin-top: 8px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
                 <div>
-                  <label class="re-form-label">Column Name</label>
-                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees">
+                  <label class="re-form-label" style="font-size: 11px;">Column Name</label>
+                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees" style="font-size: 11px;">
                 </div>
                 <div>
-                  <label class="re-form-label">Category</label>
-                  <select id="re-new-column-category" class="re-form-input">
-                    <option value="core">🏠 Core Property Information</option>
-                    <option value="location">📍 Location & Geography</option>
-                    <option value="financial">💰 Financial Data</option>
-                    <option value="features">🔧 Property Features</option>
-                    <option value="analysis">📊 Analysis Data</option>
-                    <option value="market">📈 Market Analysis</option>
-                    <option value="custom">📋 Custom Category</option>
+                  <label class="re-form-label" style="font-size: 11px;">Category</label>
+                  <select id="re-new-column-category" class="re-form-input" style="font-size: 11px;">
+                    <option value="core">Core Info</option>
+                    <option value="location">Location</option>
+                    <option value="financial">Financial</option>
+                    <option value="features">Features</option>
+                    <option value="analysis">Analysis</option>
+                    <option value="market">Market</option>
+                    <option value="custom">Custom</option>
                   </select>
                 </div>
               </div>
               
               <div class="re-form-group">
-                <label class="re-form-label">Description/Instructions</label>
-                <textarea id="re-new-column-description" class="re-form-input" rows="3" 
-                          placeholder="Describe what ChatGPT should extract for this data point..."></textarea>
+                <label class="re-form-label" style="font-size: 11px;">Description</label>
+                <textarea id="re-new-column-description" class="re-form-input" rows="2" 
+                          placeholder="What should ChatGPT extract?"
+                          style="font-size: 11px;"></textarea>
               </div>
               
-              <div style="display: flex; gap: 8px;">
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column">
-                  <span>Save Column</span>
+              <div style="display: flex; gap: 6px;">
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column" style="font-size: 11px;">
+                  Save
                 </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column">
-                  <span>Cancel</span>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column" style="font-size: 11px;">
+                  Cancel
                 </button>
               </div>
             </div>
           </div>
           
-          <!-- Action Buttons -->
-          <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--chatgpt-border-light);">
+          <!-- Tabular Action Buttons -->
+          <div style="display: flex; gap: 6px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--chatgpt-border-light);">
             <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-tabular">
-              <div>💾</div>
-              <span>Save All Changes</span>
+              💾 Save All
             </button>
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-tabular">
-              <div>🔄</div>
-              <span>Reset All to Default</span>
+              🔄 Reset All
             </button>
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-complete-tabular">
-              <div>👁️</div>
-              <span>Preview Complete Configuration</span>
+              👁️ Preview
+            </button>
+          </div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Data Management</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
+              <div>📄</div>
+              <span>Export JSON</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
+              <div>📊</div>
+              <span>Export CSV</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
+              <div>📤</div>
+              <span>Export Settings</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-import-prompts">
+              <div>📥</div>
+              <span>Import Settings</span>
+            </button>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
+              <div>🧪</div>
+              <span>Test Analysis</span>
+            </button>
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;">
+              <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
+              <span>Allow any URL (bypass validation)</span>
+            </label>
+            
+            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data" style="color: #ff6b6b; border-color: #ff6b6b;">
+              <div>🗑️</div>
+              <span>Clear All Data</span>
             </button>
           </div>
         </div>
 
         <!-- Version Info -->
-        <div style="text-align: center; padding: 16px; color: var(--chatgpt-text-tertiary); font-size: 12px;">
-          RE Analyzer v2.0.0 - Native Integration
+        <div style="text-align: center; padding: 12px; color: var(--chatgpt-text-tertiary); font-size: 11px;">
+          RE Analyzer v2.0.0
         </div>
       </div>
     `;
@@ -3857,11 +3713,8 @@ Or enter your own property URL:`);
       previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
     
-    // Settings navigation event listeners
-    this.setupSettingsNavigation();
-    
-    // Enhanced prompt configuration event listeners
-    this.setupPromptConfigurationEvents();
+    // Setup simplified prompt editor events
+    this.setupSimplifiedPromptEvents();
     
     // Column configuration event listeners
     this.setupColumnConfigurationEvents();
@@ -4030,6 +3883,55 @@ Or enter your own property URL:`);
   previewCustomPrompt() {
     // This method is kept for backward compatibility
     this.previewPrompt();
+  }
+
+  // Simplified Prompt Configuration Events
+  setupSimplifiedPromptEvents() {
+    // Advanced prompt editor toggles
+    const editDefaultBtn = this.panel.querySelector('#re-edit-default-prompt');
+    const editDynamicBtn = this.panel.querySelector('#re-edit-dynamic-prompt');
+    const defaultEditor = this.panel.querySelector('#re-default-editor');
+    const dynamicEditor = this.panel.querySelector('#re-dynamic-editor');
+    
+    if (editDefaultBtn) {
+      editDefaultBtn.addEventListener('click', () => {
+        const isVisible = defaultEditor.style.display !== 'none';
+        defaultEditor.style.display = isVisible ? 'none' : 'block';
+        editDefaultBtn.textContent = isVisible ? '📄 Edit Default' : '📄 Hide Editor';
+        
+        if (!isVisible) {
+          this.loadDefaultPrompt();
+          // Hide other editors
+          if (dynamicEditor) {
+            dynamicEditor.style.display = 'none';
+            if (editDynamicBtn) editDynamicBtn.textContent = '🔄 Edit Dynamic';
+          }
+        }
+      });
+    }
+    
+    if (editDynamicBtn) {
+      editDynamicBtn.addEventListener('click', () => {
+        const isVisible = dynamicEditor.style.display !== 'none';
+        dynamicEditor.style.display = isVisible ? 'none' : 'block';
+        editDynamicBtn.textContent = isVisible ? '🔄 Edit Dynamic' : '🔄 Hide Editor';
+        
+        if (!isVisible) {
+          this.loadDynamicPrompt();
+          // Hide other editors
+          if (defaultEditor) {
+            defaultEditor.style.display = 'none';
+            if (editDefaultBtn) editDefaultBtn.textContent = '📄 Edit Default';
+          }
+        }
+      });
+    }
+    
+    // Update existing button event handlers to use correct IDs
+    const savePromptBtn = this.panel.querySelector('#re-save-prompt-selection');
+    if (savePromptBtn) {
+      savePromptBtn.addEventListener('click', () => this.savePromptSettings());
+    }
   }
 
   // Settings Navigation Management
