@@ -1,6 +1,12 @@
 // Content script for RE Analyzer Embedded Extension
 console.log('🏠 RE Analyzer Embedded v2.0 loaded on:', window.location.href);
 
+// Prevent multiple script execution
+if (window.reAnalyzerLoaded) {
+  console.log('🏠 RE Analyzer already loaded, skipping initialization');
+} else {
+  window.reAnalyzerLoaded = true;
+
 // Embedded UI state management
 let embeddedUI = null;
 let isUIInitialized = false;
@@ -41,8 +47,7 @@ function safeChromeFall(apiCall, fallbackValue = null) {
   }
 }
 
-// Global variable to track current property analysis
-let currentPropertyAnalysis = null;
+// Global variable to track current property analysis (already declared above with embedded UI variables)
 
 // Track processed messages per property URL to prevent cross-contamination
 let processedMessagesPerProperty = new Map();
@@ -5965,3 +5970,5 @@ window.testPromptSplitting = function(propertyLink) {
   console.log('🧪 Testing prompt splitting with link:', testLink);
   insertPropertyAnalysisPrompt(testLink);
 };
+
+} // End of multiple execution prevention block
