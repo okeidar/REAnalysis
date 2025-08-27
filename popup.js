@@ -2953,6 +2953,10 @@ const WordExportModule = {
       throw new Error('No analysis data available for export');
     }
 
+    // Get category information
+    const categoryId = propertyItem.categoryId || 'uncategorized';
+    const category = categoryManager.getCategory(categoryId);
+    
     // Parse the response for structured content
     const content = {
       propertyUrl: propertyItem.url,
@@ -2960,7 +2964,13 @@ const WordExportModule = {
       analysisDate: propertyItem.date,
       fullResponse: analysis.fullResponse,
       extractedData: analysis.extractedData || {},
-      structured: this.parseStructuredResponse(analysis.fullResponse)
+      structured: this.parseStructuredResponse(analysis.fullResponse),
+      category: {
+        id: categoryId,
+        name: category?.name || 'Uncategorized',
+        icon: category?.icon || '📁',
+        color: category?.color || '#6b7280'
+      }
     };
 
     return content;
@@ -3043,6 +3053,22 @@ const WordExportModule = {
           new TextRun({
             text: content.propertyUrl,
             color: "0066CC",
+          }),
+        ],
+      })
+    );
+
+    // Category
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: "Category: ",
+            bold: true,
+          }),
+          new TextRun({
+            text: `${content.category.icon} ${content.category.name}`,
+            color: content.category.color.replace('#', ''),
           }),
         ],
       })
@@ -3320,6 +3346,57 @@ const WordExportModule = {
 
       children.push(new Paragraph({ text: "" }));
 
+      // Add category summary for batch exports
+      const categoryCount = {};
+      propertyItems.forEach(property => {
+        const categoryId = property.categoryId || 'uncategorized';
+        const category = categoryManager.getCategory(categoryId);
+        const categoryName = category?.name || 'Uncategorized';
+        const categoryIcon = category?.icon || '📁';
+        
+        if (!categoryCount[categoryId]) {
+          categoryCount[categoryId] = {
+            name: categoryName,
+            icon: categoryIcon,
+            count: 0
+          };
+        }
+        categoryCount[categoryId].count++;
+      });
+
+      if (Object.keys(categoryCount).length > 1) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Categories Summary",
+                bold: true,
+                size: 18,
+              }),
+            ],
+            heading: HeadingLevel.HEADING_2,
+          })
+        );
+
+        Object.values(categoryCount).forEach(cat => {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${cat.icon} ${cat.name}: `,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: `${cat.count} properties`,
+                }),
+              ],
+            })
+          );
+        });
+
+        children.push(new Paragraph({ text: "" }));
+      }
+
       // Process each property
       for (let i = 0; i < propertyItems.length; i++) {
         const propertyItem = propertyItems[i];
@@ -3375,6 +3452,22 @@ const WordExportModule = {
                 }),
                 new TextRun({
                   text: content.analysisDate,
+                }),
+              ],
+            })
+          );
+
+          // Category information
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Category: ",
+                  bold: true,
+                }),
+                new TextRun({
+                  text: `${content.category.icon} ${content.category.name}`,
+                  color: content.category.color.replace('#', ''),
                 }),
               ],
             })
