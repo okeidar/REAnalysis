@@ -6555,9 +6555,27 @@ function setupResponseMonitor() {
     console.log('🔍 Current prompt splitting phase:', promptSplittingState.currentPhase);
     console.log('🔍 Current property analysis:', currentPropertyAnalysis?.url || 'None');
     
-    // Check for potential incomplete responses
-    if (messageText.length < 100) {
+    // Check for potential incomplete responses with more detailed analysis
+    if (messageText.length < 50) {
       console.warn('⚠️ Warning: Response seems very short (' + messageText.length + ' characters) - might be incomplete');
+      console.log('🔍 SHORT RESPONSE DEBUG:', {
+        messageLength: messageText.length,
+        messagePreview: messageText,
+        extractionMethod: extractionMethod || 'unknown',
+        elementInfo: {
+          tagName: newMessage?.tagName,
+          className: newMessage?.className,
+          childrenCount: newMessage?.children?.length
+        }
+      });
+      
+      // Don't process responses that are extremely short (likely UI elements)
+      if (messageText.length < 20) {
+        console.log('❌ Skipping extremely short response - likely UI text, not ChatGPT content');
+        return;
+      }
+    } else if (messageText.length < 200) {
+      console.warn('⚠️ Response is shorter than expected (' + messageText.length + ' characters) but proceeding...');
     }
     
     if (messageText.endsWith('...') || messageText.endsWith('…')) {
@@ -6939,40 +6957,151 @@ function setupResponseMonitor() {
       const newMessage = messages[messages.length - 1];
       if (!newMessage) return;
       
-      // Enhanced message text extraction to capture complete content
+      // ENHANCED TEXT EXTRACTION SYSTEM - Multiple robust methods
       let messageText = '';
+      let extractionMethod = '';
       
-      // Method 1: Try textContent first (preserves formatting)
-      messageText = newMessage.textContent || '';
+      console.log('🔍 EXTRACTION DEBUG: Starting text extraction from element:', newMessage);
+      console.log('🔍 Element tag:', newMessage.tagName);
+      console.log('🔍 Element classes:', newMessage.className);
+      console.log('🔍 Element children count:', newMessage.children.length);
       
-      // Method 2: Fallback to innerText if textContent is insufficient
-      if (!messageText || messageText.length < 50) {
-        const innerText = newMessage.innerText || '';
-        if (innerText.length > messageText.length) {
-          messageText = innerText;
+      // Method 1: Direct content extraction
+      const directText = newMessage.textContent || '';
+      console.log('🔍 Method 1 (textContent):', directText.length, 'chars');
+      if (directText.length > messageText.length) {
+        messageText = directText;
+        extractionMethod = 'textContent';
+      }
+      
+      // Method 2: InnerText fallback
+      const innerText = newMessage.innerText || '';
+      console.log('🔍 Method 2 (innerText):', innerText.length, 'chars');
+      if (innerText.length > messageText.length) {
+        messageText = innerText;
+        extractionMethod = 'innerText';
+      }
+      
+      // Method 3: Look for specific content containers within the message
+      const contentSelectors = [
+        '.prose', '.markdown', '.message-content', '.content',
+        '[class*="prose"]', '[class*="markdown"]', '[class*="content"]',
+        'div:not([class*="button"]):not([class*="icon"]):not([class*="header"])'
+      ];
+      
+      for (const selector of contentSelectors) {
+        const contentEl = newMessage.querySelector(selector);
+        if (contentEl) {
+          const selectorText = contentEl.textContent || contentEl.innerText || '';
+          console.log(`🔍 Method 3 (${selector}):`, selectorText.length, 'chars');
+          if (selectorText.length > messageText.length) {
+            messageText = selectorText;
+            extractionMethod = `selector: ${selector}`;
+          }
         }
       }
       
-      // Method 3: Manual extraction for complex content
-      if (!messageText || messageText.length < 50) {
-        const textNodes = [];
+      // Method 4: Advanced TreeWalker with filtering
+      if (messageText.length < 100) {
+        console.log('🔍 Method 4: Advanced TreeWalker extraction');
+        const textParts = [];
         const walker = document.createTreeWalker(
           newMessage,
           NodeFilter.SHOW_TEXT,
-          null,
+          {
+            acceptNode: function(node) {
+              // Skip empty text nodes and nodes in buttons/controls
+              const text = node.textContent.trim();
+              if (!text) return NodeFilter.FILTER_REJECT;
+              
+              // Skip text in UI elements
+              const parent = node.parentElement;
+              if (parent && (
+                parent.tagName === 'BUTTON' ||
+                parent.classList.contains('button') ||
+                parent.classList.contains('icon') ||
+                parent.getAttribute('role') === 'button'
+              )) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              
+              return NodeFilter.FILTER_ACCEPT;
+            }
+          },
           false
         );
-        let node;
-        while (node = walker.nextNode()) {
-          if (node.textContent.trim()) {
-            textNodes.push(node.textContent);
+        
+        let textNode;
+        while (textNode = walker.nextNode()) {
+          const text = textNode.textContent.trim();
+          if (text.length > 3) { // Only include substantial text
+            textParts.push(text);
           }
         }
-        const manualText = textNodes.join(' ');
-        if (manualText.length > messageText.length) {
-          messageText = manualText;
+        
+        const walkerText = textParts.join(' ');
+        console.log('🔍 Method 4 (TreeWalker):', walkerText.length, 'chars');
+        if (walkerText.length > messageText.length) {
+          messageText = walkerText;
+          extractionMethod = 'TreeWalker';
         }
       }
+      
+      // Method 5: Paragraph-by-paragraph extraction
+      if (messageText.length < 100) {
+        console.log('🔍 Method 5: Paragraph extraction');
+        const paragraphs = newMessage.querySelectorAll('p, div, span');
+        const paragraphTexts = [];
+        
+        paragraphs.forEach((p, index) => {
+          const pText = (p.textContent || '').trim();
+          if (pText.length > 10 && !pText.match(/^(Copy|Share|Edit|Delete|Regenerate|Stop)$/i)) {
+            paragraphTexts.push(pText);
+            console.log(`🔍 Paragraph ${index}:`, pText.substring(0, 50) + '...');
+          }
+        });
+        
+        const paragraphText = paragraphTexts.join('\n\n');
+        console.log('🔍 Method 5 (paragraphs):', paragraphText.length, 'chars');
+        if (paragraphText.length > messageText.length) {
+          messageText = paragraphText;
+          extractionMethod = 'paragraphs';
+        }
+      }
+      
+      // Method 6: Look for the actual content area more specifically
+      if (messageText.length < 100) {
+        console.log('🔍 Method 6: Specific ChatGPT content extraction');
+        
+        // Try to find the main content area by looking for common patterns
+        const specificSelectors = [
+          '[data-message-author-role="assistant"] .prose',
+          '[data-message-author-role="assistant"] > div > div',
+          '[data-message-author-role="assistant"] [class*="whitespace-pre-wrap"]',
+          '.group .prose',
+          '.markdown-prose',
+          '.result-content'
+        ];
+        
+        for (const selector of specificSelectors) {
+          const specificEl = document.querySelector(selector);
+          if (specificEl) {
+            const specificText = specificEl.textContent || specificEl.innerText || '';
+            console.log(`🔍 Method 6 (${selector}):`, specificText.length, 'chars');
+            if (specificText.length > messageText.length) {
+              messageText = specificText;
+              extractionMethod = `specific: ${selector}`;
+            }
+          }
+        }
+      }
+      
+      console.log('🔍 EXTRACTION RESULT:', {
+        method: extractionMethod,
+        length: messageText.length,
+        preview: messageText.substring(0, 200) + '...',
+        element: newMessage
+      });
       
       console.log('📝 Message extraction stats:', {
         length: messageText.length,
@@ -8155,27 +8284,88 @@ window.captureCurrentResponse = function(propertyUrl) {
   const lastMessage = messages[messages.length - 1];
   console.log('📍 Found message element:', lastMessage);
   
-  // Try multiple extraction methods
-  const extractionMethods = [
-    { name: 'textContent', text: lastMessage.textContent || '' },
-    { name: 'innerText', text: lastMessage.innerText || '' },
-    { name: 'innerHTML', text: lastMessage.innerHTML || '' }
+  // Use the same robust extraction system as the main monitoring
+  let messageText = '';
+  let extractionMethod = '';
+  
+  // Method 1: Direct content extraction
+  const directText = lastMessage.textContent || '';
+  console.log('🔍 Manual Method 1 (textContent):', directText.length, 'chars');
+  if (directText.length > messageText.length) {
+    messageText = directText;
+    extractionMethod = 'textContent';
+  }
+  
+  // Method 2: InnerText fallback
+  const innerText = lastMessage.innerText || '';
+  console.log('🔍 Manual Method 2 (innerText):', innerText.length, 'chars');
+  if (innerText.length > messageText.length) {
+    messageText = innerText;
+    extractionMethod = 'innerText';
+  }
+  
+  // Method 3: Look for specific content containers
+  const contentSelectors = [
+    '.prose', '.markdown', '.message-content', '.content',
+    '[class*="prose"]', '[class*="markdown"]', '[class*="content"]'
   ];
   
-  console.log('📝 Extraction results:');
-  extractionMethods.forEach(method => {
-    console.log(`  ${method.name}: ${method.text.length} characters`);
-    console.log(`  Preview: ${method.text.substring(0, 200)}...`);
-  });
+  for (const selector of contentSelectors) {
+    const contentEl = lastMessage.querySelector(selector);
+    if (contentEl) {
+      const selectorText = contentEl.textContent || contentEl.innerText || '';
+      console.log(`🔍 Manual Method 3 (${selector}):`, selectorText.length, 'chars');
+      if (selectorText.length > messageText.length) {
+        messageText = selectorText;
+        extractionMethod = `selector: ${selector}`;
+      }
+    }
+  }
   
-  // Use the longest extraction
-  const bestMethod = extractionMethods.reduce((best, current) => 
-    current.text.length > best.text.length ? current : best
-  );
+  // Method 4: Advanced TreeWalker if still not enough content
+  if (messageText.length < 100) {
+    console.log('🔍 Manual Method 4: TreeWalker extraction');
+    const textParts = [];
+    const walker = document.createTreeWalker(
+      lastMessage,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          const text = node.textContent.trim();
+          if (!text) return NodeFilter.FILTER_REJECT;
+          
+          const parent = node.parentElement;
+          if (parent && (
+            parent.tagName === 'BUTTON' ||
+            parent.classList.contains('button') ||
+            parent.classList.contains('icon')
+          )) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
+      false
+    );
+    
+    let textNode;
+    while (textNode = walker.nextNode()) {
+      const text = textNode.textContent.trim();
+      if (text.length > 3) {
+        textParts.push(text);
+      }
+    }
+    
+    const walkerText = textParts.join(' ');
+    console.log('🔍 Manual Method 4 (TreeWalker):', walkerText.length, 'chars');
+    if (walkerText.length > messageText.length) {
+      messageText = walkerText;
+      extractionMethod = 'TreeWalker';
+    }
+  }
   
-  console.log(`✅ Using ${bestMethod.name} method: ${bestMethod.text.length} characters`);
-  
-  const messageText = bestMethod.text;
+  console.log(`✅ Manual capture using ${extractionMethod} method: ${messageText.length} characters`);
   
   if (!messageText || messageText.length < 50) {
     console.error('❌ Captured text is too short:', messageText.length);
@@ -8234,6 +8424,122 @@ window.captureCurrentResponse = function(propertyUrl) {
     captureMethod: bestMethod.name,
     url: url
   };
+};
+
+// DIAGNOSTIC FUNCTION - Inspect ChatGPT DOM structure
+window.inspectChatGPTDOM = function() {
+  console.log('🔍 CHATGPT DOM INSPECTION');
+  console.log('========================');
+  
+  // Try all possible selectors
+  const allSelectors = [
+    '[data-message-author-role="assistant"]',
+    '[data-author="assistant"]',
+    '[data-role="assistant"]',
+    '.group.w-full',
+    '.prose',
+    '[class*="message"]',
+    '[class*="assistant"]',
+    '.conversation-turn',
+    '.chat-message'
+  ];
+  
+  allSelectors.forEach(selector => {
+    const elements = document.querySelectorAll(selector);
+    console.log(`📋 ${selector}: ${elements.length} elements found`);
+    
+    if (elements.length > 0) {
+      const lastEl = elements[elements.length - 1];
+      console.log(`  Last element:`, lastEl);
+      console.log(`  Text length: ${(lastEl.textContent || '').length}`);
+      console.log(`  Inner length: ${(lastEl.innerText || '').length}`);
+      console.log(`  Children: ${lastEl.children.length}`);
+      console.log(`  Classes: ${lastEl.className}`);
+      console.log(`  Preview: ${(lastEl.textContent || '').substring(0, 100)}...`);
+      
+      // Check for content within
+      const contentElements = lastEl.querySelectorAll('div, p, span');
+      console.log(`  Content sub-elements: ${contentElements.length}`);
+      contentElements.forEach((el, i) => {
+        if (i < 5) { // Show first 5
+          const text = el.textContent || '';
+          if (text.length > 20) {
+            console.log(`    [${i}] ${el.tagName} (${text.length} chars): ${text.substring(0, 50)}...`);
+          }
+        }
+      });
+    }
+  });
+  
+  console.log('========================');
+  return 'DOM inspection complete - check console for details';
+};
+
+// EMERGENCY TEXT EXTRACTION - Last resort method
+window.emergencyExtraction = function() {
+  console.log('🚨 EMERGENCY EXTRACTION ATTEMPT');
+  
+  // Get all text content from the page and try to find the ChatGPT response
+  const allTextElements = document.querySelectorAll('*');
+  const candidateTexts = [];
+  
+  allTextElements.forEach(el => {
+    const text = el.textContent || '';
+    // Look for substantial text that might be a ChatGPT response
+    if (text.length > 500 && text.length < 20000) {
+      const hasPropertyKeywords = /property|bedroom|bathroom|price|sqft|real estate|analysis/i.test(text);
+      if (hasPropertyKeywords) {
+        candidateTexts.push({
+          element: el,
+          text: text,
+          length: text.length,
+          keywords: (text.match(/property|bedroom|bathroom|price|sqft|real estate|analysis/gi) || []).length
+        });
+      }
+    }
+  });
+  
+  // Sort by keyword count and length
+  candidateTexts.sort((a, b) => (b.keywords * 100 + b.length) - (a.keywords * 100 + a.length));
+  
+  console.log('🚨 Found', candidateTexts.length, 'potential ChatGPT responses:');
+  candidateTexts.slice(0, 3).forEach((candidate, i) => {
+    console.log(`${i + 1}. Length: ${candidate.length}, Keywords: ${candidate.keywords}`);
+    console.log(`   Preview: ${candidate.text.substring(0, 200)}...`);
+    console.log(`   Element:`, candidate.element);
+  });
+  
+  if (candidateTexts.length > 0) {
+    const best = candidateTexts[0];
+    console.log('🚨 Best candidate selected, attempting to save...');
+    
+    // Try to save this text
+    const url = prompt('Enter property URL for this analysis:') || `emergency_${Date.now()}`;
+    const analysisData = extractPropertyAnalysisData(best.text);
+    
+    if (analysisData) {
+      safeChromeFall(() => {
+        return chrome.runtime.sendMessage({
+          action: 'savePropertyAnalysis',
+          propertyUrl: url,
+          sessionId: `emergency_${Date.now()}`,
+          analysisData: {
+            ...analysisData,
+            emergencyExtraction: true,
+            extractionMethod: 'emergency'
+          }
+        });
+      }).then(response => {
+        if (response && response.success) {
+          console.log('🚨 Emergency extraction saved successfully!');
+        }
+      });
+    }
+    
+    return best.text;
+  }
+  
+  return null;
 };
 
 // Debug function to check progressive tracking status

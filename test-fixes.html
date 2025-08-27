@@ -281,7 +281,9 @@ async setupCustomPromptSettings() {
                 <li>Verify custom prompt editing works in settings</li>
                 <li><strong>Debug incomplete responses:</strong> Run <code>checkProgressiveTracking()</code> in console to see real-time saving</li>
                 <li><strong>Manual capture test:</strong> Run <code>captureCurrentResponse()</code> to manually save current ChatGPT response</li>
-                <li><strong>Force extraction:</strong> Run <code>forceExtractCurrent()</code> to test extraction on current message</li>
+                <li><strong>DOM inspection:</strong> Run <code>inspectChatGPTDOM()</code> to analyze page structure</li>
+                <li><strong>Emergency extraction:</strong> Run <code>emergencyExtraction()</code> to scan entire page for analysis text</li>
+                <li><strong>Progressive tracking:</strong> Run <code>checkProgressiveTracking()</code> to see real-time saving status</li>
             </ol>
             
             <p><strong>Expected Console Messages:</strong></p>
@@ -317,6 +319,12 @@ async setupCustomPromptSettings() {
 📏 LONG RESPONSE detected: [character count]
 🚀 MANUAL CAPTURE: Capturing current ChatGPT response...
 ✅ Manual capture saved successfully!
+
+🔍 EXTRACTION DEBUG: Starting text extraction from element
+🔍 Method 1 (textContent): [number] chars
+🔍 Method 2 (innerText): [number] chars
+🔍 EXTRACTION RESULT: {method: "textContent", length: 2500}
+🔍 SHORT RESPONSE DEBUG: [detailed extraction info]
             </div>
             
             <p><strong>Context Invalidation Handling:</strong></p>
