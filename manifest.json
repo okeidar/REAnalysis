@@ -39,7 +39,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["docx.min.js", "embedded-ui.html", "embedded-styles.css"],
+      "resources": ["docx.min.js", "embedded-ui.html", "embedded-styles.css", "chatgpt-native-styles.css"],
       "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
     }
   ]

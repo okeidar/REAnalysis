@@ -108,12 +108,12 @@ class REAnalyzerEmbeddedUI {
       this.setupKeyboardShortcuts();
       
       // Initialize status
-      this.updateConnectionStatus();
+      this.updateChatGPTConnectionStatus();
       
       // Load initial data
-      await this.loadPropertyData();
+      await this.loadChatGPTPropertyData();
       
-      console.log('✅ RE Analyzer Embedded UI initialized successfully');
+      console.log('✅ RE Analyzer ChatGPT Native UI initialized successfully');
       isUIInitialized = true;
       
     } catch (error) {
@@ -140,20 +140,17 @@ class REAnalyzerEmbeddedUI {
 
   createFloatingActionButton() {
     // Remove existing FAB if it exists
-    const existingFab = document.getElementById('re-analyzer-fab');
+    const existingFab = document.getElementById('re-analyzer-toggle');
     if (existingFab) {
       existingFab.remove();
     }
 
-    // Create FAB
-    this.fab = document.createElement('div');
-    this.fab.id = 're-analyzer-fab';
-    this.fab.className = 're-fab';
+    // Create ChatGPT-style floating toggle
+    this.fab = document.createElement('button');
+    this.fab.id = 're-analyzer-toggle';
+    this.fab.className = 're-floating-toggle re-chatgpt-native';
     this.fab.title = 'RE Analyzer';
-    this.fab.innerHTML = `
-      <div class="re-fab-icon">🏠</div>
-      <div class="re-fab-notification" id="re-fab-notification"></div>
-    `;
+    this.fab.innerHTML = '🏠';
 
     // Add to page
     document.body.appendChild(this.fab);
@@ -163,76 +160,303 @@ class REAnalyzerEmbeddedUI {
       this.togglePanel();
     });
 
-    console.log('🎯 Created floating action button');
+    console.log('🎯 Created ChatGPT-style floating toggle');
   }
 
   createEmbeddedPanel() {
     // Remove existing panel if it exists
-    const existingPanel = document.getElementById('re-analyzer-panel');
+    const existingPanel = document.getElementById('re-analyzer-sidebar');
     if (existingPanel) {
       existingPanel.remove();
     }
 
-    // Load the embedded UI HTML content
+    // Create ChatGPT-style sidebar container
     this.panel = document.createElement('div');
-    this.panel.id = 're-analyzer-panel';
-    this.panel.className = `re-panel re-panel-collapsed re-panel-${uiSettings.position}`;
+    this.panel.id = 're-analyzer-sidebar';
+    this.panel.className = 're-sidebar-container re-chatgpt-native';
     
-    // Set initial content - this will be loaded from embedded-ui.html structure
-    this.panel.innerHTML = this.getEmbeddedPanelHTML();
+    // Set native ChatGPT-style content
+    this.panel.innerHTML = this.getChatGPTNativeSidebarHTML();
 
     // Add to page
     document.body.appendChild(this.panel);
 
     // Apply compact mode if enabled
     if (uiSettings.compactMode) {
-      document.body.classList.add('re-compact-mode');
+      this.panel.classList.add('re-compact');
     }
 
-    console.log('🎨 Created embedded panel');
+    console.log('🎨 Created ChatGPT-style native sidebar');
   }
 
-  getEmbeddedPanelHTML() {
+  getChatGPTNativeSidebarHTML() {
     return `
-      <!-- Panel Header -->
-      <div class="re-panel-header">
-        <div class="re-panel-title">
-          <span class="re-logo">🏠</span>
-          <span class="re-title">RE Analyzer</span>
-          <span class="re-version">v2.0</span>
-        </div>
-        <div class="re-panel-actions">
-          <button id="re-minimize-btn" class="re-btn re-btn-icon" title="Minimize">
-            <span>−</span>
-          </button>
-          <button id="re-close-btn" class="re-btn re-btn-icon" title="Close">
-            <span>×</span>
+      <!-- Sidebar Header -->
+      <div class="re-sidebar-header">
+        <div class="re-sidebar-header-content">
+          <div class="re-sidebar-title">
+            <div class="re-sidebar-logo">🏠</div>
+            <span>RE Analyzer</span>
+          </div>
+          <button class="re-sidebar-close" id="re-sidebar-close" title="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
       </div>
 
-      <!-- Tab Navigation -->
-      <div class="re-tab-nav" id="re-tab-nav">
-        <button class="re-tab-btn re-tab-active" data-tab="analyzer">
-          <span class="re-tab-icon">🔍</span>
-          <span class="re-tab-label">Analyzer</span>
+      <!-- Sidebar Navigation -->
+      <div class="re-sidebar-nav">
+        <button class="re-nav-item re-nav-active" data-tab="analyzer" id="re-nav-analyzer">
+          <div class="re-nav-icon">🔍</div>
+          <div class="re-nav-label">Analyzer</div>
         </button>
-        <button class="re-tab-btn" data-tab="properties">
-          <span class="re-tab-icon">📊</span>
-          <span class="re-tab-label">Properties</span>
-          <span class="re-tab-notification" id="properties-notification"></span>
+        <button class="re-nav-item" data-tab="properties" id="re-nav-properties">
+          <div class="re-nav-icon">📊</div>
+          <div class="re-nav-label">Properties</div>
+          <div class="re-nav-badge re-hidden" id="re-properties-badge">0</div>
         </button>
-        <button class="re-tab-btn" data-tab="settings">
-          <span class="re-tab-icon">⚙️</span>
-          <span class="re-tab-label">Settings</span>
+        <button class="re-nav-item" data-tab="settings" id="re-nav-settings">
+          <div class="re-nav-icon">⚙️</div>
+          <div class="re-nav-label">Settings</div>
         </button>
       </div>
 
-      <!-- Panel Content -->
-      <div class="re-panel-content">
-        ${this.getAnalyzerTabHTML()}
-        ${this.getPropertiesTabHTML()}
-        ${this.getSettingsTabHTML()}
+      <!-- Sidebar Content -->
+      <div class="re-sidebar-content">
+        ${this.getChatGPTAnalyzerHTML()}
+        ${this.getChatGPTPropertiesHTML()}
+        ${this.getChatGPTSettingsHTML()}
+      </div>
+    `;
+  }
+
+  getChatGPTAnalyzerHTML() {
+    return `
+      <!-- Analyzer Section -->
+      <div class="re-section" id="re-analyzer-section">
+        <!-- Connection Status -->
+        <div class="re-status" id="re-connection-status">
+          <div class="re-status-icon">⏳</div>
+          <div class="re-status-content">
+            <div class="re-status-title">Checking Connection...</div>
+            <div class="re-status-subtitle">Verifying ChatGPT access</div>
+          </div>
+        </div>
+
+        <!-- Quick Action -->
+        <div class="re-section">
+          <button class="re-btn re-btn-primary re-btn-full re-btn-lg" id="re-quick-analyze">
+            <div>📋</div>
+            <span>Paste & Analyze Property</span>
+          </button>
+        </div>
+
+        <!-- Manual Input -->
+        <div class="re-section" id="re-manual-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Property Analysis</div>
+            <div class="re-section-subtitle">Enter a property URL from any major real estate website</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Property URL</label>
+            <div class="re-input-group">
+              <input type="text" class="re-form-input" id="re-property-input" 
+                     placeholder="https://zillow.com/property/...">
+              <div class="re-input-addon" id="re-paste-addon" title="Paste from clipboard">📋</div>
+            </div>
+            <div class="re-form-validation" id="re-input-validation"></div>
+          </div>
+
+          <div class="re-form-group">
+            <button class="re-btn re-btn-primary re-btn-full" id="re-analyze-btn">
+              <div>🔍</div>
+              <span>Analyze Property</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Analysis Progress -->
+        <div class="re-progress re-hidden" id="re-analysis-progress">
+          <div class="re-progress-header">
+            <div class="re-progress-title">Analysis in Progress</div>
+            <div class="re-progress-time" id="re-progress-timer">0:00</div>
+          </div>
+          <div class="re-progress-steps">
+            <div class="re-progress-step" data-step="validate">
+              <div class="re-step-icon">⏳</div>
+              <span>Validating URL</span>
+            </div>
+            <div class="re-progress-step" data-step="send">
+              <div class="re-step-icon">⏳</div>
+              <span>Sending to ChatGPT</span>
+            </div>
+            <div class="re-progress-step" data-step="analyze">
+              <div class="re-step-icon">⏳</div>
+              <span>AI Analysis</span>
+            </div>
+            <div class="re-progress-step" data-step="save">
+              <div class="re-step-icon">⏳</div>
+              <span>Saving Results</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="re-messages-container">
+          <div class="re-message re-message-success re-hidden" id="re-success-msg">
+            <div class="re-message-icon">✅</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div class="re-message re-message-error re-hidden" id="re-error-msg">
+            <div class="re-message-icon">❌</div>
+            <div class="re-message-content"></div>
+          </div>
+          <div class="re-message re-message-warning re-hidden" id="re-warning-msg">
+            <div class="re-message-icon">⚠️</div>
+            <div class="re-message-content"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getChatGPTPropertiesHTML() {
+    return `
+      <!-- Properties Section -->
+      <div class="re-section re-hidden" id="re-properties-section">
+        <!-- Properties Stats -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Property Portfolio</div>
+            <div class="re-section-subtitle">Your analyzed properties and insights</div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-total-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Total</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-analyzed-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Analyzed</div>
+            </div>
+            <div style="text-align: center; padding: 12px; background: var(--chatgpt-hover-bg); border-radius: 6px;">
+              <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);" id="re-sources-count">0</div>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">Sources</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Properties List -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Recent Properties</div>
+          </div>
+          
+          <div id="re-properties-list">
+            <!-- Properties will be populated here -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="re-empty-properties" class="re-hidden" style="text-align: center; padding: 32px 16px; color: var(--chatgpt-text-secondary);">
+            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">📄</div>
+            <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No Properties Yet</div>
+            <div style="font-size: 14px; line-height: 1.4; margin-bottom: 20px;">Start by analyzing your first property using the tool above</div>
+            <button class="re-btn re-btn-primary" id="re-start-first-analysis">
+              <div>🔍</div>
+              <span>Analyze First Property</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  getChatGPTSettingsHTML() {
+    return `
+      <!-- Settings Section -->
+      <div class="re-section re-hidden" id="re-settings-section">
+        <!-- Interface Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Interface</div>
+            <div class="re-section-subtitle">Customize your RE Analyzer experience</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Panel Position</label>
+            <select class="re-form-input" id="re-position-select">
+              <option value="left">Left Side</option>
+              <option value="right">Right Side</option>
+              <option value="bottom">Bottom</option>
+            </select>
+          </div>
+
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
+              <span class="re-form-label" style="margin: 0;">Compact Mode</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Use smaller interface elements to save space
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Analysis</div>
+            <div class="re-section-subtitle">Configure analysis behavior</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Automatically switch to Properties tab after analysis
+            </div>
+          </div>
+
+          <div class="re-form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
+              <span class="re-form-label" style="margin: 0;">Show Notifications</span>
+            </label>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Display notifications when analysis completes
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Data Management</div>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
+              <div>📄</div>
+              <span>Export All Properties</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
+              <div>🗑️</div>
+              <span>Clear All Data</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Version Info -->
+        <div style="text-align: center; padding: 16px; color: var(--chatgpt-text-tertiary); font-size: 12px;">
+          RE Analyzer v2.0.0 - Native Integration
+        </div>
       </div>
     `;
   }
@@ -523,40 +747,147 @@ class REAnalyzerEmbeddedUI {
   setupEventListeners() {
     if (!this.panel) return;
 
-    // Panel header actions
-    const minimizeBtn = this.panel.querySelector('#re-minimize-btn');
-    const closeBtn = this.panel.querySelector('#re-close-btn');
-    
-    if (minimizeBtn) {
-      minimizeBtn.addEventListener('click', () => this.minimizePanel());
-    }
-    
+    // Sidebar close button
+    const closeBtn = this.panel.querySelector('#re-sidebar-close');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => this.hidePanel());
     }
 
-    // Tab navigation
-    const tabButtons = this.panel.querySelectorAll('.re-tab-btn');
-    tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tabId = btn.getAttribute('data-tab');
+    // Navigation items
+    const navItems = this.panel.querySelectorAll('.re-nav-item');
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tabId = item.getAttribute('data-tab');
         this.switchTab(tabId);
       });
     });
 
-    // Analyzer tab events
-    this.setupAnalyzerEvents();
+    // Analyzer events
+    this.setupChatGPTAnalyzerEvents();
     
-    // Properties tab events  
-    this.setupPropertiesEvents();
+    // Properties events  
+    this.setupChatGPTPropertiesEvents();
     
-    // Settings tab events
-    this.setupSettingsEvents();
+    // Settings events
+    this.setupChatGPTSettingsEvents();
 
-    // Panel dragging functionality
-    this.setupPanelDragging();
+    console.log('🎮 ChatGPT-style event listeners set up');
+  }
 
-    console.log('🎮 Event listeners set up');
+  setupChatGPTAnalyzerEvents() {
+    // Quick analyze button
+    const quickAnalyzeBtn = this.panel.querySelector('#re-quick-analyze');
+    if (quickAnalyzeBtn) {
+      quickAnalyzeBtn.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (this.isValidPropertyLink(text)) {
+            await this.analyzeProperty(text);
+          } else {
+            this.showChatGPTMessage('error', 'Clipboard does not contain a valid property link');
+          }
+        } catch (err) {
+          this.showChatGPTMessage('error', 'Unable to access clipboard. Please use manual input below.');
+        }
+      });
+    }
+
+    // Manual input elements
+    const propertyInput = this.panel.querySelector('#re-property-input');
+    const pasteAddon = this.panel.querySelector('#re-paste-addon');
+    const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+
+    if (propertyInput) {
+      propertyInput.addEventListener('input', () => {
+        this.validateChatGPTInput();
+      });
+    }
+
+    if (pasteAddon) {
+      pasteAddon.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (propertyInput) {
+            propertyInput.value = text;
+            this.validateChatGPTInput();
+          }
+        } catch (err) {
+          this.showChatGPTMessage('error', 'Unable to paste from clipboard');
+        }
+      });
+    }
+
+    if (analyzeBtn) {
+      analyzeBtn.addEventListener('click', () => {
+        const url = propertyInput ? propertyInput.value.trim() : '';
+        if (url && this.isValidPropertyLink(url)) {
+          this.analyzeProperty(url);
+        } else {
+          this.showChatGPTMessage('error', 'Please enter a valid property URL');
+        }
+      });
+    }
+  }
+
+  setupChatGPTPropertiesEvents() {
+    // Start first analysis button
+    const startBtn = this.panel.querySelector('#re-start-first-analysis');
+    if (startBtn) {
+      startBtn.addEventListener('click', () => {
+        this.switchTab('analyzer');
+      });
+    }
+  }
+
+  setupChatGPTSettingsEvents() {
+    // Position selector
+    const positionSelect = this.panel.querySelector('#re-position-select');
+    if (positionSelect) {
+      positionSelect.value = uiSettings.position;
+      positionSelect.addEventListener('change', () => {
+        this.updatePanelPosition(positionSelect.value);
+      });
+    }
+
+    // Settings toggles
+    const compactToggle = this.panel.querySelector('#re-compact-toggle');
+    const autoShowToggle = this.panel.querySelector('#re-auto-show-toggle');
+    const notificationsToggle = this.panel.querySelector('#re-notifications-toggle');
+
+    if (compactToggle) {
+      compactToggle.checked = uiSettings.compactMode;
+      compactToggle.addEventListener('change', () => {
+        this.toggleCompactMode(compactToggle.checked);
+      });
+    }
+
+    if (autoShowToggle) {
+      autoShowToggle.checked = uiSettings.autoShow;
+      autoShowToggle.addEventListener('change', () => {
+        uiSettings.autoShow = autoShowToggle.checked;
+        this.saveSettings();
+      });
+    }
+
+    if (notificationsToggle) {
+      notificationsToggle.checked = uiSettings.showNotifications;
+      notificationsToggle.addEventListener('change', () => {
+        uiSettings.showNotifications = notificationsToggle.checked;
+        this.saveSettings();
+      });
+    }
+
+    // Action buttons
+    const exportBtn = this.panel.querySelector('#re-export-all');
+    const clearBtn = this.panel.querySelector('#re-clear-data');
+
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this.exportAllProperties());
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.clearAllData());
+    }
   }
 
   setupAnalyzerEvents() {
@@ -960,26 +1291,24 @@ class REAnalyzerEmbeddedUI {
   showPanel() {
     if (!this.panel) return;
     
-    this.panel.classList.remove('re-panel-collapsed');
-    this.panel.classList.add('re-panel-expanded', 're-panel-entering');
+    this.panel.classList.add('re-sidebar-open');
     this.isVisible = true;
     
-    // Remove entrance animation class after animation completes
-    setTimeout(() => {
-      this.panel.classList.remove('re-panel-entering');
-    }, 300);
+    // Update notification
+    if (this.fab) {
+      this.fab.classList.remove('re-has-notification');
+    }
     
-    console.log('👁️ Panel shown');
+    console.log('👁️ ChatGPT-style sidebar shown');
   }
 
   hidePanel() {
     if (!this.panel) return;
     
-    this.panel.classList.remove('re-panel-expanded');
-    this.panel.classList.add('re-panel-collapsed');
+    this.panel.classList.remove('re-sidebar-open');
     this.isVisible = false;
     
-    console.log('👁️ Panel hidden');
+    console.log('👁️ ChatGPT-style sidebar hidden');
   }
 
   togglePanel() {
@@ -1003,23 +1332,26 @@ class REAnalyzerEmbeddedUI {
   switchTab(tabId) {
     if (!this.panel) return;
     
-    // Update tab buttons
-    const tabButtons = this.panel.querySelectorAll('.re-tab-btn');
-    tabButtons.forEach(btn => {
-      if (btn.getAttribute('data-tab') === tabId) {
-        btn.classList.add('re-tab-active');
+    // Update navigation items
+    const navItems = this.panel.querySelectorAll('.re-nav-item');
+    navItems.forEach(item => {
+      if (item.getAttribute('data-tab') === tabId) {
+        item.classList.add('re-nav-active');
       } else {
-        btn.classList.remove('re-tab-active');
+        item.classList.remove('re-nav-active');
       }
     });
     
-    // Update tab content
-    const tabContents = this.panel.querySelectorAll('.re-tab-content');
-    tabContents.forEach(content => {
-      if (content.id === `${tabId}-tab`) {
-        content.classList.add('re-tab-active');
-      } else {
-        content.classList.remove('re-tab-active');
+    // Update section visibility
+    const sections = ['analyzer', 'properties', 'settings'];
+    sections.forEach(section => {
+      const sectionElement = this.panel.querySelector(`#re-${section}-section`);
+      if (sectionElement) {
+        if (section === tabId) {
+          sectionElement.classList.remove('re-hidden');
+        } else {
+          sectionElement.classList.add('re-hidden');
+        }
       }
     });
     
@@ -1027,12 +1359,233 @@ class REAnalyzerEmbeddedUI {
     
     // Tab-specific logic
     if (tabId === 'properties') {
-      this.loadPropertyData();
+      this.loadChatGPTPropertyData();
     } else if (tabId === 'analyzer') {
-      this.updateConnectionStatus();
+      this.updateChatGPTConnectionStatus();
     }
     
-    console.log(`📑 Switched to ${tabId} tab`);
+    console.log(`📑 Switched to ChatGPT-style ${tabId} section`);
+  }
+
+  // ChatGPT-style helper methods
+  validateChatGPTInput() {
+    const input = this.panel.querySelector('#re-property-input');
+    const validation = this.panel.querySelector('#re-input-validation');
+    
+    if (!input || !validation) return;
+    
+    const url = input.value.trim();
+    
+    if (!url) {
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      return;
+    }
+    
+    if (this.isValidPropertyLink(url)) {
+      validation.textContent = '✓ Valid property URL';
+      validation.className = 're-form-validation re-valid';
+    } else {
+      validation.textContent = '⚠ Please enter a valid property URL from a supported site';
+      validation.className = 're-form-validation re-invalid';
+    }
+  }
+
+  showChatGPTMessage(type, message) {
+    const messageElement = this.panel.querySelector(`#re-${type}-msg`);
+    const messageContent = messageElement?.querySelector('.re-message-content');
+    
+    if (messageElement && messageContent) {
+      // Hide all messages first
+      const allMessages = this.panel.querySelectorAll('.re-message');
+      allMessages.forEach(msg => msg.classList.add('re-hidden'));
+      
+      // Show the specific message
+      messageContent.textContent = message;
+      messageElement.classList.remove('re-hidden');
+      messageElement.classList.add('re-fade-in');
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        messageElement.classList.add('re-hidden');
+        messageElement.classList.remove('re-fade-in');
+      }, 5000);
+    }
+  }
+
+  updateChatGPTConnectionStatus() {
+    const statusElement = this.panel.querySelector('#re-connection-status');
+    const statusIcon = statusElement?.querySelector('.re-status-icon');
+    const statusTitle = statusElement?.querySelector('.re-status-title');
+    const statusSubtitle = statusElement?.querySelector('.re-status-subtitle');
+    
+    if (!statusElement) return;
+    
+    // Check if we're on ChatGPT
+    if (isChatGPTSite()) {
+      statusElement.className = 're-status re-status-connected';
+      if (statusIcon) statusIcon.textContent = '✅';
+      if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+    } else {
+      statusElement.className = 're-status re-status-error';
+      if (statusIcon) statusIcon.textContent = '❌';
+      if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
+      if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+    }
+  }
+
+  async loadChatGPTPropertyData() {
+    try {
+      // Load property history from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      console.log(`📚 Loaded ${properties.length} properties for ChatGPT display`);
+      
+      // Update stats
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      const sources = [...new Set(properties.map(p => p.domain))].length;
+      
+      this.updateChatGPTStats(properties.length, analyzedCount, sources);
+      
+      // Show properties or empty state
+      if (properties.length > 0) {
+        this.displayChatGPTProperties(properties);
+        this.hideChatGPTEmptyState();
+      } else {
+        this.showChatGPTEmptyState();
+      }
+      
+      // Update badge
+      this.updatePropertiesBadge(properties.length);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property data:', error);
+      this.updateChatGPTStats(0, 0, 0);
+      this.showChatGPTEmptyState();
+    }
+  }
+
+  updateChatGPTStats(total, analyzed, sources) {
+    const totalElement = this.panel.querySelector('#re-total-count');
+    const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+    const sourcesElement = this.panel.querySelector('#re-sources-count');
+    
+    if (totalElement) totalElement.textContent = total.toString();
+    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
+    if (sourcesElement) sourcesElement.textContent = sources.toString();
+  }
+
+  displayChatGPTProperties(properties) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+
+    // Clear existing content
+    propertiesList.innerHTML = '';
+
+    // Sort properties by timestamp (newest first)
+    const sortedProperties = [...properties].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Show only the most recent 10 properties in the sidebar
+    const recentProperties = sortedProperties.slice(0, 10);
+
+    recentProperties.forEach(property => {
+      const hasAnalysis = property.analysis && property.analysis.extractedData;
+      const domain = this.getDomainDisplayName(property.domain);
+      const title = this.getPropertyTitle(property);
+      
+      const propertyCard = document.createElement('div');
+      propertyCard.className = 're-property-card';
+      propertyCard.innerHTML = `
+        <div class="re-property-header">
+          <div class="re-property-title">${title}</div>
+          <div class="re-property-status ${hasAnalysis ? 're-analyzed' : 're-pending'}">
+            ${hasAnalysis ? '✅' : '⏳'}
+          </div>
+        </div>
+        <div class="re-property-meta">
+          <div class="re-property-domain">${domain}</div>
+          <div>${property.date || 'Unknown date'}</div>
+        </div>
+        <div class="re-property-actions">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="window.open('${property.url}', '_blank')">
+            View
+          </button>
+          ${hasAnalysis ? `
+            <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+              Export
+            </button>
+          ` : `
+            <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+              Analyze
+            </button>
+          `}
+        </div>
+      `;
+      
+      propertiesList.appendChild(propertyCard);
+    });
+
+    // Add "View All" button if there are more properties
+    if (properties.length > 10) {
+      const viewAllCard = document.createElement('div');
+      viewAllCard.style.textAlign = 'center';
+      viewAllCard.style.padding = '16px';
+      viewAllCard.innerHTML = `
+        <div style="color: var(--chatgpt-text-secondary); font-size: 14px; margin-bottom: 8px;">
+          ${properties.length - 10} more properties
+        </div>
+        <button class="re-btn re-btn-ghost re-btn-sm">
+          View All Properties
+        </button>
+      `;
+      propertiesList.appendChild(viewAllCard);
+    }
+  }
+
+  showChatGPTEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-properties');
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    
+    if (emptyState) emptyState.classList.remove('re-hidden');
+    if (propertiesList) propertiesList.innerHTML = '';
+  }
+
+  hideChatGPTEmptyState() {
+    const emptyState = this.panel.querySelector('#re-empty-properties');
+    if (emptyState) emptyState.classList.add('re-hidden');
+  }
+
+  updatePropertiesBadge(count) {
+    const badge = this.panel.querySelector('#re-properties-badge');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count.toString();
+        badge.classList.remove('re-hidden');
+      } else {
+        badge.classList.add('re-hidden');
+      }
+    }
+  }
+
+  exportAllProperties() {
+    this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
+  }
+
+  clearAllData() {
+    if (confirm('Are you sure you want to clear all property data? This action cannot be undone.')) {
+      safeChromeFall(
+        () => chrome.storage.local.remove(['propertyHistory']),
+        null
+      ).then(() => {
+        this.showChatGPTMessage('success', 'All property data has been cleared');
+        this.loadChatGPTPropertyData();
+      });
+    }
   }
 
   // Helper methods for UI functionality will be added in the next part...
@@ -1637,14 +2190,14 @@ class REAnalyzerEmbeddedUI {
   }
 }
 
-// Load embedded styles
-function loadEmbeddedStyles() {
-  // Inject embedded styles
+// Load ChatGPT native styles
+function loadChatGPTNativeStyles() {
+  // Inject ChatGPT-style native styles
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = chrome.runtime.getURL('embedded-styles.css');
+  link.href = chrome.runtime.getURL('chatgpt-native-styles.css');
   document.head.appendChild(link);
-  console.log('📄 Embedded styles loaded');
+  console.log('📄 ChatGPT native styles loaded');
 }
 
 // ============================================================================
@@ -1747,8 +2300,8 @@ function addPropertyPageIntegration() {
 
 // Initialize embedded UI when on ChatGPT
 if (isChatGPTSite()) {
-  // Load styles first
-  loadEmbeddedStyles();
+  // Load ChatGPT native styles first
+  loadChatGPTNativeStyles();
   
   // Wait for page to be ready
   if (document.readyState === 'loading') {
