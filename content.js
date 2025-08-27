@@ -15,7 +15,8 @@ let uiSettings = {
   position: 'right',
   compactMode: false,
   autoShow: true,
-  showNotifications: true
+  showNotifications: true,
+  allowAnyUrl: false
 };
 
 // Function to check if extension context is still valid
@@ -473,6 +474,10 @@ class REAnalyzerEmbeddedUI {
               <div>🧪</div>
               <span>Test Analysis</span>
             </button>
+            <label class="re-setting-item" style="margin: 8px 0; font-size: 14px; cursor: pointer;">
+              <input type="checkbox" id="re-allow-any-url" style="margin-right: 8px;">
+              <span>Allow any URL (bypass domain validation)</span>
+            </label>
             <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
               <div>🗑️</div>
               <span>Clear All Data</span>
@@ -915,6 +920,19 @@ class REAnalyzerEmbeddedUI {
 
     if (testBtn) {
       testBtn.addEventListener('click', () => this.testAnalysis());
+    }
+    
+    // Bypass URL validation checkbox
+    const allowAnyUrlCheckbox = this.panel.querySelector('#re-allow-any-url');
+    if (allowAnyUrlCheckbox) {
+      // Load saved setting
+      allowAnyUrlCheckbox.checked = uiSettings.allowAnyUrl || false;
+      
+      allowAnyUrlCheckbox.addEventListener('change', () => {
+        uiSettings.allowAnyUrl = allowAnyUrlCheckbox.checked;
+        this.saveSettings();
+        console.log('🔓 Allow any URL setting:', allowAnyUrlCheckbox.checked);
+      });
     }
 
     if (clearBtn) {
@@ -1651,11 +1669,28 @@ Or enter your own property URL:`);
         urlToTest = testUrls[1];
       } else if (testUrl === '3') {
         urlToTest = testUrls[2];
-      } else if (testUrl && testUrl.startsWith('http')) {
-        urlToTest = testUrl;
+      } else if (testUrl && testUrl.trim()) {
+        urlToTest = testUrl.trim();
+        // If it doesn't start with http, add https://
+        if (!urlToTest.startsWith('http')) {
+          urlToTest = 'https://' + urlToTest;
+        }
       } else {
         this.showChatGPTMessage('warning', 'Test cancelled');
         return;
+      }
+      
+      // Test URL validation first
+      console.log('🧪 Testing URL validation for:', urlToTest);
+      const isValid = this.isValidPropertyLink(urlToTest);
+      
+      if (!isValid) {
+        this.showChatGPTMessage('error', `URL validation failed for: ${urlToTest}. Check console for details.`);
+        console.log('❌ The URL did not pass validation. This is likely why analysis is not working.');
+        console.log('💡 Try adding the domain to the supported domains list or use a different property site.');
+        return;
+      } else {
+        this.showChatGPTMessage('success', `URL validation passed for: ${urlToTest}`);
       }
       
       // Test the analysis with the selected URL
@@ -1717,16 +1752,61 @@ Or enter your own property URL:`);
 
   isValidPropertyLink(url) {
     try {
+      // Check if bypass is enabled
+      const allowAnyUrl = this.panel?.querySelector('#re-allow-any-url')?.checked;
+      if (allowAnyUrl) {
+        console.log('🔓 URL validation bypassed - allowing any URL');
+        return true;
+      }
+      
       const urlObj = new URL(url);
       const hostname = urlObj.hostname.toLowerCase();
       
+      console.log('🔍 Validating URL:', url);
+      console.log('🌐 Hostname:', hostname);
+      
       const propertyDomains = [
+        // Major US platforms
         'zillow.com', 'realtor.com', 'redfin.com', 'homes.com', 'trulia.com',
-        'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com'
+        'apartments.com', 'rent.com', 'hotpads.com', 'padmapper.com', 'loopnet.com',
+        'compass.com', 'coldwellbanker.com', 'century21.com', 'remax.com',
+        'kw.com', 'sothebysrealty.com', 'movoto.com', 'homefinder.com',
+        'crexi.com', 'propertyradar.com', 'rocketmortgage.com',
+        
+        // International platforms
+        'rightmove.co.uk', 'zoopla.co.uk', 'onthemarket.com', 'primelocation.com',
+        'realestate.com.au', 'domain.com.au', 'realtor.ca', 'royallepage.ca',
+        'centris.ca', 'mls.ca', 'immoweb.be', 'immobilienscout24.de',
+        'leboncoin.fr', 'seloger.com', 'logic-immo.com', 'bienici.com',
+        'idealista.com', 'fotocasa.es', 'habitaclia.com', 'yapo.cl',
+        'mercadolibre.com', 'olx.com', 'trovit.com', 'mitula.com',
+        'kyero.com', 'thinkspain.com', 'greekpropertyportal.com',
+        
+        // Regional/Local platforms
+        'mls.com', 'mlslistings.com', 'paragonrels.com', 'northstarmlscom',
+        'matrix.neren.com', 'flexmls.com', 'carets.com', 'listhub.com',
+        'propertyshark.com', 'streeteasy.com', 'renthop.com', 'zumper.com',
+        'forrent.com', 'apartmentguide.com', 'rentals.com', 'apartments24.com'
       ];
       
-      return propertyDomains.some(domain => hostname.includes(domain));
+      const isValid = propertyDomains.some(domain => hostname.includes(domain)) || 
+                     hostname.includes('mls') || // Generic MLS sites
+                     hostname.includes('realty') || // Realty sites
+                     hostname.includes('property') || // Property sites
+                     hostname.includes('real-estate') || // Real estate sites
+                     hostname.includes('homes') || // Homes sites
+                     hostname.includes('rent'); // Rental sites
+      
+      console.log('✅ URL validation result:', isValid);
+      
+      if (!isValid) {
+        console.log('❌ URL not recognized as property listing site');
+        console.log('🔍 Supported domains include:', propertyDomains.slice(0, 5).join(', '), '+ many more');
+      }
+      
+      return isValid;
     } catch (e) {
+      console.error('❌ URL validation error:', e);
       return false;
     }
   }
