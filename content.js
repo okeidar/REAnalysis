@@ -515,7 +515,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
               <span class="re-form-label" style="margin: 0;">Compact Mode</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Use smaller interface elements to save space
             </div>
           </div>
@@ -533,7 +533,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Automatically switch to Properties tab after analysis
             </div>
           </div>
@@ -543,7 +543,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Show Notifications</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Display notifications when analysis completes
             </div>
           </div>
@@ -564,13 +564,13 @@ class REAnalyzerEmbeddedUI {
               <option value="tabular">Tabular - Data Extraction</option>
               <option value="custom">Custom - User-Defined</option>
             </select>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Select the type of analysis prompt to use
             </div>
           </div>
 
           <div class="re-form-group" id="re-prompt-description">
-            <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+            <div id="re-prompt-desc-content" style="font-size: 12px; color: #d1d5db; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
               Standard real estate investment analysis with basic property data extraction
             </div>
           </div>
@@ -580,7 +580,7 @@ class REAnalyzerEmbeddedUI {
             <textarea id="re-custom-prompt" class="re-form-input" rows="6" 
                       placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
                       style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Variables: {PROPERTY_URL}, {DATE}
             </div>
           </div>
@@ -684,7 +684,7 @@ class REAnalyzerEmbeddedUI {
           <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
             <div class="re-form-group">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">
+                <div style="font-size: 11px; color: #d1d5db;">
                   Select data points to extract
                 </div>
                 <div style="display: flex; gap: 6px;">
@@ -697,7 +697,7 @@ class REAnalyzerEmbeddedUI {
                 </div>
               </div>
               
-              <div id="re-columns-stats" style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-bottom: 6px;">
+              <div id="re-columns-stats" style="font-size: 11px; color: #d1d5db; margin-bottom: 6px;">
                 Loading columns...
               </div>
             </div>
@@ -715,7 +715,7 @@ class REAnalyzerEmbeddedUI {
               <textarea id="re-tabular-prompt-template" class="re-form-input" rows="8" 
                         placeholder="Enter tabular prompt template..."
                         style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
-              <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              <div style="font-size: 11px; color: #d1d5db; margin-top: 4px;">
                 Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
               </div>
             </div>
@@ -731,7 +731,7 @@ class REAnalyzerEmbeddedUI {
           <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
             <div class="re-form-group">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 12px; font-weight: 500;">Custom Data Columns</div>
+                <div style="font-size: 12px; font-weight: 500; color: #ffffff;">Custom Data Columns</div>
                 <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column" style="font-size: 11px; padding: 4px 8px;">
                   ➕ Add
                 </button>
@@ -827,7 +827,7 @@ class REAnalyzerEmbeddedUI {
               <span>Test Analysis</span>
             </button>
             
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: #ffffff;">
               <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
               <span>Allow any URL (bypass validation)</span>
             </label>
@@ -840,7 +840,7 @@ class REAnalyzerEmbeddedUI {
         </div>
 
         <!-- Version Info -->
-        <div style="text-align: center; padding: 12px; color: var(--chatgpt-text-tertiary); font-size: 11px;">
+        <div style="text-align: center; padding: 12px; color: #9ca3af; font-size: 11px;">
           RE Analyzer v2.0.0
         </div>
       </div>
