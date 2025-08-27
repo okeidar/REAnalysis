@@ -458,6 +458,39 @@ class REAnalyzerEmbeddedUI {
             </div>
           </div>
         </div>
+        
+        <!-- Custom Prompt Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Custom Analysis Prompt</div>
+            <div class="re-section-subtitle">Customize the prompt sent to ChatGPT for property analysis</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Custom Prompt Template</label>
+            <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
+                      placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
+                      style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Leave empty to use the default AI-generated prompt. Variables: {PROPERTY_URL}, {DATE}
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt">
+              <div>💾</div>
+              <span>Save Prompt</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
+              <div>🔄</div>
+              <span>Reset to Default</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-prompt">
+              <div>👁️</div>
+              <span>Preview</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Actions -->
         <div class="re-section">
@@ -938,6 +971,9 @@ class REAnalyzerEmbeddedUI {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => this.clearAllData());
     }
+    
+    // Custom prompt events
+    this.setupCustomPromptEvents();
   }
 
   setupAnalyzerEvents() {
@@ -1654,8 +1690,55 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
-  exportAllProperties() {
-    this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
+  async exportAllProperties() {
+    try {
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Create comprehensive export data
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        totalProperties: properties.length,
+        analyzedCount: properties.filter(p => p.analysis && p.analysis.extractedData).length,
+        properties: properties.map(property => ({
+          url: property.url,
+          domain: property.domain,
+          date: property.date,
+          timestamp: property.timestamp,
+          extractedData: property.analysis?.extractedData || {},
+          fullAnalysis: property.analysis?.fullResponse || property.analysis?.fullAnalysis || 'No analysis available',
+          hasAnalysis: !!(property.analysis && property.analysis.extractedData)
+        }))
+      };
+      
+      // Create and download file
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `all-properties-analysis-${Date.now()}.json`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', `Exported ${properties.length} properties successfully!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export all properties:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties');
+    }
   }
 
   async testAnalysis() {
@@ -2058,6 +2141,95 @@ Or enter your own property URL:`);
     if (progressSection) {
       progressSection.classList.remove('re-hidden');
     }
+    
+    // Also update the properties tab to show pending status
+    this.updatePendingAnalysisInProperties();
+  }
+  
+  updatePendingAnalysisInProperties() {
+    // Add a pending property entry to the properties list
+    if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+      console.log('📊 Adding pending analysis indicator for:', currentPropertyAnalysis.url);
+      
+      // Create a temporary property object for the pending analysis
+      const pendingProperty = {
+        url: currentPropertyAnalysis.url,
+        domain: this.extractDomainFromUrl(currentPropertyAnalysis.url),
+        date: new Date().toLocaleDateString(),
+        timestamp: Date.now(),
+        isPending: true // Special flag for pending analysis
+      };
+      
+      // Add to the properties display temporarily
+      this.addPendingPropertyToDisplay(pendingProperty);
+    }
+  }
+  
+  extractDomainFromUrl(url) {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch (e) {
+      return 'unknown';
+    }
+  }
+  
+  addPendingPropertyToDisplay(pendingProperty) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+    
+    // Remove any existing pending entries for this URL
+    const existingPending = propertiesList.querySelector(`[data-pending-url="${pendingProperty.url}"]`);
+    if (existingPending) {
+      existingPending.remove();
+    }
+    
+    // Create pending property card
+    const pendingCard = document.createElement('div');
+    pendingCard.className = 're-property-card re-pending-analysis';
+    pendingCard.setAttribute('data-pending-url', pendingProperty.url);
+    pendingCard.innerHTML = `
+      <div class="re-property-header">
+        <div class="re-property-title">🔄 Analyzing Property...</div>
+        <div class="re-property-status re-pending">
+          <div class="re-analysis-spinner"></div>
+        </div>
+      </div>
+      <div class="re-property-meta">
+        <div class="re-property-domain">${this.getDomainDisplayName(pendingProperty.domain)}</div>
+        <div>Started: ${pendingProperty.date}</div>
+      </div>
+      <div class="re-property-actions">
+        <div class="re-progress-indicator">Analysis in progress...</div>
+      </div>
+    `;
+    
+    // Insert at the top of the list
+    propertiesList.insertBefore(pendingCard, propertiesList.firstChild);
+    
+    // Hide empty state if showing
+    this.hideChatGPTEmptyState();
+  }
+  
+  removePendingPropertyFromDisplay(url) {
+    const pendingElement = this.panel.querySelector(`[data-pending-url="${url}"]`);
+    if (pendingElement) {
+      pendingElement.remove();
+      console.log('🗑️ Removed pending analysis indicator for:', url);
+    }
+  }
+  
+  // Method to be called when analysis is completed externally
+  onAnalysisCompleted(propertyUrl) {
+    console.log('🎉 Analysis completed notification received for:', propertyUrl);
+    
+    // Remove pending indicator
+    this.removePendingPropertyFromDisplay(propertyUrl);
+    
+    // Trigger complete analysis workflow
+    this.completeAnalysis();
+    
+    // Show success message specific to the completed property
+    this.showChatGPTMessage('success', `✅ Analysis completed for property! Switch to Properties tab to view results.`);
   }
 
   hideAnalysisProgress() {
@@ -2069,6 +2241,11 @@ Or enter your own property URL:`);
     if (this.analysisTimer) {
       clearInterval(this.analysisTimer);
       this.analysisTimer = null;
+    }
+    
+    // Remove pending analysis indicator
+    if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+      this.removePendingPropertyFromDisplay(currentPropertyAnalysis.url);
     }
   }
 
@@ -2111,12 +2288,20 @@ Or enter your own property URL:`);
     // Show notification on FAB
     this.showFabNotification();
     
+    // Reload property data to show the new analysis
+    this.loadChatGPTPropertyData();
+    
     // Auto-switch to properties tab if enabled
     if (uiSettings.autoShow) {
       setTimeout(() => {
         this.switchTab('properties');
+        // Ensure properties are refreshed on the tab
+        this.loadChatGPTPropertyData();
       }, 1000);
     }
+    
+    // Show success message
+    this.showChatGPTMessage('success', '✅ Property analysis completed! Check the Properties tab.');
   }
 
   showFabNotification() {
@@ -2314,7 +2499,36 @@ Or enter your own property URL:`);
   }
 
   getPropertyTitle(property) {
-    // Try to extract a title from the URL or use a generic title
+    // First priority: Check if we have extracted address and bedrooms data
+    if (property.analysis && property.analysis.extractedData) {
+      const data = property.analysis.extractedData;
+      let title = '';
+      
+      // Use address if available
+      if (data.address) {
+        title = data.address;
+      } else if (data.location) {
+        title = data.location;
+      } else if (data.neighborhood) {
+        title = data.neighborhood;
+      }
+      
+      // Add bedrooms if available
+      if (data.bedrooms) {
+        title += title ? ` • ${data.bedrooms} bed` : `${data.bedrooms} bed`;
+      }
+      
+      // Add price if available and no address
+      if (!data.address && data.price) {
+        title = title ? `${title} • ${data.price}` : data.price;
+      }
+      
+      if (title) {
+        return title;
+      }
+    }
+    
+    // Fallback: Try to extract a title from the URL
     try {
       const url = new URL(property.url);
       const pathParts = url.pathname.split('/').filter(part => part);
@@ -2809,10 +3023,57 @@ Or enter your own property URL:`);
     }
   }
 
-  exportProperty(url) {
+  async exportProperty(url) {
     console.log('📄 Export property:', url);
-    // This would implement property export functionality
-    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+    
+    try {
+      // Load property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (!property) {
+        this.showChatGPTMessage('error', 'Property not found');
+        return;
+      }
+      
+      if (!property.analysis) {
+        this.showChatGPTMessage('warning', 'No analysis data to export');
+        return;
+      }
+      
+      // Create export data
+      const exportData = {
+        url: property.url,
+        domain: property.domain,
+        analysisDate: property.date,
+        extractedData: property.analysis.extractedData || {},
+        fullAnalysis: property.analysis.fullResponse || property.analysis.fullAnalysis || 'No full analysis available',
+        exportDate: new Date().toISOString()
+      };
+      
+      // Create and download file
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `property-analysis-${Date.now()}.json`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', 'Property analysis exported successfully!');
+      
+    } catch (error) {
+      console.error('❌ Failed to export property:', error);
+      this.showChatGPTMessage('error', 'Failed to export property analysis');
+    }
   }
 
   switchPropertiesView(view) {
@@ -2889,6 +3150,147 @@ Or enter your own property URL:`);
       console.error('Failed to save settings:', error);
       this.showChatGPTMessage('error', 'Failed to save settings');
     }
+  }
+  
+  setupCustomPromptEvents() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    const savePromptBtn = this.panel.querySelector('#re-save-prompt');
+    const resetPromptBtn = this.panel.querySelector('#re-reset-prompt');
+    const previewPromptBtn = this.panel.querySelector('#re-preview-prompt');
+    
+    // Load existing custom prompt
+    this.loadCustomPrompt();
+    
+    if (savePromptBtn) {
+      savePromptBtn.addEventListener('click', () => this.saveCustomPrompt());
+    }
+    
+    if (resetPromptBtn) {
+      resetPromptBtn.addEventListener('click', () => this.resetCustomPrompt());
+    }
+    
+    if (previewPromptBtn) {
+      previewPromptBtn.addEventListener('click', () => this.previewCustomPrompt());
+    }
+  }
+  
+  async loadCustomPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customPrompt']),
+        { customPrompt: null }
+      );
+      
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      if (customPromptTextarea && result.customPrompt) {
+        customPromptTextarea.value = result.customPrompt;
+      }
+    } catch (error) {
+      console.error('Failed to load custom prompt:', error);
+    }
+  }
+  
+  async saveCustomPrompt() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    if (!customPromptTextarea) return;
+    
+    const promptText = customPromptTextarea.value.trim();
+    
+    try {
+      await safeChromeFall(
+        () => chrome.storage.local.set({ customPrompt: promptText || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Custom prompt saved successfully!');
+      console.log('💾 Custom prompt saved');
+    } catch (error) {
+      console.error('Failed to save custom prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save custom prompt');
+    }
+  }
+  
+  async resetCustomPrompt() {
+    if (confirm('Are you sure you want to reset the custom prompt to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['customPrompt']),
+          null
+        );
+        
+        const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+        if (customPromptTextarea) {
+          customPromptTextarea.value = '';
+        }
+        
+        this.showChatGPTMessage('success', 'Custom prompt reset to default');
+        console.log('🔄 Custom prompt reset');
+      } catch (error) {
+        console.error('Failed to reset custom prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset custom prompt');
+      }
+    }
+  }
+  
+  previewCustomPrompt() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    if (!customPromptTextarea) return;
+    
+    const promptText = customPromptTextarea.value.trim();
+    
+    if (!promptText) {
+      this.showChatGPTMessage('warning', 'No custom prompt to preview. The default AI-generated prompt will be used.');
+      return;
+    }
+    
+    // Show preview with example data
+    const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+    const previewText = promptText
+      .replace('{PROPERTY_URL}', exampleUrl)
+      .replace('{DATE}', new Date().toLocaleDateString());
+    
+    // Create and show preview modal
+    this.showPromptPreviewModal(previewText);
+  }
+  
+  showPromptPreviewModal(previewText) {
+    // Remove existing modal if any
+    const existingModal = document.querySelector('#re-prompt-preview-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 're-prompt-preview-modal';
+    modal.className = 're-modal-overlay';
+    modal.innerHTML = `
+      <div class="re-modal">
+        <div class="re-modal-header">
+          <h3>Prompt Preview</h3>
+          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+        </div>
+        <div class="re-modal-content">
+          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your custom prompt will appear when sent to ChatGPT:</p>
+          <div class="re-analysis-text" style="max-height: 400px;">
+            ${previewText.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+        <div class="re-modal-footer">
+          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
   }
 
   resetSettings() {
@@ -3060,12 +3462,14 @@ if (isChatGPTSite()) {
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         embeddedUI = new REAnalyzerEmbeddedUI();
+        window.embeddedUI = embeddedUI; // Make globally available
       }, 1000);
     });
   } else {
     // Page already loaded
     setTimeout(() => {
       embeddedUI = new REAnalyzerEmbeddedUI();
+      window.embeddedUI = embeddedUI; // Make globally available
     }, 1000);
   }
 } else {
@@ -6062,6 +6466,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Notify embedded UI about completed analysis
+                  if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                    window.embeddedUI.onAnalysisCompleted(promptSplittingState.pendingPropertyLink);
+                  }
                 }
               }
             }).catch(err => {
@@ -6110,6 +6519,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Notify embedded UI about completed analysis
+                  if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                    window.embeddedUI.onAnalysisCompleted(promptSplittingState.pendingPropertyLink);
+                  }
                 }
               }
             }).catch(err => {
@@ -6163,6 +6577,11 @@ function setupResponseMonitor() {
             console.log('✅ Analysis data sent successfully:', response);
             if (response.success) {
               console.log('🎉 Property analysis saved and should now show as analyzed!');
+              
+              // Notify embedded UI about completed analysis
+              if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+              }
             }
           }
         }).catch(err => {
