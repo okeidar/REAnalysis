@@ -493,119 +493,152 @@ class REAnalyzerEmbeddedUI {
     return `
       <!-- Settings Section -->
       <div class="re-section re-hidden" id="re-settings-section">
-        <!-- Interface Settings -->
-        <div class="re-section">
-          <div class="re-section-header">
-            <div class="re-section-title">Interface</div>
-            <div class="re-section-subtitle">Customize your RE Analyzer experience</div>
-          </div>
-          
-          <div class="re-form-group">
-            <label class="re-form-label">Panel Position</label>
-            <select class="re-form-input" id="re-position-select">
-              <option value="left">Left Side</option>
-              <option value="right">Right Side</option>
-              <option value="bottom">Bottom</option>
-            </select>
-          </div>
-
-          <div class="re-form-group">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
-              <span class="re-form-label" style="margin: 0;">Compact Mode</span>
-            </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Use smaller interface elements to save space
-            </div>
-          </div>
-        </div>
-
-        <!-- Analysis Settings -->
-        <div class="re-section">
-          <div class="re-section-header">
-            <div class="re-section-title">Analysis</div>
-            <div class="re-section-subtitle">Configure analysis behavior</div>
-          </div>
-          
-          <div class="re-form-group">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
-              <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
-            </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Automatically switch to Properties tab after analysis
-            </div>
-          </div>
-
-          <div class="re-form-group">
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
-              <span class="re-form-label" style="margin: 0;">Show Notifications</span>
-            </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Display notifications when analysis completes
-            </div>
-          </div>
-        </div>
         
-        <!-- Analysis Prompt Configuration -->
-        <div class="re-section">
-          <div class="re-section-header">
-            <div class="re-section-title">Analysis Prompt Configuration</div>
-            <div class="re-section-subtitle">Customize all prompts sent to ChatGPT for property analysis</div>
-          </div>
-          
-          <!-- Prompt Configuration Tabs -->
-          <div class="re-prompt-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 16px;">
-            <button class="re-prompt-tab re-prompt-tab-active" data-tab="selection" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500;">
-              🎯 Prompt Selection
-            </button>
-            <button class="re-prompt-tab" data-tab="default" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
-              📄 Default Prompt
-            </button>
-            <button class="re-prompt-tab" data-tab="dynamic" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
-              🔄 Dynamic Prompt
-            </button>
-            <button class="re-prompt-tab" data-tab="tabular" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
-              📊 Tabular Configuration
-            </button>
-          </div>
-          
-          <!-- Prompt Selection Tab -->
-          <div id="re-prompt-selection-tab" class="re-prompt-tab-content">
-            <div class="re-form-group">
-              <label class="re-form-label">Active Prompt Type</label>
-              <select class="re-form-input" id="re-prompt-type-select">
-                <option value="default">Default - Standard Analysis</option>
-                <option value="dynamic">Dynamic - Column-Based</option>
-                <option value="tabular">Tabular - Comprehensive Data Extraction</option>
-                <option value="custom">Custom - User-Defined Template</option>
-              </select>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                Select which prompt type to use for analysis
-              </div>
-            </div>
+        <!-- Settings Navigation -->
+        <div class="re-settings-nav" style="display: flex; gap: 8px; margin-bottom: 20px; padding: 4px; background: var(--chatgpt-surface-secondary); border-radius: 8px;">
+          <button class="re-settings-nav-btn re-settings-nav-active" data-section="basic" style="flex: 1; padding: 8px 12px; border: none; background: var(--chatgpt-surface-primary); border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+            ⚙️ Basic Settings
+          </button>
+          <button class="re-settings-nav-btn" data-section="prompts" style="flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; cursor: pointer;">
+            💬 Analysis Prompts
+          </button>
+          <button class="re-settings-nav-btn" data-section="advanced" style="flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; cursor: pointer;">
+            🔧 Advanced
+          </button>
+        </div>
 
-            <div class="re-form-group" id="re-prompt-description">
-              <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
-                Standard real estate investment analysis with basic property data extraction
+        <!-- Basic Settings Section -->
+        <div id="re-basic-settings" class="re-settings-content">
+          <!-- Quick Setup -->
+          <div class="re-section" style="background: var(--chatgpt-surface-secondary); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <div class="re-section-header" style="margin-bottom: 12px;">
+              <div class="re-section-title">🚀 Quick Setup</div>
+              <div class="re-section-subtitle">Essential settings to get started</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="re-form-group">
+                <label class="re-form-label">Analysis Type</label>
+                <select class="re-form-input" id="re-quick-prompt-type">
+                  <option value="default">📄 Standard Analysis (Recommended)</option>
+                  <option value="tabular">📊 Data Extraction (Advanced)</option>
+                  <option value="dynamic">🔄 Custom Data Points</option>
+                </select>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                  Choose how ChatGPT analyzes properties
+                </div>
+              </div>
+              
+              <div class="re-form-group">
+                <label class="re-form-label">Panel Position</label>
+                <select class="re-form-input" id="re-position-select">
+                  <option value="right">Right Side (Default)</option>
+                  <option value="left">Left Side</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                  Where to show the extension panel
+                </div>
               </div>
             </div>
             
-            <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
-              <label class="re-form-label">Custom Prompt Template</label>
-              <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
-                        placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
-                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                Variables: {PROPERTY_URL}, {DATE}
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
+                <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
+                <span style="font-size: 13px;">Auto-show results after analysis</span>
+              </label>
+              
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
+                <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
+                <span style="font-size: 13px;">Show notifications</span>
+              </label>
+              
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; background: var(--chatgpt-surface-primary);">
+                <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
+                <span style="font-size: 13px;">Compact mode</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Current Configuration Display -->
+          <div class="re-section">
+            <div class="re-section-header">
+              <div class="re-section-title">📋 Current Configuration</div>
+              <div class="re-section-subtitle">Overview of your current settings</div>
+            </div>
+            
+            <div id="re-config-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">📄</div>
+                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Prompt Type</div>
+                <div id="re-current-prompt-type" style="font-size: 11px; color: var(--chatgpt-text-secondary);">Standard Analysis</div>
+              </div>
+              
+              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">⚡</div>
+                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Quick Actions</div>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">Enabled</div>
+              </div>
+              
+              <div style="padding: 12px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
+                <div style="font-size: 18px; font-weight: 600; color: var(--chatgpt-primary);">📊</div>
+                <div style="font-size: 12px; font-weight: 500; margin-top: 4px;">Data Export</div>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary);">JSON & CSV</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analysis Prompts Section -->
+        <div id="re-prompts-settings" class="re-settings-content" style="display: none;">
+          <!-- Prompt Type Selector -->
+          <div class="re-section" style="background: linear-gradient(135deg, var(--chatgpt-surface-secondary), var(--chatgpt-surface-primary)); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <div class="re-section-header" style="margin-bottom: 12px;">
+              <div class="re-section-title">💬 Analysis Prompt Settings</div>
+              <div class="re-section-subtitle">Choose how ChatGPT analyzes your properties</div>
+            </div>
+            
+            <div class="re-form-group">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px;">
+                <label class="re-prompt-option" data-type="default" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
+                  <input type="radio" name="prompt-type" value="default" style="display: none;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div style="font-size: 20px;">📄</div>
+                    <div style="font-weight: 500;">Standard Analysis</div>
+                  </div>
+                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+                    Comprehensive property analysis with investment insights, market analysis, and recommendations
+                  </div>
+                </label>
+                
+                <label class="re-prompt-option" data-type="tabular" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
+                  <input type="radio" name="prompt-type" value="tabular" style="display: none;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div style="font-size: 20px;">📊</div>
+                    <div style="font-weight: 500;">Data Extraction</div>
+                  </div>
+                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+                    Extract specific data points in structured format for spreadsheet analysis and comparison
+                  </div>
+                </label>
+                
+                <label class="re-prompt-option" data-type="dynamic" style="display: block; cursor: pointer; padding: 12px; border: 2px solid var(--chatgpt-border-light); border-radius: 8px; background: var(--chatgpt-surface-primary); transition: all 0.2s;">
+                  <input type="radio" name="prompt-type" value="dynamic" style="display: none;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <div style="font-size: 20px;">🔄</div>
+                    <div style="font-weight: 500;">Custom Data Points</div>
+                  </div>
+                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+                    Choose specific data points to extract with customizable prompt template
+                  </div>
+                </label>
               </div>
             </div>
             
             <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-settings">
                 <div>💾</div>
-                <span>Save Selection</span>
+                <span>Save Prompt Type</span>
               </button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-current-prompt">
                 <div>👁️</div>
@@ -613,117 +646,192 @@ class REAnalyzerEmbeddedUI {
               </button>
             </div>
           </div>
-          
-          <!-- Default Prompt Tab -->
-          <div id="re-prompt-default-tab" class="re-prompt-tab-content" style="display: none;">
-            <div class="re-form-group">
-              <label class="re-form-label">Default Analysis Prompt</label>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
-                Customize the standard property analysis prompt template
+
+          <!-- Prompt Customization -->
+          <div class="re-section" id="re-prompt-customization">
+            <div class="re-section-header">
+              <div class="re-section-title">✏️ Customize Prompts</div>
+              <div class="re-section-subtitle">Edit prompt templates for different analysis types</div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <button class="re-customize-btn re-customize-active" data-customize="default" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: var(--chatgpt-surface-primary); border-radius: 6px; cursor: pointer;">
+                📄 Edit Standard
+              </button>
+              <button class="re-customize-btn" data-customize="dynamic" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: transparent; border-radius: 6px; cursor: pointer;">
+                🔄 Edit Dynamic
+              </button>
+              <button class="re-customize-btn" data-customize="tabular" style="padding: 8px 16px; border: 1px solid var(--chatgpt-border-light); background: transparent; border-radius: 6px; cursor: pointer;">
+                📊 Configure Tabular
+              </button>
+            </div>
+            
+            <!-- Default Prompt Editor -->
+            <div id="re-customize-default" class="re-customize-content">
+              <div class="re-form-group">
+                <label class="re-form-label">Standard Analysis Prompt</label>
+                <textarea id="re-default-prompt-template" class="re-form-input" rows="10" 
+                          placeholder="Enter your standard analysis prompt..."
+                          style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                  Variables: {PROPERTY_URL}, {DATE}
+                </div>
               </div>
-              <textarea id="re-default-prompt-template" class="re-form-input" rows="15" 
-                        placeholder="Enter your default analysis prompt..."
-                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                Available variables: {PROPERTY_URL}, {DATE}
+              
+              <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">
+                  <div>💾</div>
+                  <span>Save</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">
+                  <div>🔄</div>
+                  <span>Reset</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">
+                  <div>👁️</div>
+                  <span>Preview</span>
+                </button>
               </div>
             </div>
             
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">
-                <div>💾</div>
-                <span>Save Default Prompt</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">
-                <div>🔄</div>
-                <span>Reset to Default</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">
-                <div>👁️</div>
-                <span>Preview</span>
-              </button>
-            </div>
-          </div>
-          
-          <!-- Dynamic Prompt Tab -->
-          <div id="re-prompt-dynamic-tab" class="re-prompt-tab-content" style="display: none;">
-            <div class="re-form-group">
-              <label class="re-form-label">Dynamic Prompt Template</label>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
-                Template for column-based dynamic prompts. Use {{COLUMNS}} where you want the selected columns to be inserted.
+            <!-- Dynamic Prompt Editor -->
+            <div id="re-customize-dynamic" class="re-customize-content" style="display: none;">
+              <div class="re-form-group">
+                <label class="re-form-label">Dynamic Prompt Template</label>
+                <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="8" 
+                          placeholder="Enter your dynamic prompt template..."
+                          style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+                <div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                  Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+                </div>
               </div>
-              <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="12" 
-                        placeholder="Enter your dynamic prompt template..."
-                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-                Available variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+              
+              <div class="re-form-group">
+                <label class="re-form-label">Data Points to Extract</label>
+                <div id="re-dynamic-columns-container" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px;">
+                  <!-- Dynamic columns will be populated here -->
+                </div>
               </div>
-            </div>
-            
-            <div class="re-form-group">
-              <label class="re-form-label">Column Selection for Dynamic Prompt</label>
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
-                Choose which data points to include in the dynamic prompt
-              </div>
-              <div id="re-dynamic-columns-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px;">
-                <!-- Dynamic columns will be populated here -->
+              
+              <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">
+                  <div>💾</div>
+                  <span>Save</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">
+                  <div>🔄</div>
+                  <span>Reset</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">
+                  <div>👁️</div>
+                  <span>Preview</span>
+                </button>
               </div>
             </div>
             
-            <div style="display: flex; gap: 8px; margin-top: 12px;">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">
-                <div>💾</div>
-                <span>Save Dynamic Prompt</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">
-                <div>🔄</div>
-                <span>Reset to Default</span>
-              </button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">
-                <div>👁️</div>
-                <span>Preview Dynamic</span>
-              </button>
+            <!-- Tabular Configuration -->
+            <div id="re-customize-tabular" class="re-customize-content" style="display: none;">
+              <div style="padding: 16px; background: var(--chatgpt-surface-secondary); border-radius: 6px; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
+                <div style="font-weight: 500; margin-bottom: 8px;">Comprehensive Tabular Configuration</div>
+                <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 16px;">
+                  The tabular data system includes advanced features like custom columns, template editing, and data export
+                </div>
+                <button class="re-btn re-btn-primary" id="re-goto-tabular-config">
+                  <div>📊</div>
+                  <span>Open Tabular Configuration</span>
+                </button>
+              </div>
             </div>
-          </div>
-          
-          <!-- Tabular Configuration Tab (Enhanced) -->
-          <div id="re-prompt-tabular-tab" class="re-prompt-tab-content" style="display: none;">
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 12px; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
-              📊 This tab redirects to the comprehensive Tabular Data Configuration section below, which includes prompt template editing, column management, and custom column creation.
-            </div>
-            
-            <button class="re-btn re-btn-primary re-btn-full" id="re-goto-tabular-config">
-              <div>📊</div>
-              <span>Go to Tabular Configuration</span>
-            </button>
-          </div>
-          
-          <!-- Global Prompt Actions -->
-          <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--chatgpt-border-light);">
-            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-prompts">
-              <div>💾</div>
-              <span>Save All Prompts</span>
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-prompts">
-              <div>🔄</div>
-              <span>Reset All to Default</span>
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-export-prompts">
-              <div>📤</div>
-              <span>Export Prompts</span>
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-import-prompts">
-              <div>📥</div>
-              <span>Import Prompts</span>
-            </button>
           </div>
         </div>
 
-        <!-- Tabular Prompt Configuration -->
+        <!-- Advanced Section -->
+        <div id="re-advanced-settings" class="re-settings-content" style="display: none;">
+          <!-- Import/Export -->
+          <div class="re-section">
+            <div class="re-section-header">
+              <div class="re-section-title">💾 Backup & Restore</div>
+              <div class="re-section-subtitle">Export and import your configurations</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
+                <div>📤</div>
+                <span>Export All Settings</span>
+              </button>
+              <button class="re-btn re-btn-secondary re-btn-full" id="re-import-prompts">
+                <div>📥</div>
+                <span>Import Settings</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Data Management -->
+          <div class="re-section">
+            <div class="re-section-header">
+              <div class="re-section-title">📊 Data Management</div>
+              <div class="re-section-subtitle">Export and manage your property data</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
+                <div>📄</div>
+                <span>Export Properties (JSON)</span>
+              </button>
+              <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
+                <div>📊</div>
+                <span>Export to Spreadsheet (CSV)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Developer Tools -->
+          <div class="re-section">
+            <div class="re-section-header">
+              <div class="re-section-title">🛠️ Developer Tools</div>
+              <div class="re-section-subtitle">Testing and debugging features</div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
+                <div>🧪</div>
+                <span>Test Analysis System</span>
+              </button>
+              
+              <label class="re-setting-item" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; cursor: pointer;">
+                <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
+                <span style="font-size: 13px;">Allow any URL (bypass domain validation)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Reset & Clear -->
+          <div class="re-section" style="border: 1px solid #ff6b6b; border-radius: 8px; padding: 16px;">
+            <div class="re-section-header">
+              <div class="re-section-title" style="color: #ff6b6b;">⚠️ Reset & Clear Data</div>
+              <div class="re-section-subtitle">Permanently remove data and reset settings</div>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="re-btn re-btn-ghost re-btn-full" id="re-reset-all-prompts" style="border-color: #ff6b6b; color: #ff6b6b;">
+                <div>🔄</div>
+                <span>Reset All Prompts to Default</span>
+              </button>
+              
+              <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data" style="border-color: #ff6b6b; color: #ff6b6b;">
+                <div>🗑️</div>
+                <span>Clear All Property Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabular Data Configuration (Separate Section) -->
         <div class="re-section" id="re-tabular-columns-section" style="display: none;">
           <div class="re-section-header">
-            <div class="re-section-title">Tabular Data Configuration</div>
-            <div class="re-section-subtitle">Customize both the prompt template and data columns for tabular extraction</div>
+            <div class="re-section-title">📊 Tabular Data Configuration</div>
+            <div class="re-section-subtitle">Advanced data extraction with customizable columns and templates</div>
           </div>
           
           <!-- Tabular Configuration Tabs -->
@@ -871,36 +979,6 @@ class REAnalyzerEmbeddedUI {
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-complete-tabular">
               <div>👁️</div>
               <span>Preview Complete Configuration</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="re-section">
-          <div class="re-section-header">
-            <div class="re-section-title">Data Management</div>
-          </div>
-          
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
-              <div>📄</div>
-              <span>Export All Properties (JSON)</span>
-            </button>
-            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
-              <div>📊</div>
-              <span>Export to CSV (Comprehensive)</span>
-            </button>
-            <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
-              <div>🧪</div>
-              <span>Test Analysis</span>
-            </button>
-            <label class="re-setting-item" style="margin: 8px 0; font-size: 14px; cursor: pointer;">
-              <input type="checkbox" id="re-allow-any-url" style="margin-right: 8px;">
-              <span>Allow any URL (bypass domain validation)</span>
-            </label>
-            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
-              <div>🗑️</div>
-              <span>Clear All Data</span>
             </button>
           </div>
         </div>
@@ -3779,6 +3857,9 @@ Or enter your own property URL:`);
       previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
     
+    // Settings navigation event listeners
+    this.setupSettingsNavigation();
+    
     // Enhanced prompt configuration event listeners
     this.setupPromptConfigurationEvents();
     
@@ -3949,6 +4030,183 @@ Or enter your own property URL:`);
   previewCustomPrompt() {
     // This method is kept for backward compatibility
     this.previewPrompt();
+  }
+
+  // Settings Navigation Management
+  setupSettingsNavigation() {
+    // Main settings navigation
+    const navButtons = this.panel.querySelectorAll('.re-settings-nav-btn');
+    const contentSections = this.panel.querySelectorAll('.re-settings-content');
+    
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetSection = btn.dataset.section;
+        
+        // Update navigation buttons
+        navButtons.forEach(b => {
+          b.classList.remove('re-settings-nav-active');
+          b.style.background = 'transparent';
+          b.style.boxShadow = 'none';
+        });
+        
+        btn.classList.add('re-settings-nav-active');
+        btn.style.background = 'var(--chatgpt-surface-primary)';
+        btn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+        
+        // Show/hide content sections
+        contentSections.forEach(section => {
+          section.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-${targetSection}-settings`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching sections
+          if (targetSection === 'prompts') {
+            this.loadPromptSettings();
+            this.updatePromptTypeUI();
+          } else if (targetSection === 'basic') {
+            this.updateConfigurationSummary();
+          }
+        }
+      });
+    });
+    
+    // Prompt type radio buttons
+    const promptOptions = this.panel.querySelectorAll('.re-prompt-option');
+    promptOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        // Update radio button states
+        promptOptions.forEach(opt => {
+          opt.style.borderColor = 'var(--chatgpt-border-light)';
+          opt.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = opt.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        option.style.borderColor = 'var(--chatgpt-accent)';
+        option.style.background = 'var(--chatgpt-hover-bg)';
+        const radio = option.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        
+        // Update prompt type selector
+        const promptType = option.dataset.type;
+        const quickSelector = this.panel.querySelector('#re-quick-prompt-type');
+        if (quickSelector) {
+          quickSelector.value = promptType;
+        }
+      });
+    });
+    
+    // Prompt customization tabs
+    const customizeBtns = this.panel.querySelectorAll('.re-customize-btn');
+    const customizeContents = this.panel.querySelectorAll('.re-customize-content');
+    
+    customizeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetCustomize = btn.dataset.customize;
+        
+        // Update customize buttons
+        customizeBtns.forEach(b => {
+          b.classList.remove('re-customize-active');
+          b.style.background = 'transparent';
+        });
+        
+        btn.classList.add('re-customize-active');
+        btn.style.background = 'var(--chatgpt-surface-primary)';
+        
+        // Show/hide customize content
+        customizeContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-customize-${targetCustomize}`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to customization tabs
+          if (targetCustomize === 'default') {
+            this.loadDefaultPrompt();
+          } else if (targetCustomize === 'dynamic') {
+            this.loadDynamicPrompt();
+          }
+        }
+      });
+    });
+    
+    // Quick setup synchronization
+    const quickPromptType = this.panel.querySelector('#re-quick-prompt-type');
+    if (quickPromptType) {
+      quickPromptType.addEventListener('change', () => {
+        const selectedType = quickPromptType.value;
+        
+        // Update prompt option selection
+        promptOptions.forEach(option => {
+          option.style.borderColor = 'var(--chatgpt-border-light)';
+          option.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = option.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        const matchingOption = this.panel.querySelector(`.re-prompt-option[data-type="${selectedType}"]`);
+        if (matchingOption) {
+          matchingOption.style.borderColor = 'var(--chatgpt-accent)';
+          matchingOption.style.background = 'var(--chatgpt-hover-bg)';
+          const radio = matchingOption.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+        }
+      });
+    }
+  }
+
+  updateConfigurationSummary() {
+    // Update the current configuration display
+    const promptTypeDisplay = this.panel.querySelector('#re-current-prompt-type');
+    if (promptTypeDisplay) {
+      // Get current prompt type from storage or UI
+      const quickSelector = this.panel.querySelector('#re-quick-prompt-type');
+      if (quickSelector) {
+        const promptType = quickSelector.value;
+        const typeNames = {
+          'default': 'Standard Analysis',
+          'tabular': 'Data Extraction',
+          'dynamic': 'Custom Data Points'
+        };
+        promptTypeDisplay.textContent = typeNames[promptType] || 'Standard Analysis';
+      }
+    }
+  }
+
+  updatePromptTypeUI() {
+    // Sync prompt type across different UI elements
+    this.loadPromptSettings().then(() => {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const quickPromptType = this.panel.querySelector('#re-quick-prompt-type');
+      
+      if (promptTypeSelect && quickPromptType) {
+        quickPromptType.value = promptTypeSelect.value;
+        
+        // Update radio buttons
+        const promptOptions = this.panel.querySelectorAll('.re-prompt-option');
+        promptOptions.forEach(option => {
+          option.style.borderColor = 'var(--chatgpt-border-light)';
+          option.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = option.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        const matchingOption = this.panel.querySelector(`.re-prompt-option[data-type="${promptTypeSelect.value}"]`);
+        if (matchingOption) {
+          matchingOption.style.borderColor = 'var(--chatgpt-accent)';
+          matchingOption.style.background = 'var(--chatgpt-hover-bg)';
+          const radio = matchingOption.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+        }
+      }
+      
+      this.updateConfigurationSummary();
+    });
   }
 
   // Enhanced Prompt Configuration Management
