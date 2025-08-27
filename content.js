@@ -19,33 +19,159 @@ let uiSettings = {
   allowAnyUrl: false
 };
 
+// Extension context state tracking
+let extensionContextValid = true;
+let lastContextCheck = Date.now();
+const CONTEXT_CHECK_INTERVAL = 5000; // Check every 5 seconds
+
 // Function to check if extension context is still valid
 function isExtensionContextValid() {
+  const now = Date.now();
+  
+  // Only check periodically to avoid performance issues
+  if (now - lastContextCheck < CONTEXT_CHECK_INTERVAL && extensionContextValid) {
+    return extensionContextValid;
+  }
+  
   try {
-    return !!(chrome && chrome.runtime && chrome.runtime.id);
+    lastContextCheck = now;
+    const isValid = !!(chrome && chrome.runtime && chrome.runtime.id);
+    
+    if (!isValid && extensionContextValid) {
+      console.warn('🔄 Extension context invalidated - disabling Chrome API calls');
+      extensionContextValid = false;
+      handleContextInvalidation();
+    } else if (isValid && !extensionContextValid) {
+      console.log('✅ Extension context restored');
+      extensionContextValid = true;
+    }
+    
+    return isValid;
   } catch (err) {
-    console.warn('Extension context validation failed:', err);
+    if (extensionContextValid) {
+      console.warn('⚠️ Extension context validation failed:', err.message);
+      extensionContextValid = false;
+      handleContextInvalidation();
+    }
     return false;
   }
 }
 
-// Safe wrapper for chrome API calls
-function safeChromeFall(apiCall, fallbackValue = null) {
-  try {
-    if (!isExtensionContextValid()) {
-      console.warn('⚠️ Extension context invalidated, skipping chrome API call');
-      return Promise.resolve(fallbackValue);
+// Handle extension context invalidation
+function handleContextInvalidation() {
+  console.warn('🔧 Handling extension context invalidation...');
+  
+  // Disable features that require chrome APIs
+  if (typeof embeddedUI !== 'undefined' && embeddedUI) {
+    try {
+      embeddedUI.disableChromeFeatures();
+    } catch (err) {
+      console.warn('Failed to disable Chrome features:', err);
     }
-    return apiCall();
-  } catch (err) {
-    if (err && (err.message && err.message.includes('Extension context invalidated') || 
-               err.message && err.message.includes('Unexpected token'))) {
-      console.warn('⚠️ Extension context invalidated during API call:', err.message);
-      return Promise.resolve(fallbackValue);
-    }
-    console.error('Chrome API call failed:', err);
-    throw err;
   }
+  
+  // Show user notification about extension state
+  showContextInvalidationNotice();
+}
+
+// Show notice about context invalidation
+function showContextInvalidationNotice() {
+  const existingNotice = document.getElementById('re-context-notice');
+  if (existingNotice) return; // Don't show multiple notices
+  
+  const notice = document.createElement('div');
+  notice.id = 're-context-notice';
+  notice.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ff6b6b;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    max-width: 300px;
+    cursor: pointer;
+  `;
+  notice.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 4px;">🔄 Extension Reloaded</div>
+    <div style="font-size: 12px;">RE Analyzer needs a page refresh to work properly. Click to refresh.</div>
+  `;
+  
+  notice.addEventListener('click', () => {
+    window.location.reload();
+  });
+  
+  document.body.appendChild(notice);
+  
+  // Auto-remove after 10 seconds
+  setTimeout(() => {
+    if (notice.parentNode) {
+      notice.remove();
+    }
+  }, 10000);
+}
+
+// Safe wrapper for chrome API calls with enhanced error handling
+function safeChromeFall(apiCall, fallbackValue = null) {
+  return new Promise((resolve) => {
+    try {
+      if (!isExtensionContextValid()) {
+        console.warn('⚠️ Extension context invalidated, returning fallback value');
+        resolve(fallbackValue);
+        return;
+      }
+      
+      const result = apiCall();
+      
+      // Handle both sync and async results
+      if (result && typeof result.then === 'function') {
+        result
+          .then(resolve)
+          .catch(err => {
+            if (isContextInvalidationError(err)) {
+              console.warn('⚠️ Extension context invalidated during async API call:', err.message);
+              extensionContextValid = false;
+              handleContextInvalidation();
+              resolve(fallbackValue);
+            } else {
+              console.error('Chrome API call failed:', err);
+              resolve(fallbackValue); // Resolve with fallback instead of throwing
+            }
+          });
+      } else {
+        resolve(result);
+      }
+    } catch (err) {
+      if (isContextInvalidationError(err)) {
+        console.warn('⚠️ Extension context invalidated during sync API call:', err.message);
+        extensionContextValid = false;
+        handleContextInvalidation();
+        resolve(fallbackValue);
+      } else {
+        console.error('Chrome API call failed:', err);
+        resolve(fallbackValue); // Resolve with fallback instead of throwing
+      }
+    }
+  });
+}
+
+// Check if an error indicates context invalidation
+function isContextInvalidationError(err) {
+  if (!err || !err.message) return false;
+  
+  const invalidationMessages = [
+    'Extension context invalidated',
+    'Unexpected token',
+    'runtime.lastError',
+    'The message port closed before a response was received',
+    'Could not establish connection'
+  ];
+  
+  return invalidationMessages.some(msg => err.message.includes(msg));
 }
 
 // Global variable to track current property analysis (already declared above with embedded UI variables)
@@ -84,6 +210,9 @@ class REAnalyzerEmbeddedUI {
     this.dragState = { isDragging: false, startX: 0, startY: 0 };
     this.analysisTimer = null;
     this.analysisStartTime = 0;
+    this.chromeApiEnabled = true;
+    this.settingsDisabled = false;
+    this.contextCheckInterval = null;
     
     this.initialize();
   }
@@ -104,6 +233,9 @@ class REAnalyzerEmbeddedUI {
       
       // Set up event listeners
       this.setupEventListeners();
+      
+      // Start context monitoring
+      this.startContextMonitoring();
       
       // Set up adaptive positioning
       this.setupAdaptivePositioning();
@@ -129,6 +261,12 @@ class REAnalyzerEmbeddedUI {
   }
 
   async loadSettings() {
+    if (this.settingsDisabled || !this.chromeApiEnabled) {
+      console.log('⚠️ Settings disabled due to context invalidation, using defaults');
+      this.uiSettings = { ...uiSettings };
+      return;
+    }
+    
     try {
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['embeddedUISettings']),
@@ -1623,6 +1761,12 @@ class REAnalyzerEmbeddedUI {
   }
 
   async loadChatGPTPropertyData() {
+    if (!this.chromeApiEnabled) {
+      console.log('⚠️ Property data loading disabled due to context invalidation');
+      this.displayNoDataMessage('Extension needs refresh to load property data');
+      return;
+    }
+    
     try {
       // Load property history from storage
       const result = await safeChromeFall(
@@ -3011,6 +3155,57 @@ Or enter your own property URL:`);
     });
   }
 
+  disableChromeFeatures() {
+    console.log('🔧 Disabling Chrome-dependent features due to context invalidation');
+    
+    // Disable any features that require chrome APIs
+    this.chromeApiEnabled = false;
+    
+    // Show notice in the UI if panel is visible
+    if (this.panel && this.isVisible) {
+      this.showChatGPTMessage('warning', '🔄 Extension needs refresh - some features disabled');
+    }
+    
+    // Stop any timers or intervals that might make chrome API calls
+    clearInterval(this.contextCheckInterval);
+    
+    // Disable settings loading/saving
+    this.settingsDisabled = true;
+  }
+
+  startContextMonitoring() {
+    // Check extension context periodically
+    this.contextCheckInterval = setInterval(() => {
+      const wasEnabled = this.chromeApiEnabled;
+      const isValid = isExtensionContextValid();
+      
+      if (!wasEnabled && isValid && extensionContextValid) {
+        console.log('✅ Extension context restored - re-enabling features');
+        this.chromeApiEnabled = true;
+        this.settingsDisabled = false;
+        
+        // Remove any context invalidation notices
+        const notice = document.getElementById('re-context-notice');
+        if (notice) notice.remove();
+        
+        // Show success message
+        this.showChatGPTMessage('success', '✅ Extension reconnected - all features restored');
+      }
+    }, 10000); // Check every 10 seconds
+  }
+
+  displayNoDataMessage(message) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (propertiesList) {
+      propertiesList.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 18px; margin-bottom: 8px;">⚠️</div>
+          <div>${message}</div>
+        </div>
+      `;
+    }
+  }
+
   async debugSavedAnalyses() {
     try {
       this.showChatGPTMessage('info', 'Debugging saved analysis data. Check console for detailed information.');
@@ -3215,6 +3410,11 @@ Or enter your own property URL:`);
   }
 
   async saveSettings() {
+    if (this.settingsDisabled || !this.chromeApiEnabled) {
+      console.log('⚠️ Settings save disabled due to context invalidation');
+      return;
+    }
+    
     try {
       const result = await safeChromeFall(
         () => chrome.storage.local.set({ embeddedUISettings: uiSettings }),
@@ -3399,20 +3599,25 @@ if (isChatGPTSite()) {
   // Load ChatGPT native styles first
   loadChatGPTNativeStyles();
   
-  // Wait for page to be ready
+  // Wait for page to be ready and ensure extension context is valid
+  const initializeWithValidation = () => {
+    // Double-check context before initialization
+    if (isExtensionContextValid()) {
+      embeddedUI = new REAnalyzerEmbeddedUI();
+      window.embeddedUI = embeddedUI; // Make globally accessible for onclick handlers
+    } else {
+      console.warn('🔄 Extension context invalid during initialization - showing refresh notice');
+      showContextInvalidationNotice();
+    }
+  };
+  
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        embeddedUI = new REAnalyzerEmbeddedUI();
-        window.embeddedUI = embeddedUI; // Make globally accessible for onclick handlers
-      }, 1000);
+      setTimeout(initializeWithValidation, 1000);
     });
   } else {
     // Page already loaded
-    setTimeout(() => {
-      embeddedUI = new REAnalyzerEmbeddedUI();
-      window.embeddedUI = embeddedUI; // Make globally accessible for onclick handlers
-    }, 1000);
+    setTimeout(initializeWithValidation, 1000);
   }
 } else {
   // Add contextual integration on property pages
