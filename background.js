@@ -135,6 +135,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
   
+  // Utility function to handle large analysis responses
+  function compressAnalysisData(analysisData, maxSize = 2 * 1024 * 1024) { // 2MB limit
+    const fullDataSize = JSON.stringify(analysisData).length;
+    
+    if (fullDataSize <= maxSize) {
+      return analysisData; // No compression needed
+    }
+    
+    console.log('📦 Compressing analysis data:', {
+      originalSize: fullDataSize,
+      maxSize: maxSize,
+      needsCompression: true
+    });
+    
+    // Create compressed version
+    const compressed = { ...analysisData };
+    
+    if (compressed.fullResponse && compressed.fullResponse.length > 10000) {
+      // Keep first 5000 and last 5000 characters
+      const original = compressed.fullResponse;
+      compressed.fullResponse = original.substring(0, 5000) + 
+        '\n\n... [Analysis truncated due to size limits] ...\n\n' + 
+        original.substring(original.length - 5000);
+      compressed.truncated = true;
+      compressed.originalLength = original.length;
+    }
+    
+    if (compressed.fullAnalysis && compressed.fullAnalysis !== compressed.fullResponse) {
+      // Same compression for fullAnalysis
+      const original = compressed.fullAnalysis;
+      compressed.fullAnalysis = original.substring(0, 5000) + 
+        '\n\n... [Analysis truncated due to size limits] ...\n\n' + 
+        original.substring(original.length - 5000);
+    }
+    
+    const compressedSize = JSON.stringify(compressed).length;
+    console.log('📦 Compression complete:', {
+      originalSize: fullDataSize,
+      compressedSize: compressedSize,
+      compressionRatio: ((fullDataSize - compressedSize) / fullDataSize * 100).toFixed(1) + '%'
+    });
+    
+    return compressed;
+  }
+  
   // Handle saving property analysis data with enhanced logging
   if (request.action === 'savePropertyAnalysis') {
     console.log('🔄 Background script saving property analysis for:', request.propertyUrl);
@@ -161,12 +206,47 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (propertyIndex !== -1) {
           // Update existing entry with analysis data
           const oldEntry = { ...history[propertyIndex] };
-          history[propertyIndex].analysis = request.analysisData;
+          
+          // Compress analysis data if needed
+          const compressedAnalysisData = compressAnalysisData(request.analysisData);
+          
+          history[propertyIndex].analysis = compressedAnalysisData;
           history[propertyIndex].analysisTimestamp = Date.now();
           history[propertyIndex].sessionId = request.sessionId;
           
+          // Check storage size before saving
+          const dataToSave = { propertyHistory: history };
+          const dataSize = JSON.stringify(dataToSave).length;
+          console.log('💾 Storage size check:', {
+            historyEntries: history.length,
+            dataSize: dataSize,
+            dataSizeMB: (dataSize / 1024 / 1024).toFixed(2),
+            analysisSize: JSON.stringify(request.analysisData).length,
+            fullResponseLength: request.analysisData?.fullResponse?.length || 0
+          });
+          
+          if (dataSize > 4 * 1024 * 1024) { // 4MB warning threshold
+            console.warn('⚠️ Storage approaching quota limit:', (dataSize / 1024 / 1024).toFixed(2) + 'MB');
+          }
+          
           // Save updated history
-          await chrome.storage.local.set({ propertyHistory: history });
+          try {
+            await chrome.storage.local.set({ propertyHistory: history });
+          } catch (storageError) {
+            console.error('❌ Storage error while saving:', storageError);
+            if (storageError.message && storageError.message.includes('QUOTA_EXCEEDED')) {
+              console.error('💾 QUOTA EXCEEDED: Analysis data too large for storage');
+              // Try saving without fullResponse to reduce size
+              const compactAnalysisData = { ...request.analysisData };
+              delete compactAnalysisData.fullResponse;
+              delete compactAnalysisData.fullAnalysis;
+              history[propertyIndex].analysis = compactAnalysisData;
+              await chrome.storage.local.set({ propertyHistory: history });
+              console.log('✅ Saved analysis without full text due to quota limits');
+            } else {
+              throw storageError;
+            }
+          }
           
           console.log('✅ Property analysis data saved successfully');
           console.log('📝 Updated entry:', {
@@ -179,13 +259,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else {
           console.log('⚠️ Property not found in history, creating new entry');
           
+          // Compress analysis data if needed
+          const compressedAnalysisData = compressAnalysisData(request.analysisData);
+          
           // Create new entry with analysis data
           const newEntry = {
             url: request.propertyUrl,
             timestamp: Date.now(),
             date: new Date().toLocaleDateString(),
             domain: new URL(request.propertyUrl).hostname,
-            analysis: request.analysisData,
+            analysis: compressedAnalysisData,
             analysisTimestamp: Date.now(),
             sessionId: request.sessionId
           };
@@ -197,7 +280,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             history.splice(50);
           }
           
-          await chrome.storage.local.set({ propertyHistory: history });
+          // Check storage size before saving
+          const dataToSave = { propertyHistory: history };
+          const dataSize = JSON.stringify(dataToSave).length;
+          console.log('💾 Storage size check (new entry):', {
+            historyEntries: history.length,
+            dataSize: dataSize,
+            dataSizeMB: (dataSize / 1024 / 1024).toFixed(2),
+            analysisSize: JSON.stringify(request.analysisData).length,
+            fullResponseLength: request.analysisData?.fullResponse?.length || 0
+          });
+          
+          if (dataSize > 4 * 1024 * 1024) { // 4MB warning threshold
+            console.warn('⚠️ Storage approaching quota limit:', (dataSize / 1024 / 1024).toFixed(2) + 'MB');
+          }
+          
+          try {
+            await chrome.storage.local.set({ propertyHistory: history });
+          } catch (storageError) {
+            console.error('❌ Storage error while saving new entry:', storageError);
+            if (storageError.message && storageError.message.includes('QUOTA_EXCEEDED')) {
+              console.error('💾 QUOTA EXCEEDED: Analysis data too large for storage');
+              // Try saving without fullResponse to reduce size
+              const compactAnalysisData = { ...request.analysisData };
+              delete compactAnalysisData.fullResponse;
+              delete compactAnalysisData.fullAnalysis;
+              newEntry.analysis = compactAnalysisData;
+              await chrome.storage.local.set({ propertyHistory: history });
+              console.log('✅ Saved new entry without full text due to quota limits');
+            } else {
+              throw storageError;
+            }
+          }
           
           console.log('✅ New property entry with analysis created');
           console.log('📝 New entry:', {

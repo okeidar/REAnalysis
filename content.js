@@ -2649,6 +2649,10 @@ Or enter your own property URL:`);
     const propertyDetails = this.formatPropertyDetails(extractedData);
     const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
     
+    // Check if content was truncated
+    const wasTruncated = analysisData.truncated || false;
+    const originalLength = analysisData.originalLength || 0;
+    
     modal.innerHTML = `
       <div class="re-modal">
         <div class="re-modal-header">
@@ -2676,6 +2680,13 @@ Or enter your own property URL:`);
           <!-- Full Analysis -->
           <div class="re-analysis-section">
             <h4>🤖 Full ChatGPT Analysis</h4>
+            ${wasTruncated ? `
+              <div class="re-truncation-notice">
+                ⚠️ <strong>Content Truncated:</strong> This analysis was truncated due to storage size limits. 
+                Original length: ${originalLength.toLocaleString()} characters. 
+                Showing first and last portions of the analysis.
+              </div>
+            ` : ''}
             <div class="re-analysis-text">
               ${this.formatAnalysisText(analysisText)}
             </div>
@@ -2900,6 +2911,16 @@ Or enter your own property URL:`);
         max-height: 400px;
         overflow-y: auto;
         white-space: pre-wrap;
+      }
+      
+      .re-truncation-notice {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        color: #856404;
       }
       
       .re-analysis-text p {
@@ -6334,6 +6355,26 @@ function setupResponseMonitor() {
           if (response && response.success) {
             console.log('🎉 Split prompt analysis saved successfully!');
             
+            // Debug: Verify the saved data immediately
+            setTimeout(() => {
+              console.log('🔍 SPLIT VERIFICATION: Checking saved data...');
+              chrome.storage.local.get(['propertyHistory']).then(result => {
+                const properties = result.propertyHistory || [];
+                const savedProperty = properties.find(p => p.url === promptSplittingState.pendingPropertyLink);
+                if (savedProperty) {
+                  console.log('🔍 SPLIT VERIFICATION: Saved property found:', {
+                    url: savedProperty.url,
+                    hasAnalysis: !!savedProperty.analysis,
+                    hasFullResponse: !!(savedProperty.analysis?.fullResponse),
+                    fullResponseLength: savedProperty.analysis?.fullResponse?.length || 0,
+                    fullResponsePreview: savedProperty.analysis?.fullResponse?.substring(0, 100) || 'No fullResponse'
+                  });
+                } else {
+                  console.log('❌ SPLIT VERIFICATION: Property not found in saved data');
+                }
+              });
+            }, 500);
+            
             // Trigger embedded UI completion
             if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
               embeddedUI.completeAnalysis();
@@ -6433,6 +6474,26 @@ function setupResponseMonitor() {
             console.log('✅ Analysis data sent successfully:', response);
             if (response.success) {
               console.log('🎉 Property analysis saved and should now show as analyzed!');
+              
+              // Debug: Verify the saved data immediately
+              setTimeout(() => {
+                console.log('🔍 VERIFICATION: Checking saved data...');
+                chrome.storage.local.get(['propertyHistory']).then(result => {
+                  const properties = result.propertyHistory || [];
+                  const savedProperty = properties.find(p => p.url === currentPropertyAnalysis.url);
+                  if (savedProperty) {
+                    console.log('🔍 VERIFICATION: Saved property found:', {
+                      url: savedProperty.url,
+                      hasAnalysis: !!savedProperty.analysis,
+                      hasFullResponse: !!(savedProperty.analysis?.fullResponse),
+                      fullResponseLength: savedProperty.analysis?.fullResponse?.length || 0,
+                      fullResponsePreview: savedProperty.analysis?.fullResponse?.substring(0, 100) || 'No fullResponse'
+                    });
+                  } else {
+                    console.log('❌ VERIFICATION: Property not found in saved data');
+                  }
+                });
+              }, 500);
               
               // Trigger embedded UI completion if available
               if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
