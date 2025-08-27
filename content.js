@@ -33,7 +33,9 @@ function isExtensionContextValid() {
 function safeChromeFall(apiCall, fallbackValue = null) {
   try {
     if (!isExtensionContextValid()) {
-      console.warn('⚠️ Extension context invalidated, skipping chrome API call');
+      console.warn('⚠️ Extension context invalidated, using fallback value');
+      // Notify user about context invalidation
+      notifyContextInvalidation();
       return Promise.resolve(fallbackValue);
     }
     return apiCall();
@@ -41,10 +43,77 @@ function safeChromeFall(apiCall, fallbackValue = null) {
     if (err && (err.message && err.message.includes('Extension context invalidated') || 
                err.message && err.message.includes('Unexpected token'))) {
       console.warn('⚠️ Extension context invalidated during API call:', err.message);
+      notifyContextInvalidation();
       return Promise.resolve(fallbackValue);
     }
     console.error('Chrome API call failed:', err);
     throw err;
+  }
+}
+
+// Track if we've already notified about context invalidation to avoid spam
+let contextInvalidationNotified = false;
+
+// Function to notify user about context invalidation
+function notifyContextInvalidation() {
+  if (contextInvalidationNotified) return;
+  contextInvalidationNotified = true;
+  
+  console.log('🔄 Extension context invalidated - switching to fallback mode');
+  
+  // Show user-friendly message in UI if available
+  if (window.embeddedUI && window.embeddedUI.showChatGPTMessage) {
+    window.embeddedUI.showChatGPTMessage('warning', 
+      'Extension context lost. Please refresh the page to restore full functionality.');
+  }
+  
+  // Try to save current state to localStorage as backup
+  try {
+    backupStateToLocalStorage();
+  } catch (backupError) {
+    console.warn('Failed to backup state to localStorage:', backupError);
+  }
+}
+
+// Backup current state to localStorage as fallback
+function backupStateToLocalStorage() {
+  try {
+    // Backup UI settings
+    if (uiSettings) {
+      localStorage.setItem('reAnalyzer_backup_uiSettings', JSON.stringify(uiSettings));
+    }
+    
+    // Backup current property analysis if available
+    if (currentPropertyAnalysis) {
+      localStorage.setItem('reAnalyzer_backup_currentAnalysis', JSON.stringify(currentPropertyAnalysis));
+    }
+    
+    console.log('💾 State backed up to localStorage');
+  } catch (error) {
+    console.warn('Failed to backup to localStorage:', error);
+  }
+}
+
+// Restore state from localStorage fallback
+function restoreStateFromLocalStorage() {
+  try {
+    // Restore UI settings
+    const backupSettings = localStorage.getItem('reAnalyzer_backup_uiSettings');
+    if (backupSettings) {
+      const parsedSettings = JSON.parse(backupSettings);
+      uiSettings = { ...uiSettings, ...parsedSettings };
+      console.log('📋 Restored UI settings from localStorage backup');
+    }
+    
+    // Restore current analysis
+    const backupAnalysis = localStorage.getItem('reAnalyzer_backup_currentAnalysis');
+    if (backupAnalysis) {
+      currentPropertyAnalysis = JSON.parse(backupAnalysis);
+      console.log('📋 Restored current analysis from localStorage backup');
+    }
+    
+  } catch (error) {
+    console.warn('Failed to restore from localStorage:', error);
   }
 }
 
@@ -127,6 +196,7 @@ class REAnalyzerEmbeddedUI {
 
   async loadSettings() {
     try {
+      // Try extension storage first
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['embeddedUISettings']),
         null
@@ -141,12 +211,22 @@ class REAnalyzerEmbeddedUI {
       } else {
         // Fallback to localStorage if extension context is invalidated
         try {
-          const localSettings = localStorage.getItem('reAnalyzerSettings');
-          if (localSettings) {
-            const parsedSettings = JSON.parse(localSettings);
+          // First try the backup from context invalidation
+          const backupSettings = localStorage.getItem('reAnalyzer_backup_uiSettings');
+          if (backupSettings) {
+            const parsedSettings = JSON.parse(backupSettings);
             uiSettings = { ...uiSettings, ...parsedSettings };
             settingsLoaded = true;
-            console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+            console.log('📋 Loaded UI settings from context invalidation backup:', uiSettings);
+          } else {
+            // Try regular localStorage fallback
+            const localSettings = localStorage.getItem('reAnalyzerSettings');
+            if (localSettings) {
+              const parsedSettings = JSON.parse(localSettings);
+              uiSettings = { ...uiSettings, ...parsedSettings };
+              settingsLoaded = true;
+              console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+            }
           }
         } catch (localError) {
           console.warn('Failed to load settings from localStorage:', localError);
@@ -157,8 +237,17 @@ class REAnalyzerEmbeddedUI {
         console.log('📋 Using default UI settings:', uiSettings);
       }
       
+      // Always backup current settings to localStorage for future fallback
+      try {
+        localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      } catch (backupError) {
+        console.warn('Failed to backup settings to localStorage:', backupError);
+      }
+      
     } catch (error) {
       console.warn('Failed to load UI settings:', error);
+      // Try to restore from localStorage backup as last resort
+      restoreStateFromLocalStorage();
     }
   }
 
@@ -1715,17 +1804,34 @@ class REAnalyzerEmbeddedUI {
     
     if (!statusElement) return;
     
-    // Check if we're on ChatGPT
-    if (isChatGPTSite()) {
+    // Check extension context first
+    if (!isExtensionContextValid()) {
+      statusElement.className = 're-status re-status-warning';
+      if (statusIcon) statusIcon.textContent = '⚠️';
+      if (statusTitle) statusTitle.textContent = 'Limited Functionality';
+      if (statusSubtitle) statusSubtitle.textContent = 'Extension context lost - refresh page to restore features';
+      
+      // Add visual warning styling
+      statusElement.style.borderLeft = '3px solid #ffa726';
+      statusElement.style.backgroundColor = 'rgba(255, 167, 38, 0.1)';
+    } else if (isChatGPTSite()) {
       statusElement.className = 're-status re-status-connected';
       if (statusIcon) statusIcon.textContent = '✅';
       if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
       if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+      
+      // Remove any warning styling
+      statusElement.style.borderLeft = '';
+      statusElement.style.backgroundColor = '';
     } else {
       statusElement.className = 're-status re-status-error';
       if (statusIcon) statusIcon.textContent = '❌';
       if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
       if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+      
+      // Remove any warning styling
+      statusElement.style.borderLeft = '';
+      statusElement.style.backgroundColor = '';
     }
   }
 
@@ -1742,10 +1848,33 @@ class REAnalyzerEmbeddedUI {
       if (result && result.propertyHistory) {
         properties = result.propertyHistory;
         console.log(`📚 Loaded ${properties.length} properties from extension storage`);
+        
+        // Backup to localStorage for future fallback
+        try {
+          localStorage.setItem('reAnalyzer_backup_properties', JSON.stringify(properties));
+        } catch (backupError) {
+          console.warn('Failed to backup properties to localStorage:', backupError);
+        }
       } else {
-        // If extension context is invalidated, show a message but continue with empty state
-        console.log('📚 Extension context invalidated, showing empty property state');
-        this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+        // Try localStorage fallback for properties
+        try {
+          const localProperties = localStorage.getItem('reAnalyzer_backup_properties');
+          if (localProperties) {
+            properties = JSON.parse(localProperties);
+            console.log(`📚 Loaded ${properties.length} properties from localStorage backup`);
+            
+            if (properties.length > 0) {
+              this.showChatGPTMessage('warning', 
+                `Loaded ${properties.length} properties from backup. Please refresh to restore full functionality.`);
+            }
+          } else {
+            console.log('📚 No properties found in storage or backup');
+            this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+          }
+        } catch (localError) {
+          console.warn('Failed to load properties from localStorage:', localError);
+          this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+        }
       }
       
       // Update stats
@@ -2128,6 +2257,9 @@ Or enter your own property URL:`);
       console.warn('⚠️ Extension context invalidated during initialization');
       this.showChatGPTMessage('warning', 'Extension was updated. Please reload the page for full functionality.');
       
+      // Show persistent warning banner
+      this.showExtensionContextWarning();
+      
       // Add a reload button to the warning message
       setTimeout(() => {
         const warningMsg = this.panel.querySelector('#re-warning-msg');
@@ -2145,6 +2277,74 @@ Or enter your own property URL:`);
         }
       }, 100);
     }
+  }
+
+  showExtensionContextWarning() {
+    // Remove existing warning if any
+    const existingWarning = document.getElementById('re-context-warning');
+    if (existingWarning) {
+      existingWarning.remove();
+    }
+
+    // Create warning banner
+    const warningBanner = document.createElement('div');
+    warningBanner.id = 're-context-warning';
+    warningBanner.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(90deg, #ff6b6b, #ffa726);
+      color: white;
+      padding: 12px 16px;
+      text-align: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 10001;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+    `;
+    
+    warningBanner.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+        <span>⚠️ RE Analyzer: Extension context lost - some features may not work</span>
+        <button onclick="window.location.reload()" style="
+          background: rgba(255,255,255,0.2);
+          border: 1px solid rgba(255,255,255,0.4);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+        ">
+          🔄 Refresh Page
+        </button>
+        <button onclick="document.getElementById('re-context-warning').remove()" style="
+          background: transparent;
+          border: none;
+          color: white;
+          padding: 6px;
+          cursor: pointer;
+          font-size: 16px;
+          opacity: 0.8;
+        ">
+          ×
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(warningBanner);
+    
+    // Auto-fade after 10 seconds to be less intrusive
+    setTimeout(() => {
+      if (document.getElementById('re-context-warning')) {
+        warningBanner.style.opacity = '0.8';
+      }
+    }, 10000);
+    
+    console.log('📢 Context invalidation warning banner displayed');
   }
 
   // Helper methods for UI functionality will be added in the next part...
