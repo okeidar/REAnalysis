@@ -7227,9 +7227,10 @@ function setupResponseMonitor() {
   // Check for new messages every 500ms for better completion detection
   const intervalId = setInterval(checkForNewMessages, 500);
   
-  // Also use MutationObserver for more immediate detection
+  // Enhanced MutationObserver for real-time response tracking
   const observer = new MutationObserver((mutations) => {
     let shouldCheck = false;
+    let hasTextChanges = false;
     mutations.forEach((mutation) => {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         // Check if any added nodes might be ChatGPT messages
@@ -7253,6 +7254,27 @@ function setupResponseMonitor() {
           }
         }
       }
+      
+      // Track text content changes in assistant messages
+      if (mutation.type === 'characterData' || mutation.type === 'childList') {
+        const target = mutation.target;
+        if (target && (target.closest('[data-message-author-role="assistant"]') || 
+                      target.querySelector('[data-message-author-role="assistant"]'))) {
+          hasTextChanges = true;
+          shouldCheck = true;
+          
+          // Log text changes for debugging during active analysis
+          if (currentPropertyAnalysis || promptSplittingState.currentPhase === 'complete') {
+            console.log('📝 REAL-TIME: Text change detected in assistant message:', {
+              type: mutation.type,
+              targetLength: target.textContent?.length || 0,
+              timestamp: new Date().toLocaleTimeString(),
+              isActiveAnalysis: !!currentPropertyAnalysis,
+              promptPhase: promptSplittingState.currentPhase
+            });
+          }
+        }
+      }
     });
     
     if (shouldCheck) {
@@ -7273,7 +7295,9 @@ function setupResponseMonitor() {
     if (container) {
       observer.observe(container, {
         childList: true,
-        subtree: true
+        subtree: true,
+        characterData: true, // Track text changes
+        characterDataOldValue: true
       });
       console.log('👀 Started observing container:', container.tagName);
     }
@@ -7296,10 +7320,36 @@ function setupResponseMonitor() {
     }
   }, 5000); // Check every 5 seconds
   
+  // Add periodic content checker for debugging
+  const contentChecker = setInterval(() => {
+    if (currentPropertyAnalysis || promptSplittingState.currentPhase === 'complete') {
+      const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        const currentText = lastMessage.textContent || lastMessage.innerText || '';
+        
+        console.log('🔍 PERIODIC CHECK:', {
+          timestamp: new Date().toLocaleTimeString(),
+          messageLength: currentText.length,
+          preview: currentText.substring(0, 150) + '...',
+          isStreaming: isResponseStreaming(),
+          activeAnalysis: !!currentPropertyAnalysis,
+          promptPhase: promptSplittingState.currentPhase
+        });
+        
+        // If we have a very long response, log a warning about potential truncation
+        if (currentText.length > 3000) {
+          console.log('📏 LONG RESPONSE detected:', currentText.length, 'characters');
+        }
+      }
+    }
+  }, 3000); // Check every 3 seconds during active analysis
+  
   // Cleanup function
   return () => {
     clearInterval(intervalId);
     clearInterval(contextCheckInterval);
+    clearInterval(contentChecker);
     observer.disconnect();
   };
 }
@@ -8088,6 +8138,101 @@ window.diagnoseProblem = function() {
     messagesFound: messages.length,
     keywordMatches: messages.length > 0 ? keywordMatches : [],
     extractionResult: messages.length > 0 ? result : null
+  };
+};
+
+// MANUAL CAPTURE FUNCTION - for immediate testing
+window.captureCurrentResponse = function(propertyUrl) {
+  console.log('🚀 MANUAL CAPTURE: Capturing current ChatGPT response...');
+  
+  // Get all assistant messages
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length === 0) {
+    console.error('❌ No ChatGPT messages found');
+    return null;
+  }
+  
+  const lastMessage = messages[messages.length - 1];
+  console.log('📍 Found message element:', lastMessage);
+  
+  // Try multiple extraction methods
+  const extractionMethods = [
+    { name: 'textContent', text: lastMessage.textContent || '' },
+    { name: 'innerText', text: lastMessage.innerText || '' },
+    { name: 'innerHTML', text: lastMessage.innerHTML || '' }
+  ];
+  
+  console.log('📝 Extraction results:');
+  extractionMethods.forEach(method => {
+    console.log(`  ${method.name}: ${method.text.length} characters`);
+    console.log(`  Preview: ${method.text.substring(0, 200)}...`);
+  });
+  
+  // Use the longest extraction
+  const bestMethod = extractionMethods.reduce((best, current) => 
+    current.text.length > best.text.length ? current : best
+  );
+  
+  console.log(`✅ Using ${bestMethod.name} method: ${bestMethod.text.length} characters`);
+  
+  const messageText = bestMethod.text;
+  
+  if (!messageText || messageText.length < 50) {
+    console.error('❌ Captured text is too short:', messageText.length);
+    return null;
+  }
+  
+  // Extract analysis data
+  const analysisData = extractPropertyAnalysisData(messageText);
+  console.log('📊 Analysis extraction result:', {
+    hasData: !!analysisData,
+    fullResponseLength: analysisData?.fullResponse?.length || 0,
+    extractedKeys: Object.keys(analysisData?.extractedData || {}),
+    analysisPreview: analysisData?.fullResponse?.substring(0, 200) || 'No fullResponse'
+  });
+  
+  if (!analysisData || !analysisData.fullResponse) {
+    console.error('❌ Failed to extract analysis data');
+    return null;
+  }
+  
+  // Save the analysis
+  const url = propertyUrl || prompt('Enter property URL for this analysis:') || `manual_${Date.now()}`;
+  
+  console.log('💾 Saving manual capture for:', url);
+  
+  safeChromeFall(() => {
+    return chrome.runtime.sendMessage({
+      action: 'savePropertyAnalysis',
+      propertyUrl: url,
+      sessionId: `manual_${Date.now()}`,
+      analysisData: {
+        ...analysisData,
+        manualCapture: true,
+        captureMethod: bestMethod.name,
+        captureTimestamp: Date.now()
+      }
+    });
+  }).then(response => {
+    if (response && response.success) {
+      console.log('✅ Manual capture saved successfully!');
+      console.log('📊 Saved data:', {
+        url: url,
+        responseLength: analysisData.fullResponse.length,
+        extractedFields: Object.keys(analysisData.extractedData).length
+      });
+    } else {
+      console.error('❌ Failed to save manual capture:', response);
+    }
+  }).catch(err => {
+    console.error('❌ Manual capture save error:', err);
+  });
+  
+  return {
+    messageText: messageText,
+    analysisData: analysisData,
+    captureMethod: bestMethod.name,
+    url: url
   };
 };
 

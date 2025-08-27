@@ -280,6 +280,8 @@ async setupCustomPromptSettings() {
                     <code>🔍 Event delegation: viewProperty clicked for: [url]</code></li>
                 <li>Verify custom prompt editing works in settings</li>
                 <li><strong>Debug incomplete responses:</strong> Run <code>checkProgressiveTracking()</code> in console to see real-time saving</li>
+                <li><strong>Manual capture test:</strong> Run <code>captureCurrentResponse()</code> to manually save current ChatGPT response</li>
+                <li><strong>Force extraction:</strong> Run <code>forceExtractCurrent()</code> to test extraction on current message</li>
             </ol>
             
             <p><strong>Expected Console Messages:</strong></p>
@@ -309,6 +311,12 @@ async setupCustomPromptSettings() {
 💾 PROGRESSIVE SAVE triggered: [save info]
 ✅ Progressive save #2 successful for: [url]
 🧹 Cleaning up progressive tracking for: [url]
+
+🔍 PERIODIC CHECK: [real-time monitoring]
+📝 REAL-TIME: Text change detected in assistant message
+📏 LONG RESPONSE detected: [character count]
+🚀 MANUAL CAPTURE: Capturing current ChatGPT response...
+✅ Manual capture saved successfully!
             </div>
             
             <p><strong>Context Invalidation Handling:</strong></p>
