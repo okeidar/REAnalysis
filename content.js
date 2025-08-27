@@ -6400,7 +6400,13 @@ function setupResponseMonitor() {
       '[data-state="stop"]',
       'button:has(svg[class*="stop"])',
       '[aria-label*="Stop generating"]',
-      '[title*="Stop generating"]'
+      '[title*="Stop generating"]',
+      // Additional selectors for ChatGPT UI variations
+      'button[class*="btn-stop"]',
+      '[data-testid="stop-button"]',
+      'button:has(span:contains("Stop"))',
+      'button[class*="regenerate"][disabled]', // Disabled regenerate during generation
+      'form button[disabled]:last-child' // Often the last button in the form
     ];
     
     for (const selector of stopSelectors) {
@@ -6460,6 +6466,38 @@ function setupResponseMonitor() {
       }
     }
     
+    // Final check: Look for cursor or typing indicators in the message
+    const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      const messageText = lastMessage.textContent || lastMessage.innerText || '';
+      
+      // Check for common streaming indicators in the text itself
+      const streamingPatterns = [
+        /\.\.\.$/, // Ends with ellipsis
+        /…$/, // Ends with unicode ellipsis
+        /\|$/, // Ends with cursor
+        /▌$/, // Ends with block cursor
+        /\s$/ // Ends with whitespace (often added during streaming)
+      ];
+      
+      for (const pattern of streamingPatterns) {
+        if (pattern.test(messageText)) {
+          console.log('🔍 Text-based streaming indicator found:', pattern);
+          return true;
+        }
+      }
+      
+      // Check if the message element has streaming-related classes
+      if (lastMessage.classList.contains('result-streaming') || 
+          lastMessage.querySelector('.streaming') ||
+          lastMessage.querySelector('.animate-pulse') ||
+          lastMessage.querySelector('[class*="typing"]')) {
+        console.log('🔍 Element-based streaming indicator found');
+        return true;
+      }
+    }
+    
     console.log('✅ No streaming indicators found - ChatGPT appears to have finished');
     return false;
   };
@@ -6470,6 +6508,24 @@ function setupResponseMonitor() {
     console.log('📝 Final response length:', messageText.length);
     console.log('🔍 Current prompt splitting phase:', promptSplittingState.currentPhase);
     console.log('🔍 Current property analysis:', currentPropertyAnalysis?.url || 'None');
+    
+    // Check for potential incomplete responses
+    if (messageText.length < 100) {
+      console.warn('⚠️ Warning: Response seems very short (' + messageText.length + ' characters) - might be incomplete');
+    }
+    
+    if (messageText.endsWith('...') || messageText.endsWith('…')) {
+      console.warn('⚠️ Warning: Response ends with ellipsis - might be cut off');
+    }
+    
+    // Log response quality indicators
+    console.log('📊 Response quality indicators:', {
+      length: messageText.length,
+      endsWithPeriod: messageText.endsWith('.'),
+      endsWithEllipsis: messageText.endsWith('...') || messageText.endsWith('…'),
+      containsPropertyKeywords: /property|bedroom|bathroom|price|sqft/i.test(messageText),
+      looksComplete: messageText.length > 500 && (messageText.endsWith('.') || messageText.endsWith('!') || messageText.endsWith('?'))
+    });
     
     // Clear any existing timer
     if (completionTimers.has(propertyUrl)) {
@@ -6816,7 +6872,46 @@ function setupResponseMonitor() {
       const newMessage = messages[messages.length - 1];
       if (!newMessage) return;
       
-      const messageText = newMessage.textContent || newMessage.innerText || '';
+      // Enhanced message text extraction to capture complete content
+      let messageText = '';
+      
+      // Method 1: Try textContent first (preserves formatting)
+      messageText = newMessage.textContent || '';
+      
+      // Method 2: Fallback to innerText if textContent is insufficient
+      if (!messageText || messageText.length < 50) {
+        const innerText = newMessage.innerText || '';
+        if (innerText.length > messageText.length) {
+          messageText = innerText;
+        }
+      }
+      
+      // Method 3: Manual extraction for complex content
+      if (!messageText || messageText.length < 50) {
+        const textNodes = [];
+        const walker = document.createTreeWalker(
+          newMessage,
+          NodeFilter.SHOW_TEXT,
+          null,
+          false
+        );
+        let node;
+        while (node = walker.nextNode()) {
+          if (node.textContent.trim()) {
+            textNodes.push(node.textContent);
+          }
+        }
+        const manualText = textNodes.join(' ');
+        if (manualText.length > messageText.length) {
+          messageText = manualText;
+        }
+      }
+      
+      console.log('📝 Message extraction stats:', {
+        length: messageText.length,
+        preview: messageText.substring(0, 100) + '...',
+        hasContent: messageText.length > 10
+      });
       
       // Debug logging for all messages when waiting for confirmation
       if (promptSplittingState.currentPhase === 'waiting_confirmation') {
@@ -6880,8 +6975,8 @@ function setupResponseMonitor() {
             // Length hasn't changed, use the previous length change time
             lastLengthChangeTime = previousBuffer.lastLengthChange || previousBuffer.lastUpdated;
             const stableTime = currentTime - lastLengthChangeTime;
-            // More aggressive completion detection for faster processing
-            if (stableTime > 1500) { // Reduced from 2000ms to 1500ms for faster detection
+            // Conservative completion detection to ensure full responses are captured
+            if (stableTime > 4000) { // Increased to 4 seconds to avoid cutting off long responses
               lengthStable = true;
               console.log('📏 Response length stable for', Math.round(stableTime/1000), 'seconds, likely complete');
             }
@@ -6915,7 +7010,7 @@ function setupResponseMonitor() {
         console.log('🔄 Is ChatGPT still streaming?', isStreaming);
         console.log('📏 Response length stable?', lengthStable);
         
-        if (lengthStable || !isStreaming) {
+        if (lengthStable && !isStreaming) {
           console.log('✅ Response appears complete - processing now');
           console.log('  - Length stable:', lengthStable);
           console.log('  - Not streaming:', !isStreaming);
@@ -6937,14 +7032,29 @@ function setupResponseMonitor() {
             clearTimeout(completionTimers.get(currentUrl));
           }
           
-          // Set a shorter completion timer (1.5 seconds after last change for faster processing)
+          // Set a conservative completion timer to allow full responses to complete
           completionTimers.set(currentUrl, setTimeout(() => {
-            console.log('⏰ Completion timer triggered - assuming response is complete');
+            console.log('⏰ Completion timer triggered - checking final state before processing');
             const bufferedResponse = responseBuffer.get(currentUrl);
             if (bufferedResponse && currentPropertyAnalysis) {
-              processCompletedResponse(bufferedResponse.messageText, currentPropertyAnalysis.url);
+              // Final check: only process if not streaming
+              const finalStreamCheck = isResponseStreaming();
+              if (!finalStreamCheck) {
+                console.log('✅ Final check confirmed response is complete');
+                processCompletedResponse(bufferedResponse.messageText, currentPropertyAnalysis.url);
+              } else {
+                console.log('⏳ Still streaming during timer check - extending timer');
+                // Extend timer by another 3 seconds
+                completionTimers.set(currentUrl, setTimeout(() => {
+                  console.log('⏰ Extended timer triggered - processing regardless of state');
+                  const extendedResponse = responseBuffer.get(currentUrl);
+                  if (extendedResponse && currentPropertyAnalysis) {
+                    processCompletedResponse(extendedResponse.messageText, currentPropertyAnalysis.url);
+                  }
+                }, 3000));
+              }
             }
-          }, 1500)); // Reduced from 2000ms to 1500ms
+          }, 5000)); // Increased to 5 seconds to allow more time
         }
       }
       
