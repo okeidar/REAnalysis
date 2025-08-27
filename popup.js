@@ -3475,8 +3475,26 @@ const WordExportModule = {
 
   // Show export options modal
   showExportOptionsModal(propertyItems) {
-    const isMultiple = Array.isArray(propertyItems) && propertyItems.length > 1;
-    const title = isMultiple ? `Export ${propertyItems.length} Properties to Word` : 'Export to Word Document';
+    // Handle both single property objects and arrays
+    const isArray = Array.isArray(propertyItems);
+    const isSingleProperty = !isArray || (isArray && propertyItems.length === 1);
+    const isMultiple = isArray && propertyItems.length > 1;
+    
+    // Get the single property for non-array cases or single-item arrays
+    const singleProperty = isArray ? propertyItems[0] : propertyItems;
+    
+    let title;
+    if (propertyItems.isCategoryExport) {
+      if (propertyItems.isMultiCategory) {
+        title = `Export ${propertyItems.selectedCategories.length} Categories to Word`;
+      } else {
+        title = `Export "${propertyItems.categoryName}" Category to Word`;
+      }
+    } else if (isMultiple) {
+      title = `Export ${propertyItems.length} Properties to Word`;
+    } else {
+      title = 'Export to Word Document';
+    }
     
     const modal = document.createElement('div');
     modal.id = 'wordExportModal';
@@ -3556,9 +3574,11 @@ const WordExportModule = {
             border-left: 4px solid var(--primary);
           ">
             <strong>Export Preview:</strong><br>
-            ${isMultiple ? 
-              `${propertyItems.length} properties will be exported to a single Word document.` :
-              `Property from ${propertyItems.domain} will be exported with full ChatGPT analysis.`
+            ${propertyItems.isCategoryExport ? 
+              `${propertyItems.totalProperties || propertyItems.properties?.length || 0} analyzed properties will be exported from selected categories.` :
+              isMultiple ? 
+                `${propertyItems.length} properties will be exported to a single Word document.` :
+                `Property from ${singleProperty.domain || new URL(singleProperty.url).hostname} will be exported with full ChatGPT analysis.`
             }
           </div>
         </div>
@@ -3601,10 +3621,30 @@ const WordExportModule = {
 
       closeModal();
 
-      if (isMultiple) {
+      if (propertyItems.isCategoryExport) {
+        // Handle category export
+        if (propertyItems.isMultiCategory || propertyItems.categories) {
+          // Multiple categories export
+          const allProperties = [];
+          if (propertyItems.categories) {
+            Object.values(propertyItems.categories).forEach(cat => {
+              allProperties.push(...cat.properties);
+            });
+          } else {
+            propertyItems.selectedCategories.forEach(cat => {
+              allProperties.push(...cat.properties);
+            });
+          }
+          await this.exportMultipleProperties(allProperties, options);
+        } else {
+          // Single category export
+          await this.exportMultipleProperties(propertyItems.properties, options);
+        }
+      } else if (isMultiple) {
         await this.exportMultipleProperties(propertyItems, options);
       } else {
-        await this.exportSingleProperty(propertyItems, options);
+        // Single property export - ensure we pass the actual property object
+        await this.exportSingleProperty(singleProperty, options);
       }
     });
   }
@@ -5181,13 +5221,13 @@ async function processPropertyAnalysisEnhanced(propertyUrl, analysis) {
 window.processPropertyAnalysis = processPropertyAnalysisEnhanced;
 window.checkForLatestAnalysis = checkForLatestAnalysis;
 
+// Export functions to global scope for UI handlers
+window.WordExportModule = WordExportModule;
+
 // Initialize Word export module when popup loads
 document.addEventListener('DOMContentLoaded', () => {
   WordExportModule.init();
 });
-
-// Export functions to global scope for UI handlers
-window.WordExportModule = WordExportModule;
 window.showProgress = showProgress;
 window.hideProgress = hideProgress;
 
@@ -6241,30 +6281,23 @@ async function testCategorization() {
 
 function exportSingleProperty(propertyId) {
   const property = categoryManager.properties.get(propertyId);
-  if (!property || !property.analysis) {
-    showError('No analysis data available for export');
+  
+  if (!property) {
+    showError('Property not found');
+    return;
+  }
+  
+  if (!property.analysis || !property.analysis.fullResponse) {
+    showError('No analysis data available for export. The property must be analyzed first.');
     return;
   }
 
-  // Create a temporary array with just this property for export
-  const tempProperties = [property];
-  const originalProperties = Array.from(categoryManager.properties.values());
-  
-  // Temporarily replace the properties for export
-  categoryManager.properties.clear();
-  tempProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
-  
-  // Trigger export
-  const exportWordBtn = document.getElementById('exportWordBtn');
-  if (exportWordBtn) {
-    exportWordBtn.click();
+  // Use the WordExportModule directly
+  if (window.WordExportModule) {
+    window.WordExportModule.showExportOptionsModal(property);
+  } else {
+    showError('Word export module not loaded. Please refresh the extension.');
   }
-  
-  // Restore original properties
-  setTimeout(() => {
-    categoryManager.properties.clear();
-    originalProperties.forEach(p => categoryManager.properties.set(p.id || p.url, p));
-  }, 1000);
 }
 
 function showPropertyDetails(propertyId) {
