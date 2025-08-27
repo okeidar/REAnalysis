@@ -99,6 +99,9 @@ class REAnalyzerEmbeddedUI {
       this.createFloatingActionButton();
       this.createEmbeddedPanel();
       
+      // Set up event delegation for property actions
+      this.setupEventDelegation();
+      
       // Set up event listeners
       this.setupEventListeners();
       
@@ -2578,6 +2581,8 @@ Or enter your own property URL:`);
   // Property action methods
   async viewProperty(url) {
     console.log('📖 View saved analysis for property:', url);
+    console.log('🔍 DEBUG: embeddedUI object available:', !!window.embeddedUI);
+    console.log('🔍 DEBUG: viewProperty method called from:', new Error().stack?.split('\n')[1]);
     
     try {
       // Load property data from storage
@@ -2939,6 +2944,50 @@ Or enter your own property URL:`);
     `;
     
     document.head.appendChild(styles);
+  }
+
+  setupEventDelegation() {
+    // Set up event delegation for property action buttons
+    document.addEventListener('click', (e) => {
+      // Handle viewProperty button clicks
+      if (e.target.closest('button[onclick*="viewProperty"]')) {
+        e.preventDefault();
+        const button = e.target.closest('button');
+        const onclickAttr = button.getAttribute('onclick');
+        const urlMatch = onclickAttr.match(/viewProperty\('([^']+)'\)/);
+        if (urlMatch && urlMatch[1]) {
+          console.log('🔍 Event delegation: viewProperty clicked for:', urlMatch[1]);
+          this.viewProperty(urlMatch[1]);
+        }
+        return;
+      }
+      
+      // Handle exportProperty button clicks
+      if (e.target.closest('button[onclick*="exportProperty"]')) {
+        e.preventDefault();
+        const button = e.target.closest('button');
+        const onclickAttr = button.getAttribute('onclick');
+        const urlMatch = onclickAttr.match(/exportProperty\('([^']+)'\)/);
+        if (urlMatch && urlMatch[1]) {
+          console.log('📄 Event delegation: exportProperty clicked for:', urlMatch[1]);
+          this.exportProperty(urlMatch[1]);
+        }
+        return;
+      }
+      
+      // Handle analyzeExistingProperty button clicks
+      if (e.target.closest('button[onclick*="analyzeExistingProperty"]')) {
+        e.preventDefault();
+        const button = e.target.closest('button');
+        const onclickAttr = button.getAttribute('onclick');
+        const urlMatch = onclickAttr.match(/analyzeExistingProperty\('([^']+)'\)/);
+        if (urlMatch && urlMatch[1]) {
+          console.log('🔍 Event delegation: analyzeExistingProperty clicked for:', urlMatch[1]);
+          this.analyzeExistingProperty(urlMatch[1]);
+        }
+        return;
+      }
+    });
   }
 
   async debugSavedAnalyses() {
@@ -3334,12 +3383,14 @@ if (isChatGPTSite()) {
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         embeddedUI = new REAnalyzerEmbeddedUI();
+        window.embeddedUI = embeddedUI; // Make globally accessible for onclick handlers
       }, 1000);
     });
   } else {
     // Page already loaded
     setTimeout(() => {
       embeddedUI = new REAnalyzerEmbeddedUI();
+      window.embeddedUI = embeddedUI; // Make globally accessible for onclick handlers
     }, 1000);
   }
 } else {

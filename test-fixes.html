@@ -274,8 +274,10 @@ async setupCustomPromptSettings() {
                     <code>🎉 Split prompt analysis saved successfully!</code><br>
                 </li>
                 <li>Check Properties tab - should show only ONE property (not duplicates)</li>
-                <li>Test "View Analysis" button - should show the saved analysis</li>
-                <li>Test "Export" button - should download analysis data</li>
+                <li><strong>Test "View Analysis" button</strong> - should open a modal with the saved analysis</li>
+                <li><strong>Test "Export" button</strong> - should download analysis data as JSON</li>
+                <li>If buttons don't work, check console for errors or messages like:<br>
+                    <code>🔍 Event delegation: viewProperty clicked for: [url]</code></li>
                 <li>Verify custom prompt editing works in settings</li>
             </ol>
             
@@ -285,6 +287,11 @@ async setupCustomPromptSettings() {
 📊 Response length: [number]
 🔗 Property URL: [property-url]
 🎉 Split prompt analysis saved successfully!
+
+📖 View saved analysis for property: [url]
+🔍 DEBUG: embeddedUI object available: true
+🖼️ Showing analysis modal for: [url]
+✅ Analysis modal displayed
             </div>
         </div>
     </div>
