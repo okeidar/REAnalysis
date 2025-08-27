@@ -52,11 +52,13 @@
     body {
       width: 380px;
       min-height: 500px;
+      max-height: 600px;
       font-family: var(--font-family);
       background: var(--background);
       color: var(--text-primary);
       font-size: var(--font-size-base);
       line-height: 1.5;
+      overflow-y: auto;
     }
     
     /* Tab Navigation System */
@@ -140,6 +142,8 @@
       display: none;
       padding: var(--space-md);
       min-height: 400px;
+      max-height: calc(600px - 120px);
+      overflow-y: auto;
     }
     
     .tab-content.active {
@@ -618,6 +622,91 @@
     .history-list::-webkit-scrollbar-thumb:hover {
       background: var(--text-secondary);
     }
+
+    /* Additional Layout Improvements */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-height: 600px;
+    }
+
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Smooth scrolling */
+    * {
+      scroll-behavior: smooth;
+    }
+
+    /* Enhanced button spacing */
+    .btn-group .btn + .btn {
+      margin-left: var(--space-xs);
+    }
+
+    /* Improved modal backdrop */
+    .modal {
+      backdrop-filter: blur(2px);
+    }
+
+    /* Better category grid responsiveness */
+    .enhanced-category-grid {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: var(--space-md);
+    }
+
+    /* Enhanced focus states */
+    .btn:focus,
+    .form-input:focus,
+    .tab-button:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* Category Export Section */
+    .category-export-section {
+      margin: var(--space-md) 0;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--border);
+    }
+
+    .category-export-section .btn {
+      font-weight: var(--font-weight-semibold);
+      transition: all 0.2s ease-in-out;
+    }
+
+    .category-export-section .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+    }
+
+    /* Export Dialog Enhancements */
+    .export-category-item {
+      border: 2px solid var(--border) !important;
+      transition: all 0.2s ease-in-out !important;
+    }
+
+    .export-category-item:hover {
+      border-color: var(--primary) !important;
+      background: rgba(16, 163, 127, 0.05) !important;
+      transform: translateY(-1px);
+    }
+
+    .export-category-item input[type="checkbox"]:checked + div {
+      color: var(--primary);
+    }
+
+    /* Ensure clear text visibility */
+    .modal-body p,
+    .modal-body div {
+      line-height: 1.5;
+    }
+
+    #exportSummary {
+      font-weight: var(--font-weight-semibold);
+    }
     
     /* Properties Dashboard Enhancements */
     .section-controls {
@@ -739,8 +828,9 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: var(--space-md);
-      max-height: 400px;
+      max-height: 350px;
       overflow-y: auto;
+      padding: var(--space-xs);
     }
     
     /* Enhanced Property Cards */
@@ -1211,10 +1301,11 @@
       background: var(--background);
       border-radius: var(--radius-lg);
       max-width: 500px;
-      max-height: 90vh;
+      max-height: 85vh;
       overflow-y: auto;
       box-shadow: var(--shadow-md);
       margin: var(--space-md);
+      position: relative;
     }
 
     .modal-header {
@@ -3001,7 +3092,17 @@
 
     .action-controls {
       display: flex;
-      gap: var(--space-sm);
+      gap: var(--space-md);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-controls .btn {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      padding: var(--space-md) var(--space-lg);
+      min-width: 140px;
+      box-shadow: var(--shadow-sm);
     }
 
     /* Enhanced Category Grid */
@@ -3969,7 +4070,6 @@
     <header class="header">
       <div class="logo">🏠</div>
       <h1 class="title">RE Analyzer</h1>
-      <p class="subtitle">AI-powered property analysis</p>
     </header>
     
     <!-- Tab Navigation -->
@@ -4004,7 +4104,6 @@
             
             <div class="workflow-steps">
               <div class="workflow-step" data-step="1">
-                <div class="step-number">1</div>
                 <div class="step-content">
                   <h3>Open ChatGPT</h3>
                   <p>Make sure you're on <a href="https://chatgpt.com" target="_blank">chatgpt.com</a></p>
@@ -4013,7 +4112,6 @@
               </div>
               
               <div class="workflow-step" data-step="2">
-                <div class="step-number">2</div>
                 <div class="step-content">
                   <h3>Find a Property</h3>
                   <p>Copy the URL from Zillow, Realtor.com, or any real estate site</p>
@@ -4022,7 +4120,6 @@
               </div>
               
               <div class="workflow-step" data-step="3">
-                <div class="step-number">3</div>
                 <div class="step-content">
                   <h3>Paste & Analyze</h3>
                   <p>Paste the property URL below and click analyze</p>
@@ -4031,32 +4128,7 @@
               </div>
             </div>
             
-            <div class="workflow-tip">
-              <span class="tip-icon">💡</span>
-              <span class="tip-text">Pro tip: The extension will automatically categorize your properties and provide detailed investment analysis!</span>
-            </div>
-          </div>
-        </section>
-        
-        <!-- Enhanced Status Section -->
-        <section class="section">
-          <div class="status-container">
-            <div id="status" class="status loading">
-              <div class="status-content">
-                <div class="status-icon">
-                  <div class="spinner"></div>
-                </div>
-                <div class="status-text">
-                  <div class="status-title">Checking Connection...</div>
-                  <div class="status-subtitle">Verifying ChatGPT access</div>
-                </div>
-              </div>
-              <div class="status-progress">
-                <div class="progress-bar">
-                  <div class="progress-fill" id="statusProgress"></div>
-                </div>
-              </div>
-            </div>
+
           </div>
         </section>
         
@@ -4155,6 +4227,28 @@
               <div id="warningMessage" class="message warning">
                 <div class="message-icon">⚠️</div>
                 <div class="message-content"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Enhanced Status Section -->
+        <section class="section">
+          <div class="status-container">
+            <div id="status" class="status loading">
+              <div class="status-content">
+                <div class="status-icon">
+                  <div class="spinner"></div>
+                </div>
+                <div class="status-text">
+                  <div class="status-title">Checking Connection...</div>
+                  <div class="status-subtitle">Verifying ChatGPT access</div>
+                </div>
+              </div>
+              <div class="status-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" id="statusProgress"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -4285,21 +4379,13 @@
             </div>
             
             <div class="action-controls">
-              <button id="testCategorizationBtn" class="btn btn-primary btn-sm" title="Test categorization with a sample property">
-                <span class="btn-icon">🧪</span>
-                Test Categorization
-              </button>
-              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
+              <button id="manageCategoriesBtn" class="btn btn-primary btn-sm">
                 <span class="btn-icon">⚙️</span>
                 Manage Categories
               </button>
-              <button id="exportWordBtn" class="btn btn-secondary btn-sm">
+              <button id="exportWordBtn" class="btn btn-primary btn-sm">
                 <span class="btn-icon">📄</span>
                 Export to Word
-              </button>
-              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-                <span class="btn-icon">🗑️</span>
-                Clear All
               </button>
             </div>
           </div>
