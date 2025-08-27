@@ -458,6 +458,39 @@ class REAnalyzerEmbeddedUI {
             </div>
           </div>
         </div>
+        
+        <!-- Custom Prompt Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Custom Analysis Prompt</div>
+            <div class="re-section-subtitle">Customize the prompt sent to ChatGPT for property analysis</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Custom Prompt Template</label>
+            <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
+                      placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
+                      style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Leave empty to use the default AI-generated prompt. Variables: {PROPERTY_URL}, {DATE}
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt">
+              <div>💾</div>
+              <span>Save Prompt</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
+              <div>🔄</div>
+              <span>Reset to Default</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-prompt">
+              <div>👁️</div>
+              <span>Preview</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Actions -->
         <div class="re-section">
@@ -938,6 +971,9 @@ class REAnalyzerEmbeddedUI {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => this.clearAllData());
     }
+    
+    // Custom prompt events
+    this.setupCustomPromptEvents();
   }
 
   setupAnalyzerEvents() {
@@ -1654,8 +1690,55 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
-  exportAllProperties() {
-    this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
+  async exportAllProperties() {
+    try {
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Create comprehensive export data
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        totalProperties: properties.length,
+        analyzedCount: properties.filter(p => p.analysis && p.analysis.extractedData).length,
+        properties: properties.map(property => ({
+          url: property.url,
+          domain: property.domain,
+          date: property.date,
+          timestamp: property.timestamp,
+          extractedData: property.analysis?.extractedData || {},
+          fullAnalysis: property.analysis?.fullResponse || property.analysis?.fullAnalysis || 'No analysis available',
+          hasAnalysis: !!(property.analysis && property.analysis.extractedData)
+        }))
+      };
+      
+      // Create and download file
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `all-properties-analysis-${Date.now()}.json`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', `Exported ${properties.length} properties successfully!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export all properties:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties');
+    }
   }
 
   async testAnalysis() {
@@ -2058,6 +2141,95 @@ Or enter your own property URL:`);
     if (progressSection) {
       progressSection.classList.remove('re-hidden');
     }
+    
+    // Also update the properties tab to show pending status
+    this.updatePendingAnalysisInProperties();
+  }
+  
+  updatePendingAnalysisInProperties() {
+    // Add a pending property entry to the properties list
+    if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+      console.log('📊 Adding pending analysis indicator for:', currentPropertyAnalysis.url);
+      
+      // Create a temporary property object for the pending analysis
+      const pendingProperty = {
+        url: currentPropertyAnalysis.url,
+        domain: this.extractDomainFromUrl(currentPropertyAnalysis.url),
+        date: new Date().toLocaleDateString(),
+        timestamp: Date.now(),
+        isPending: true // Special flag for pending analysis
+      };
+      
+      // Add to the properties display temporarily
+      this.addPendingPropertyToDisplay(pendingProperty);
+    }
+  }
+  
+  extractDomainFromUrl(url) {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch (e) {
+      return 'unknown';
+    }
+  }
+  
+  addPendingPropertyToDisplay(pendingProperty) {
+    const propertiesList = this.panel.querySelector('#re-properties-list');
+    if (!propertiesList) return;
+    
+    // Remove any existing pending entries for this URL
+    const existingPending = propertiesList.querySelector(`[data-pending-url="${pendingProperty.url}"]`);
+    if (existingPending) {
+      existingPending.remove();
+    }
+    
+    // Create pending property card
+    const pendingCard = document.createElement('div');
+    pendingCard.className = 're-property-card re-pending-analysis';
+    pendingCard.setAttribute('data-pending-url', pendingProperty.url);
+    pendingCard.innerHTML = `
+      <div class="re-property-header">
+        <div class="re-property-title">🔄 Analyzing Property...</div>
+        <div class="re-property-status re-pending">
+          <div class="re-analysis-spinner"></div>
+        </div>
+      </div>
+      <div class="re-property-meta">
+        <div class="re-property-domain">${this.getDomainDisplayName(pendingProperty.domain)}</div>
+        <div>Started: ${pendingProperty.date}</div>
+      </div>
+      <div class="re-property-actions">
+        <div class="re-progress-indicator">Analysis in progress...</div>
+      </div>
+    `;
+    
+    // Insert at the top of the list
+    propertiesList.insertBefore(pendingCard, propertiesList.firstChild);
+    
+    // Hide empty state if showing
+    this.hideChatGPTEmptyState();
+  }
+  
+  removePendingPropertyFromDisplay(url) {
+    const pendingElement = this.panel.querySelector(`[data-pending-url="${url}"]`);
+    if (pendingElement) {
+      pendingElement.remove();
+      console.log('🗑️ Removed pending analysis indicator for:', url);
+    }
+  }
+  
+  // Method to be called when analysis is completed externally
+  onAnalysisCompleted(propertyUrl) {
+    console.log('🎉 Analysis completed notification received for:', propertyUrl);
+    
+    // Remove pending indicator
+    this.removePendingPropertyFromDisplay(propertyUrl);
+    
+    // Trigger complete analysis workflow
+    this.completeAnalysis();
+    
+    // Show success message specific to the completed property
+    this.showChatGPTMessage('success', `✅ Analysis completed for property! Switch to Properties tab to view results.`);
   }
 
   hideAnalysisProgress() {
@@ -2069,6 +2241,11 @@ Or enter your own property URL:`);
     if (this.analysisTimer) {
       clearInterval(this.analysisTimer);
       this.analysisTimer = null;
+    }
+    
+    // Remove pending analysis indicator
+    if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+      this.removePendingPropertyFromDisplay(currentPropertyAnalysis.url);
     }
   }
 
@@ -2111,12 +2288,20 @@ Or enter your own property URL:`);
     // Show notification on FAB
     this.showFabNotification();
     
+    // Reload property data to show the new analysis
+    this.loadChatGPTPropertyData();
+    
     // Auto-switch to properties tab if enabled
     if (uiSettings.autoShow) {
       setTimeout(() => {
         this.switchTab('properties');
+        // Ensure properties are refreshed on the tab
+        this.loadChatGPTPropertyData();
       }, 1000);
     }
+    
+    // Show success message
+    this.showChatGPTMessage('success', '✅ Property analysis completed! Check the Properties tab.');
   }
 
   showFabNotification() {
@@ -2314,7 +2499,36 @@ Or enter your own property URL:`);
   }
 
   getPropertyTitle(property) {
-    // Try to extract a title from the URL or use a generic title
+    // First priority: Check if we have extracted address and bedrooms data
+    if (property.analysis && property.analysis.extractedData) {
+      const data = property.analysis.extractedData;
+      let title = '';
+      
+      // Use address if available
+      if (data.address) {
+        title = data.address;
+      } else if (data.location) {
+        title = data.location;
+      } else if (data.neighborhood) {
+        title = data.neighborhood;
+      }
+      
+      // Add bedrooms if available
+      if (data.bedrooms) {
+        title += title ? ` • ${data.bedrooms} bed` : `${data.bedrooms} bed`;
+      }
+      
+      // Add price if available and no address
+      if (!data.address && data.price) {
+        title = title ? `${title} • ${data.price}` : data.price;
+      }
+      
+      if (title) {
+        return title;
+      }
+    }
+    
+    // Fallback: Try to extract a title from the URL
     try {
       const url = new URL(property.url);
       const pathParts = url.pathname.split('/').filter(part => part);
@@ -2809,10 +3023,57 @@ Or enter your own property URL:`);
     }
   }
 
-  exportProperty(url) {
+  async exportProperty(url) {
     console.log('📄 Export property:', url);
-    // This would implement property export functionality
-    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+    
+    try {
+      // Load property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (!property) {
+        this.showChatGPTMessage('error', 'Property not found');
+        return;
+      }
+      
+      if (!property.analysis) {
+        this.showChatGPTMessage('warning', 'No analysis data to export');
+        return;
+      }
+      
+      // Create export data
+      const exportData = {
+        url: property.url,
+        domain: property.domain,
+        analysisDate: property.date,
+        extractedData: property.analysis.extractedData || {},
+        fullAnalysis: property.analysis.fullResponse || property.analysis.fullAnalysis || 'No full analysis available',
+        exportDate: new Date().toISOString()
+      };
+      
+      // Create and download file
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `property-analysis-${Date.now()}.json`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', 'Property analysis exported successfully!');
+      
+    } catch (error) {
+      console.error('❌ Failed to export property:', error);
+      this.showChatGPTMessage('error', 'Failed to export property analysis');
+    }
   }
 
   switchPropertiesView(view) {
@@ -2889,6 +3150,147 @@ Or enter your own property URL:`);
       console.error('Failed to save settings:', error);
       this.showChatGPTMessage('error', 'Failed to save settings');
     }
+  }
+  
+  setupCustomPromptEvents() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    const savePromptBtn = this.panel.querySelector('#re-save-prompt');
+    const resetPromptBtn = this.panel.querySelector('#re-reset-prompt');
+    const previewPromptBtn = this.panel.querySelector('#re-preview-prompt');
+    
+    // Load existing custom prompt
+    this.loadCustomPrompt();
+    
+    if (savePromptBtn) {
+      savePromptBtn.addEventListener('click', () => this.saveCustomPrompt());
+    }
+    
+    if (resetPromptBtn) {
+      resetPromptBtn.addEventListener('click', () => this.resetCustomPrompt());
+    }
+    
+    if (previewPromptBtn) {
+      previewPromptBtn.addEventListener('click', () => this.previewCustomPrompt());
+    }
+  }
+  
+  async loadCustomPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customPrompt']),
+        { customPrompt: null }
+      );
+      
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      if (customPromptTextarea && result.customPrompt) {
+        customPromptTextarea.value = result.customPrompt;
+      }
+    } catch (error) {
+      console.error('Failed to load custom prompt:', error);
+    }
+  }
+  
+  async saveCustomPrompt() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    if (!customPromptTextarea) return;
+    
+    const promptText = customPromptTextarea.value.trim();
+    
+    try {
+      await safeChromeFall(
+        () => chrome.storage.local.set({ customPrompt: promptText || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Custom prompt saved successfully!');
+      console.log('💾 Custom prompt saved');
+    } catch (error) {
+      console.error('Failed to save custom prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save custom prompt');
+    }
+  }
+  
+  async resetCustomPrompt() {
+    if (confirm('Are you sure you want to reset the custom prompt to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['customPrompt']),
+          null
+        );
+        
+        const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+        if (customPromptTextarea) {
+          customPromptTextarea.value = '';
+        }
+        
+        this.showChatGPTMessage('success', 'Custom prompt reset to default');
+        console.log('🔄 Custom prompt reset');
+      } catch (error) {
+        console.error('Failed to reset custom prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset custom prompt');
+      }
+    }
+  }
+  
+  previewCustomPrompt() {
+    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+    if (!customPromptTextarea) return;
+    
+    const promptText = customPromptTextarea.value.trim();
+    
+    if (!promptText) {
+      this.showChatGPTMessage('warning', 'No custom prompt to preview. The default AI-generated prompt will be used.');
+      return;
+    }
+    
+    // Show preview with example data
+    const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+    const previewText = promptText
+      .replace('{PROPERTY_URL}', exampleUrl)
+      .replace('{DATE}', new Date().toLocaleDateString());
+    
+    // Create and show preview modal
+    this.showPromptPreviewModal(previewText);
+  }
+  
+  showPromptPreviewModal(previewText) {
+    // Remove existing modal if any
+    const existingModal = document.querySelector('#re-prompt-preview-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 're-prompt-preview-modal';
+    modal.className = 're-modal-overlay';
+    modal.innerHTML = `
+      <div class="re-modal">
+        <div class="re-modal-header">
+          <h3>Prompt Preview</h3>
+          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+        </div>
+        <div class="re-modal-content">
+          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your custom prompt will appear when sent to ChatGPT:</p>
+          <div class="re-analysis-text" style="max-height: 400px;">
+            ${previewText.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+        <div class="re-modal-footer">
+          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
   }
 
   resetSettings() {
@@ -3060,12 +3462,14 @@ if (isChatGPTSite()) {
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         embeddedUI = new REAnalyzerEmbeddedUI();
+        window.embeddedUI = embeddedUI; // Make globally available
       }, 1000);
     });
   } else {
     // Page already loaded
     setTimeout(() => {
       embeddedUI = new REAnalyzerEmbeddedUI();
+      window.embeddedUI = embeddedUI; // Make globally available
     }, 1000);
   }
 } else {
@@ -3286,25 +3690,90 @@ async function handleConfirmationReceived() {
     
     const linkMessage = propertyLink;  // Send only the raw link
     
-    // Insert the link message
+    console.log('🔍 DEBUG: About to insert link message:', linkMessage);
+    console.log('🔍 DEBUG: Input field type:', inputField.tagName);
+    console.log('🔍 DEBUG: Input field contentEditable:', inputField.contentEditable);
+    console.log('🔍 DEBUG: Input field current value/content:', inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent);
+    
+    // Insert the link message with enhanced React compatibility
     if (inputField.tagName === 'TEXTAREA') {
+      // Clear field first
       inputField.value = '';
       inputField.focus();
+      
+      // Set the link
       inputField.value = linkMessage;
+      
+      // Trigger React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log('🔍 DEBUG: After setting textarea value:', inputField.value);
     } else if (inputField.contentEditable === 'true') {
+      // Clear field first
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the link using multiple methods for better compatibility
       inputField.textContent = linkMessage;
+      
+      // Also try innerHTML as backup
+      if (inputField.textContent !== linkMessage) {
+        inputField.innerHTML = linkMessage;
+      }
+      
+      // Trigger React state updates with more events
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+      inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' }));
+      
+      // Modern React sometimes uses these events
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      
+      console.log('🔍 DEBUG: After setting contentEditable content:', inputField.textContent);
+      console.log('🔍 DEBUG: contentEditable innerHTML:', inputField.innerHTML);
+    }
+    
+    // Wait a moment for React state to update
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Verify the content was set
+    const finalContent = inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent;
+    console.log('🔍 DEBUG: Final content in input field:', finalContent);
+    
+    if (finalContent !== linkMessage) {
+      console.warn('⚠️ WARNING: Link may not have been set correctly in input field');
+      console.warn('⚠️ Expected:', linkMessage);
+      console.warn('⚠️ Actual:', finalContent);
+      
+      // Try alternative method with direct manipulation
+      try {
+        if (inputField.contentEditable === 'true') {
+          // Try using document.execCommand as fallback
+          inputField.focus();
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+          document.execCommand('insertText', false, linkMessage);
+          
+          console.log('🔄 RETRY: Attempted alternative content setting method');
+          console.log('🔍 DEBUG: Content after retry:', inputField.textContent);
+        }
+      } catch (execError) {
+        console.warn('⚠️ Alternative content setting method failed:', execError);
+      }
     }
     
     inputField.focus();
     
-    // Auto-submit the link
-        setTimeout(() => {
+    // Auto-submit the link with additional delay to ensure content is ready
+    setTimeout(() => {
+      console.log('🚀 DEBUG: About to submit message');
+      console.log('🔍 DEBUG: Input content before submit:', inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent);
+      
       submitMessage();
       promptSplittingState.currentPhase = 'complete';
       showPromptSplittingIndicator('complete', 'Analysis request sent successfully!');
@@ -3369,19 +3838,37 @@ async function handleSplittingFallback() {
       .replace('{PROPERTY_URL}', promptSplittingState.pendingPropertyLink)
       .replace('{DATE}', new Date().toLocaleDateString());
     
-    // Insert the full prompt
+    // Insert the full prompt with enhanced React compatibility
+    console.log('🔄 DEBUG FALLBACK: About to insert full prompt:', fullPrompt.substring(0, 100) + '...');
+    console.log('🔄 DEBUG FALLBACK: Input field type:', inputField.tagName);
+    
     if (inputField.tagName === 'TEXTAREA') {
       inputField.value = '';
       inputField.focus();
       inputField.value = fullPrompt;
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      
+      console.log('🔄 DEBUG FALLBACK: Textarea value set to length:', inputField.value.length);
     } else if (inputField.contentEditable === 'true') {
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the content using multiple methods
       inputField.textContent = fullPrompt;
+      
+      // Also try innerHTML as backup
+      if (inputField.textContent !== fullPrompt) {
+        inputField.innerHTML = fullPrompt;
+      }
+      
+      // Trigger comprehensive React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
+      
+      console.log('🔄 DEBUG FALLBACK: ContentEditable content set to length:', inputField.textContent.length);
     }
     
     inputField.focus();
@@ -6062,6 +6549,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Notify embedded UI about completed analysis
+                  if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                    window.embeddedUI.onAnalysisCompleted(promptSplittingState.pendingPropertyLink);
+                  }
                 }
               }
             }).catch(err => {
@@ -6110,6 +6602,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Notify embedded UI about completed analysis
+                  if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                    window.embeddedUI.onAnalysisCompleted(promptSplittingState.pendingPropertyLink);
+                  }
                 }
               }
             }).catch(err => {
@@ -6163,6 +6660,11 @@ function setupResponseMonitor() {
             console.log('✅ Analysis data sent successfully:', response);
             if (response.success) {
               console.log('🎉 Property analysis saved and should now show as analyzed!');
+              
+              // Notify embedded UI about completed analysis
+              if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+              }
             }
           }
         }).catch(err => {
@@ -6480,6 +6982,115 @@ function setupResponseMonitor() {
   };
 }
 
+// Enhanced text insertion function for modern ChatGPT input compatibility
+async function insertTextInChatGPTInput(inputField, text, description = 'text') {
+  console.log(`🔤 Enhanced text insertion (${description}):`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+  console.log(`🔤 Input field type: ${inputField.tagName}, contentEditable: ${inputField.contentEditable}`);
+  
+  // Clear field first
+  if (inputField.tagName === 'TEXTAREA') {
+    inputField.value = '';
+  } else if (inputField.contentEditable === 'true') {
+    inputField.textContent = '';
+    inputField.innerHTML = '';
+  }
+  
+  // Focus the field
+  inputField.focus();
+  
+  // Wait a moment for focus to take effect
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  if (inputField.tagName === 'TEXTAREA') {
+    // For textarea elements
+    inputField.value = text;
+    
+    // Trigger React state updates
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    console.log(`🔤 Textarea content set (${description}), length:`, inputField.value.length);
+    
+  } else if (inputField.contentEditable === 'true') {
+    // For contentEditable elements (modern ChatGPT)
+    
+    // Method 1: Direct property assignment
+    inputField.textContent = text;
+    
+    // Method 2: If textContent fails, try innerHTML
+    if (inputField.textContent !== text) {
+      console.log('🔄 Trying innerHTML method as fallback...');
+      inputField.innerHTML = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    
+    // Method 3: If both fail, try execCommand
+    if (inputField.textContent !== text && document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+      console.log('🔄 Trying execCommand method as fallback...');
+      try {
+        inputField.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, text);
+      } catch (execError) {
+        console.warn('⚠️ execCommand method failed:', execError);
+      }
+    }
+    
+    // Method 4: Modern alternative using clipboard API
+    if (inputField.textContent !== text && navigator.clipboard) {
+      console.log('🔄 Trying clipboard API method as final fallback...');
+      try {
+        await navigator.clipboard.writeText(text);
+        inputField.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('paste', false, null);
+      } catch (clipError) {
+        console.warn('⚠️ Clipboard API method failed:', clipError);
+      }
+    }
+    
+    // Trigger comprehensive React state updates
+    const events = [
+      new Event('beforeinput', { bubbles: true }),
+      new Event('input', { bubbles: true }),
+      new Event('change', { bubbles: true }),
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }),
+      new KeyboardEvent('keyup', { bubbles: true, key: 'Enter' })
+    ];
+    
+    // Add composition events for international input support
+    try {
+      events.push(new CompositionEvent('compositionstart', { bubbles: true }));
+      events.push(new CompositionEvent('compositionend', { bubbles: true }));
+    } catch (compError) {
+      // CompositionEvent might not be supported in all browsers
+    }
+    
+    events.forEach(event => {
+      try {
+        inputField.dispatchEvent(event);
+      } catch (eventError) {
+        console.warn('⚠️ Event dispatch failed:', eventError);
+      }
+    });
+    
+    console.log(`🔤 ContentEditable content set (${description}), length:`, inputField.textContent.length);
+  }
+  
+  // Final verification
+  const finalContent = inputField.tagName === 'TEXTAREA' ? inputField.value : inputField.textContent;
+  const success = finalContent === text;
+  
+  console.log(`🔤 Text insertion ${success ? 'SUCCESS' : 'FAILED'} (${description})`);
+  if (!success) {
+    console.warn(`⚠️ Expected length: ${text.length}, Actual length: ${finalContent.length}`);
+    console.warn(`⚠️ Expected start: "${text.substring(0, 50)}"`);
+    console.warn(`⚠️ Actual start: "${finalContent.substring(0, 50)}"`);
+  }
+  
+  return success;
+}
+
 // Function to find ChatGPT input field with more comprehensive selectors
 function findChatGPTInput() {
   console.log('🔍 Searching for ChatGPT input field...');
@@ -6703,7 +7314,10 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       const prompt = fullPrompt;
       console.log('Inserting prompt into input field:', inputField);
     
-    // Clear existing content first
+    // Clear existing content first and insert with enhanced React compatibility
+    console.log('🔀 DEBUG SINGLE: About to insert single prompt:', prompt.substring(0, 100) + '...');
+    console.log('🔀 DEBUG SINGLE: Input field type:', inputField.tagName);
+    
     if (inputField.tagName === 'TEXTAREA') {
       inputField.value = '';
       inputField.focus();
@@ -6713,18 +7327,50 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
       
+      console.log('🔀 DEBUG SINGLE: Textarea value set to length:', inputField.value.length);
+      
     } else if (inputField.contentEditable === 'true') {
       inputField.textContent = '';
+      inputField.innerHTML = '';
       inputField.focus();
+      
+      // Set the content using multiple methods for better compatibility
       inputField.textContent = prompt;
       
-      // Trigger input events for contenteditable
+      // Also try innerHTML as backup
+      if (inputField.textContent !== prompt) {
+        inputField.innerHTML = prompt;
+      }
+      
+      // Trigger comprehensive React state updates
       inputField.dispatchEvent(new Event('input', { bubbles: true }));
       inputField.dispatchEvent(new Event('change', { bubbles: true }));
+      inputField.dispatchEvent(new Event('beforeinput', { bubbles: true }));
       
       // Also try composition events which some modern inputs use
-      inputField.dispatchEvent(new CompositionEvent('compositionstart'));
-      inputField.dispatchEvent(new CompositionEvent('compositionend'));
+      inputField.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      inputField.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      
+      console.log('🔀 DEBUG SINGLE: ContentEditable content set to length:', inputField.textContent.length);
+      
+      // Verify the content was set correctly
+      if (inputField.textContent !== prompt) {
+        console.warn('⚠️ WARNING: Single prompt may not have been set correctly');
+        console.warn('⚠️ Expected length:', prompt.length);
+        console.warn('⚠️ Actual length:', inputField.textContent.length);
+        
+        // Try alternative method with direct manipulation
+        try {
+          inputField.focus();
+          document.execCommand('selectAll', false, null);
+          document.execCommand('delete', false, null);
+          document.execCommand('insertText', false, prompt);
+          
+          console.log('🔄 RETRY SINGLE: Attempted alternative content setting method');
+        } catch (execError) {
+          console.warn('⚠️ Alternative single prompt setting method failed:', execError);
+        }
+      }
     }
     
       // Ensure the field has focus
