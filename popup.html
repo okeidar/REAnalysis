@@ -3433,6 +3433,32 @@
       max-width: 500px;
     }
 
+    .current-indicator {
+      position: absolute;
+      top: var(--space-xs);
+      right: var(--space-xs);
+      background: var(--primary);
+      color: white;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    .category-option {
+      position: relative;
+    }
+
+    .no-categories-message {
+      text-align: center;
+      padding: var(--space-lg);
+      color: var(--text-secondary);
+    }
+
+    .no-categories-message p {
+      margin-bottom: var(--space-md);
+    }
+
 
 
     .categorization-content {
@@ -4259,11 +4285,15 @@
             </div>
             
             <div class="action-controls">
+              <button id="testCategorizationBtn" class="btn btn-primary btn-sm" title="Test categorization with a sample property">
+                <span class="btn-icon">🧪</span>
+                Test Categorization
+              </button>
               <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
                 <span class="btn-icon">⚙️</span>
                 Manage Categories
               </button>
-              <button id="exportWordBtn" class="btn btn-primary btn-sm">
+              <button id="exportWordBtn" class="btn btn-secondary btn-sm">
                 <span class="btn-icon">📄</span>
                 Export to Word
               </button>

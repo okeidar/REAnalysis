@@ -5192,6 +5192,12 @@ function setupPropertiesEventListeners() {
     clearHistoryBtn.addEventListener('click', handleClearHistory);
   }
 
+  // Test categorization button
+  const testCategorizationBtn = document.getElementById('testCategorizationBtn');
+  if (testCategorizationBtn) {
+    testCategorizationBtn.addEventListener('click', testCategorization);
+  }
+
 
   
   // Latest analysis dismiss button
@@ -5536,9 +5542,14 @@ function openCategorizationModal(propertyId) {
   selectedPropertyForCategorization = propertyId;
   const property = categoryManager.properties.get(propertyId);
   
-  if (!property) return;
+  if (!property) {
+    console.error('Property not found:', propertyId);
+    return;
+  }
   
-    // Populate property preview
+  console.log('Opening categorization modal for property:', property);
+  
+  // Populate property preview
   const propertyPreview = document.getElementById('categorizationPropertyPreview');
   if (propertyPreview) {
     const address = extractAddressFromUrl(property.url) || property.address || property.url;
@@ -5551,12 +5562,24 @@ function openCategorizationModal(propertyId) {
         ${property.date || new Date(property.timestamp).toLocaleDateString()}
         ${property.analysis ? ' • Analyzed' : ' • Pending Analysis'}
       </div>
+      <div class="current-category">
+        <strong>Current Category:</strong> ${categoryManager.getCategory(property.categoryId)?.name || 'Uncategorized'}
+      </div>
     `;
   }
    
-   // Populate category options
-   populateCategoryOptions();
- }
+  // Populate category options
+  populateCategoryOptions();
+  
+  // Show the modal
+  const modal = document.getElementById('categorizationModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    console.log('Categorization modal opened');
+  } else {
+    console.error('Categorization modal not found');
+  }
+}
  
  // Function to extract address from property URL
  function extractAddressFromUrl(url) {
@@ -5639,11 +5662,29 @@ function openCategorizationModal(propertyId) {
 // Populate category options in modal
 function populateCategoryOptions() {
   const categoryOptions = document.getElementById('categoryOptions');
-  if (!categoryOptions) return;
+  if (!categoryOptions) {
+    console.error('Category options container not found');
+    return;
+  }
   
   const categories = categoryManager.getAllCategories();
   const currentProperty = categoryManager.properties.get(selectedPropertyForCategorization);
   const currentCategoryId = currentProperty?.categoryId;
+  
+  console.log('Available categories:', categories);
+  console.log('Current property category:', currentCategoryId);
+  
+  if (categories.length === 0) {
+    categoryOptions.innerHTML = `
+      <div class="no-categories-message">
+        <p>No categories available. Please create categories first.</p>
+        <button class="btn btn-primary" onclick="document.getElementById('manageCategoriesBtn').click(); document.getElementById('categorizationModal').style.display='none';">
+          Create Categories
+        </button>
+      </div>
+    `;
+    return;
+  }
   
   const optionsHTML = categories.map(category => `
     <div class="category-option ${category.id === currentCategoryId ? 'selected' : ''}" 
@@ -5653,6 +5694,7 @@ function populateCategoryOptions() {
         <h5>${category.name}</h5>
         <p>${category.description}</p>
       </div>
+      ${category.id === currentCategoryId ? '<div class="current-indicator">Current</div>' : ''}
     </div>
   `).join('');
   
@@ -5755,6 +5797,37 @@ function handleClearHistory() {
     updateViewDisplay();
     showSuccess('Property history cleared successfully');
   }
+}
+
+// Test categorization functionality
+async function testCategorization() {
+  await categoryManager.initialize();
+  
+  // Create a test property if none exist
+  const testProperty = {
+    id: 'test_property_' + Date.now(),
+    url: 'https://www.zillow.com/homedetails/123-Main-St-Anytown-ST-12345/123456789_zpid/',
+    timestamp: Date.now(),
+    date: new Date().toLocaleDateString(),
+    domain: 'zillow.com',
+    categoryId: 'uncategorized',
+    analysis: null
+  };
+  
+  // Add to category manager
+  categoryManager.properties.set(testProperty.id, testProperty);
+  await categoryManager.saveData();
+  
+  // Update displays
+  updatePropertiesStats();
+  updateViewDisplay();
+  
+  // Open categorization modal for the test property
+  setTimeout(() => {
+    openCategorizationModal(testProperty.id);
+  }, 500);
+  
+  showSuccess('Test property created! Try categorizing it.');
 }
 
 function exportSingleProperty(propertyId) {
