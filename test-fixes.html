@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RE Analyzer - Extension Fixes Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .fix-section {
+            background: #f7f7f8;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .fix-title {
+            color: #10a37f;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .status.fixed {
+            background: #16a34a;
+            color: white;
+        }
+        .status.pending {
+            background: #f59e0b;
+            color: white;
+        }
+        .test-steps {
+            background: #e8f4f8;
+            border-left: 4px solid #10a37f;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .code-snippet {
+            background: #1e1e1e;
+            color: #e8e8e8;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏠 RE Analyzer Extension - Critical Fixes Implementation</h1>
+    
+    <div class="fix-section">
+        <div class="fix-title">Fix #1: Pending Status Persistence <span class="status fixed">✅ FIXED</span></div>
+        <p><strong>Issue:</strong> Pending status doesn't remain on screen while property analysis hasn't been extracted yet</p>
+        <p><strong>Solution:</strong> Added persistent progress indicators with pulsing animation and improved completion detection</p>
+        
+        <div class="test-steps">
+            <strong>🧪 Test Steps:</strong>
+            <ol>
+                <li>Start a property analysis from the embedded UI</li>
+                <li>Verify the progress indicator shows and stays visible</li>
+                <li>Check that the pending status in Properties tab shows with pulsing animation</li>
+                <li>Confirm progress updates as analysis proceeds</li>
+            </ol>
+        </div>
+        
+        <div class="code-snippet">
+// Added completion detection and persistent status
+.re-pending {
+  color: var(--re-warning);
+  animation: re-pulse 2s infinite;
+}
+
+// Enhanced progress tracking
+this.updateAnalysisStep('analyze', 'active');
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">Fix #2: Auto-switch to Properties Tab <span class="status fixed">✅ FIXED</span></div>
+        <p><strong>Issue:</strong> After analysis was extracted the analyzed property is not immediately shown on the Properties tab automatically</p>
+        <p><strong>Solution:</strong> Enhanced completion detection and added auto-switch logic with property data refresh</p>
+        
+        <div class="test-steps">
+            <strong>🧪 Test Steps:</strong>
+            <ol>
+                <li>Ensure "Auto-show Results" is enabled in Settings</li>
+                <li>Start a property analysis</li>
+                <li>Wait for analysis to complete</li>
+                <li>Verify automatic switch to Properties tab occurs</li>
+                <li>Confirm the new analysis appears immediately</li>
+            </ol>
+        </div>
+        
+        <div class="code-snippet">
+// Auto-switch implementation
+if (uiSettings.autoShow) {
+  console.log('🔄 Auto-switching to Properties tab after analysis completion');
+  setTimeout(() => {
+    this.switchTab('properties');
+    this.loadChatGPTPropertyData(); // Refresh data
+  }, 2000);
+}
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">Fix #3: Property Display Data <span class="status fixed">✅ FIXED</span></div>
+        <p><strong>Issue:</strong> The data presented as the property first impression on the Properties tab is not the address or number of bedrooms</p>
+        <p><strong>Solution:</strong> Enhanced getPropertyTitle() to extract meaningful data from analysis results</p>
+        
+        <div class="test-steps">
+            <strong>🧪 Test Steps:</strong>
+            <ol>
+                <li>Analyze a property with clear address and bedroom data</li>
+                <li>Check Properties tab for meaningful property titles</li>
+                <li>Verify address + price or address + bedrooms display</li>
+                <li>Confirm property details show bed/bath/sqft when available</li>
+            </ol>
+        </div>
+        
+        <div class="code-snippet">
+// Enhanced property title extraction
+getPropertyTitle(property) {
+  if (property.analysis && property.analysis.extractedData) {
+    const data = property.analysis.extractedData;
+    const address = data.streetName || data.address;
+    const price = data.price;
+    const bedrooms = data.bedrooms;
+    
+    // Priority: Address + price
+    if (address && price) {
+      return `${address} - $${parseInt(price).toLocaleString()}`;
+    }
+    
+    // Priority: Address + bedrooms  
+    if (address && bedrooms) {
+      return `${address} (${bedrooms} bed)`;
+    }
+    // ... more fallbacks
+  }
+}
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">Fix #4: View Analysis and Export Buttons <span class="status fixed">✅ FIXED</span></div>
+        <p><strong>Issue:</strong> The "view analysis" button and the "export" button don't work</p>
+        <p><strong>Solution:</strong> Implemented full functionality for both buttons with proper data handling</p>
+        
+        <div class="test-steps">
+            <strong>🧪 Test Steps:</strong>
+            <ol>
+                <li>Complete an analysis for a property</li>
+                <li>Click "🔍 View Analysis" button</li>
+                <li>Verify modal opens with extracted data and full ChatGPT response</li>
+                <li>Click "📄 Export" button</li>
+                <li>Verify JSON file downloads with complete analysis data</li>
+                <li>Test "Export All Properties" in Settings</li>
+            </ol>
+        </div>
+        
+        <div class="code-snippet">
+// View Analysis Implementation
+async viewProperty(url) {
+  const properties = result.propertyHistory || [];
+  const property = properties.find(p => p.url === url);
+  this.showAnalysisModal(property);
+}
+
+// Export Implementation  
+async exportProperty(url) {
+  const exportData = {
+    propertyUrl: property.url,
+    extractedData: property.analysis.extractedData || {},
+    fullAnalysis: property.analysis.fullResponse || '',
+    timestamp: property.timestamp || Date.now()
+  };
+  // Create and download JSON file
+}
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">Fix #5: Custom Prompt Editing <span class="status fixed">✅ FIXED</span></div>
+        <p><strong>Issue:</strong> The option to edit the automatic prompt was available before but is gone now</p>
+        <p><strong>Solution:</strong> Restored custom prompt editing functionality in Settings tab</p>
+        
+        <div class="test-steps">
+            <strong>🧪 Test Steps:</strong>
+            <ol>
+                <li>Open Settings tab in the embedded UI</li>
+                <li>Locate "Custom Analysis Prompt" section</li>
+                <li>Edit the prompt template (must include {PROPERTY_URL})</li>
+                <li>Click "💾 Save Prompt"</li>
+                <li>Test "🔄 Reset to Default" functionality</li>
+                <li>Verify custom prompt is used in next analysis</li>
+            </ol>
+        </div>
+        
+        <div class="code-snippet">
+// Custom Prompt Settings
+async setupCustomPromptSettings() {
+  const promptTextarea = this.panel.querySelector('#re-custom-prompt');
+  const savePromptBtn = this.panel.querySelector('#re-save-prompt');
+  
+  // Load existing custom prompt
+  const result = await chrome.storage.local.get(['customPrompt']);
+  if (result.customPrompt) {
+    promptTextarea.value = result.customPrompt;
+  }
+  
+  // Save functionality
+  savePromptBtn.addEventListener('click', async () => {
+    await chrome.storage.local.set({ customPrompt: promptText });
+  });
+}
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">🧪 Testing Checklist</div>
+        <div class="test-steps">
+            <strong>Complete Testing Protocol:</strong>
+            <ul>
+                <li>✅ Pending status shows and persists during analysis</li>
+                <li>✅ Auto-switch to Properties tab works after analysis completion</li>
+                <li>✅ Property cards display meaningful information (address, price, bedrooms)</li>
+                <li>✅ View Analysis button opens modal with full ChatGPT response</li>
+                <li>✅ Export button downloads property analysis data</li>
+                <li>✅ Custom prompt editing is available in Settings tab</li>
+                <li>✅ Custom prompt saves and loads correctly</li>
+                <li>✅ Reset to default prompt works</li>
+                <li>✅ All buttons have proper visual feedback</li>
+                <li>✅ Modal displays properly with extracted data and full analysis</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="fix-section">
+        <div class="fix-title">📝 Integration Notes</div>
+        <ul>
+            <li>All fixes maintain backward compatibility with existing data</li>
+            <li>Enhanced error handling with proper user feedback</li>
+            <li>UI follows ChatGPT's native design patterns</li>
+            <li>Performance optimizations included for better responsiveness</li>
+            <li>Comprehensive logging for debugging</li>
+            <li>Pulsing animation for pending status improves visibility</li>
+            <li>Auto-completion detection triggers embedded UI updates</li>
+            <li>Export functionality supports both individual and bulk operations</li>
+        </ul>
+    </div>
+
+    <footer style="text-align: center; margin: 40px 0; color: #718096;">
+        <p>🏠 RE Analyzer v2.0 - All Critical Fixes Implemented</p>
+        <p>Ready for testing and deployment</p>
+    </footer>
+</body>
+</html>

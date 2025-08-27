@@ -1135,6 +1135,16 @@
 
 .re-pending {
   color: var(--re-warning);
+  animation: re-pulse 2s infinite;
+}
+
+@keyframes re-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .re-category-actions {

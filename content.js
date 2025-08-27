@@ -459,6 +459,35 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
 
+        <!-- Custom Prompt Settings -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Custom Analysis Prompt</div>
+            <div class="re-section-subtitle">Customize the AI analysis instructions</div>
+          </div>
+          
+          <div class="re-form-group">
+            <label class="re-form-label">Analysis Prompt Template</label>
+            <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
+                      placeholder="Enter your custom prompt template here...">
+            </textarea>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Use {PROPERTY_URL} for the property link and {DATE} for current date
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <button class="re-btn re-btn-primary" id="re-save-prompt">
+              <div>💾</div>
+              <span>Save Prompt</span>
+            </button>
+            <button class="re-btn re-btn-ghost" id="re-reset-prompt">
+              <div>🔄</div>
+              <span>Reset to Default</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="re-section">
           <div class="re-section-header">
@@ -908,6 +937,9 @@ class REAnalyzerEmbeddedUI {
         this.saveSettings();
       });
     }
+    
+    // Custom prompt handling
+    this.setupCustomPromptSettings();
 
     // Action buttons
     const exportBtn = this.panel.querySelector('#re-export-all');
@@ -937,6 +969,84 @@ class REAnalyzerEmbeddedUI {
 
     if (clearBtn) {
       clearBtn.addEventListener('click', () => this.clearAllData());
+    }
+  }
+  
+  async setupCustomPromptSettings() {
+    const promptTextarea = this.panel.querySelector('#re-custom-prompt');
+    const savePromptBtn = this.panel.querySelector('#re-save-prompt');
+    const resetPromptBtn = this.panel.querySelector('#re-reset-prompt');
+    
+    if (!promptTextarea) return;
+    
+    try {
+      // Load existing custom prompt
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customPrompt']),
+        { customPrompt: null }
+      );
+      
+      if (result.customPrompt) {
+        promptTextarea.value = result.customPrompt;
+      } else {
+        // Load default prompt
+        const defaultPrompt = getDefaultPromptTemplate();
+        promptTextarea.placeholder = defaultPrompt;
+      }
+      
+    } catch (error) {
+      console.warn('Failed to load custom prompt:', error);
+    }
+    
+    if (savePromptBtn) {
+      savePromptBtn.addEventListener('click', async () => {
+        const promptText = promptTextarea.value.trim();
+        
+        if (!promptText) {
+          this.showChatGPTMessage('warning', 'Please enter a prompt template');
+          return;
+        }
+        
+        if (!promptText.includes('{PROPERTY_URL}')) {
+          this.showChatGPTMessage('error', 'Prompt must include {PROPERTY_URL} placeholder');
+          return;
+        }
+        
+        try {
+          await safeChromeFall(
+            () => chrome.storage.local.set({ customPrompt: promptText }),
+            null
+          );
+          
+          this.showChatGPTMessage('success', 'Custom prompt saved successfully!');
+          
+        } catch (error) {
+          console.error('Failed to save custom prompt:', error);
+          this.showChatGPTMessage('error', 'Failed to save custom prompt');
+        }
+      });
+    }
+    
+    if (resetPromptBtn) {
+      resetPromptBtn.addEventListener('click', async () => {
+        if (confirm('Reset to default prompt? This will overwrite your custom prompt.')) {
+          try {
+            await safeChromeFall(
+              () => chrome.storage.local.remove(['customPrompt']),
+              null
+            );
+            
+            const defaultPrompt = getDefaultPromptTemplate();
+            promptTextarea.value = defaultPrompt;
+            
+            this.showChatGPTMessage('success', 'Prompt reset to default');
+            
+          } catch (error) {
+            console.error('Failed to reset prompt:', error);
+            this.showChatGPTMessage('error', 'Failed to reset prompt');
+          }
+        }
+      });
     }
   }
 
@@ -1580,30 +1690,46 @@ class REAnalyzerEmbeddedUI {
       const domain = this.getDomainDisplayName(property.domain);
       const title = this.getPropertyTitle(property);
       
+      // Extract key property details for display
+      let propertyDetails = '';
+      if (hasAnalysis && property.analysis.extractedData) {
+        const data = property.analysis.extractedData;
+        const details = [];
+        
+        if (data.bedrooms) details.push(`${data.bedrooms} bed`);
+        if (data.bathrooms) details.push(`${data.bathrooms} bath`);
+        if (data.squareFeet) details.push(`${parseInt(data.squareFeet).toLocaleString()} sqft`);
+        
+        if (details.length > 0) {
+          propertyDetails = `<div class="re-property-details">${details.join(' • ')}</div>`;
+        }
+      }
+      
       const propertyCard = document.createElement('div');
       propertyCard.className = 're-property-card';
       propertyCard.innerHTML = `
         <div class="re-property-header">
           <div class="re-property-title">${title}</div>
           <div class="re-property-status ${hasAnalysis ? 're-analyzed' : 're-pending'}">
-            ${hasAnalysis ? '✅' : '⏳'}
+            ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
           </div>
         </div>
+        ${propertyDetails}
         <div class="re-property-meta">
           <div class="re-property-domain">${domain}</div>
           <div>${property.date || 'Unknown date'}</div>
         </div>
         <div class="re-property-actions">
           <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
-            View Analysis
+            🔍 View Analysis
           </button>
           ${hasAnalysis ? `
             <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
-              Export
+              📄 Export
             </button>
           ` : `
             <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
-              Analyze
+              🔍 Analyze
             </button>
           `}
         </div>
@@ -1654,8 +1780,56 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
-  exportAllProperties() {
-    this.showChatGPTMessage('warning', 'Export functionality will be implemented in the next update');
+  async exportAllProperties() {
+    try {
+      // Load all property data from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Create comprehensive export data
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        totalProperties: properties.length,
+        analyzedProperties: properties.filter(p => p.analysis && p.analysis.extractedData).length,
+        properties: properties.map(property => ({
+          propertyUrl: property.url,
+          domain: property.domain,
+          dateAnalyzed: property.date,
+          extractedData: property.analysis?.extractedData || {},
+          fullAnalysis: property.analysis?.fullResponse || property.analysis?.fullAnalysis || '',
+          timestamp: property.timestamp || Date.now(),
+          hasAnalysis: !!(property.analysis && property.analysis.extractedData)
+        }))
+      };
+      
+      // Create and download JSON file
+      const jsonData = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `re-analyzer-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      
+      this.showChatGPTMessage('success', `Exported ${properties.length} properties successfully!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export all properties:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties');
+    }
   }
 
   async testAnalysis() {
@@ -1999,13 +2173,12 @@ Or enter your own property URL:`);
         this.updateAnalysisStep('send', 'completed');
         this.updateAnalysisStep('analyze', 'active');
         
-        // Simulate analysis time
-        setTimeout(() => {
-          this.updateAnalysisStep('analyze', 'completed');
-          this.updateAnalysisStep('save', 'completed');
-          this.completeAnalysis();
-          this.showMessage('success', 'Property analysis completed successfully!');
-        }, 2000);
+        // Keep progress visible while waiting for ChatGPT response
+        console.log('✅ Analysis sent to ChatGPT, waiting for response...');
+        this.showChatGPTMessage('info', 'Analysis sent to ChatGPT. Waiting for response...');
+        
+        // Don't hide progress here - it will be hidden when the analysis completes
+        // The response monitor will handle completion detection
         
       } else {
         throw new Error(response?.error || 'Analysis failed');
@@ -2106,16 +2279,29 @@ Or enter your own property URL:`);
   }
 
   completeAnalysis() {
-    this.hideAnalysisProgress();
+    // Update final progress steps
+    this.updateAnalysisStep('analyze', 'completed');
+    this.updateAnalysisStep('save', 'completed');
+    
+    // Show completion message
+    this.showChatGPTMessage('success', 'Property analysis completed successfully!');
+    
+    // Hide progress after a brief delay
+    setTimeout(() => {
+      this.hideAnalysisProgress();
+    }, 2000);
     
     // Show notification on FAB
     this.showFabNotification();
     
     // Auto-switch to properties tab if enabled
     if (uiSettings.autoShow) {
+      console.log('🔄 Auto-switching to Properties tab after analysis completion');
       setTimeout(() => {
         this.switchTab('properties');
-      }, 1000);
+        // Reload property data to show the new analysis
+        this.loadChatGPTPropertyData();
+      }, 2000);
     }
   }
 
@@ -2314,12 +2500,52 @@ Or enter your own property URL:`);
   }
 
   getPropertyTitle(property) {
-    // Try to extract a title from the URL or use a generic title
+    // Extract meaningful property data from analysis for display
     try {
+      if (property.analysis && property.analysis.extractedData) {
+        const data = property.analysis.extractedData;
+        
+        // Try to build a meaningful title from extracted data
+        const address = data.streetName || data.address;
+        const price = data.price;
+        const bedrooms = data.bedrooms;
+        const propertyType = data.propertyType;
+        
+        // Priority 1: Address + price
+        if (address && price) {
+          return `${address} - $${parseInt(price).toLocaleString()}`;
+        }
+        
+        // Priority 2: Address + bedrooms
+        if (address && bedrooms) {
+          return `${address} (${bedrooms} bed)`;
+        }
+        
+        // Priority 3: Address only
+        if (address) {
+          return address;
+        }
+        
+        // Priority 4: Property type + price
+        if (propertyType && price) {
+          return `${propertyType} - $${parseInt(price).toLocaleString()}`;
+        }
+        
+        // Priority 5: Property type + bedrooms
+        if (propertyType && bedrooms) {
+          return `${propertyType} (${bedrooms} bed)`;
+        }
+        
+        // Priority 6: Just property type
+        if (propertyType) {
+          return propertyType;
+        }
+      }
+      
+      // Fallback to URL-based title
       const url = new URL(property.url);
       const pathParts = url.pathname.split('/').filter(part => part);
       
-      // Look for property-specific identifiers in the URL
       if (pathParts.length > 0) {
         const lastPart = pathParts[pathParts.length - 1];
         if (lastPart && lastPart.length > 5) {
@@ -2809,10 +3035,58 @@ Or enter your own property URL:`);
     }
   }
 
-  exportProperty(url) {
+  async exportProperty(url) {
     console.log('📄 Export property:', url);
-    // This would implement property export functionality
-    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+    
+    try {
+      // Load property data from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (!property) {
+        this.showChatGPTMessage('error', 'Property not found in saved data');
+        return;
+      }
+      
+      if (!property.analysis) {
+        this.showChatGPTMessage('warning', 'No analysis data to export for this property');
+        return;
+      }
+      
+      // Create export data
+      const exportData = {
+        propertyUrl: property.url,
+        domain: property.domain,
+        dateAnalyzed: property.date,
+        extractedData: property.analysis.extractedData || {},
+        fullAnalysis: property.analysis.fullResponse || property.analysis.fullAnalysis || '',
+        timestamp: property.timestamp || Date.now()
+      };
+      
+      // Create and download JSON file
+      const jsonData = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `property-analysis-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+      
+      this.showChatGPTMessage('success', 'Property analysis exported successfully!');
+      
+    } catch (error) {
+      console.error('❌ Failed to export property:', error);
+      this.showChatGPTMessage('error', 'Failed to export property analysis');
+    }
   }
 
   switchPropertiesView(view) {
@@ -6062,6 +6336,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Trigger embedded UI completion if available
+                  if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
+                    embeddedUI.completeAnalysis();
+                  }
                 }
               }
             }).catch(err => {
@@ -6110,6 +6389,11 @@ function setupResponseMonitor() {
                 console.log('✅ Split prompt analysis data sent successfully:', response);
                 if (response.success) {
                   console.log('🎉 Split prompt property analysis saved!');
+                  
+                  // Trigger embedded UI completion if available
+                  if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
+                    embeddedUI.completeAnalysis();
+                  }
                 }
               }
             }).catch(err => {
@@ -6163,6 +6447,11 @@ function setupResponseMonitor() {
             console.log('✅ Analysis data sent successfully:', response);
             if (response.success) {
               console.log('🎉 Property analysis saved and should now show as analyzed!');
+              
+              // Trigger embedded UI completion if available
+              if (typeof embeddedUI !== 'undefined' && embeddedUI && embeddedUI.completeAnalysis) {
+                embeddedUI.completeAnalysis();
+              }
             }
           }
         }).catch(err => {
