@@ -511,50 +511,158 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
 
-        <!-- Column Configuration -->
+        <!-- Tabular Prompt Configuration -->
         <div class="re-section" id="re-tabular-columns-section" style="display: none;">
           <div class="re-section-header">
-            <div class="re-section-title">Tabular Data Columns</div>
-            <div class="re-section-subtitle">Configure which data points to request from ChatGPT</div>
+            <div class="re-section-title">Tabular Data Configuration</div>
+            <div class="re-section-subtitle">Customize both the prompt template and data columns for tabular extraction</div>
           </div>
           
-          <div class="re-form-group">
-            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 12px;">
-              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
-                Select the data points you want ChatGPT to extract when using the Tabular prompt
+          <!-- Tabular Configuration Tabs -->
+          <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 16px;">
+            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500;">
+              📊 Data Columns
+            </button>
+            <button class="re-tabular-tab" data-tab="prompt" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+              📝 Prompt Template
+            </button>
+            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 8px 16px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;">
+              ➕ Custom Columns
+            </button>
+          </div>
+          
+          <!-- Data Columns Tab -->
+          <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
+            <div class="re-form-group">
+              <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
+                  Select the data points you want ChatGPT to extract when using the Tabular prompt
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all">
+                    <span>Select All</span>
+                  </button>
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all">
+                    <span>Clear All</span>
+                  </button>
+                </div>
               </div>
-              <div style="display: flex; gap: 8px;">
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all">
-                  <span>Select All</span>
-                </button>
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all">
-                  <span>Clear All</span>
+              
+              <div id="re-columns-stats" style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+                Loading columns...
+              </div>
+            </div>
+            
+            <!-- Column Categories -->
+            <div id="re-columns-container">
+              <!-- Categories will be dynamically populated -->
+            </div>
+          </div>
+          
+          <!-- Prompt Template Tab -->
+          <div id="re-tabular-prompt-tab" class="re-tabular-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Tabular Prompt Template</label>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+                Edit the base prompt template. Use {{COLUMNS}} where you want the selected columns to be inserted.
+              </div>
+              <textarea id="re-tabular-prompt-template" class="re-form-input" rows="12" 
+                        placeholder="Enter your tabular prompt template..."
+                        style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+                Available variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">
+                <div>💾</div>
+                <span>Save Template</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">
+                <div>🔄</div>
+                <span>Reset to Default</span>
+              </button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">
+                <div>👁️</div>
+                <span>Preview Full Prompt</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Custom Columns Tab -->
+          <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                  <div style="font-weight: 500; margin-bottom: 4px;">Custom Data Columns</div>
+                  <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
+                    Create your own data points to request from ChatGPT
+                  </div>
+                </div>
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column">
+                  <div>➕</div>
+                  <span>Add Column</span>
                 </button>
               </div>
             </div>
             
-            <div id="re-columns-stats" style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
-              Loading columns...
+            <!-- Custom Columns List -->
+            <div id="re-custom-columns-list">
+              <!-- Custom columns will be populated here -->
+            </div>
+            
+            <!-- Add Custom Column Form -->
+            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 8px; padding: 12px; margin-top: 12px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div>
+                  <label class="re-form-label">Column Name</label>
+                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees">
+                </div>
+                <div>
+                  <label class="re-form-label">Category</label>
+                  <select id="re-new-column-category" class="re-form-input">
+                    <option value="core">🏠 Core Property Information</option>
+                    <option value="location">📍 Location & Geography</option>
+                    <option value="financial">💰 Financial Data</option>
+                    <option value="features">🔧 Property Features</option>
+                    <option value="analysis">📊 Analysis Data</option>
+                    <option value="market">📈 Market Analysis</option>
+                    <option value="custom">📋 Custom Category</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="re-form-group">
+                <label class="re-form-label">Description/Instructions</label>
+                <textarea id="re-new-column-description" class="re-form-input" rows="3" 
+                          placeholder="Describe what ChatGPT should extract for this data point..."></textarea>
+              </div>
+              
+              <div style="display: flex; gap: 8px;">
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column">
+                  <span>Save Column</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column">
+                  <span>Cancel</span>
+                </button>
+              </div>
             </div>
           </div>
           
-          <!-- Column Categories -->
-          <div id="re-columns-container">
-            <!-- Categories will be dynamically populated -->
-          </div>
-          
-          <div style="display: flex; gap: 8px; margin-top: 16px;">
-            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-columns">
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--chatgpt-border-light);">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-tabular">
               <div>💾</div>
-              <span>Save Column Configuration</span>
+              <span>Save All Changes</span>
             </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-columns">
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-tabular">
               <div>🔄</div>
-              <span>Reset to Default</span>
+              <span>Reset All to Default</span>
             </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-prompt">
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-complete-tabular">
               <div>👁️</div>
-              <span>Preview Prompt</span>
+              <span>Preview Complete Configuration</span>
             </button>
           </div>
         </div>
@@ -3521,13 +3629,14 @@ Or enter your own property URL:`);
     this.previewPrompt();
   }
 
-  // Column Configuration Methods
+  // Enhanced Tabular Configuration Methods
   setupColumnConfigurationEvents() {
+    // Tab switching
+    this.setupTabularTabs();
+    
+    // Column management (existing)
     const selectAllBtn = this.panel.querySelector('#re-columns-select-all');
     const clearAllBtn = this.panel.querySelector('#re-columns-clear-all');
-    const saveColumnsBtn = this.panel.querySelector('#re-save-columns');
-    const resetColumnsBtn = this.panel.querySelector('#re-reset-columns');
-    const previewTabularBtn = this.panel.querySelector('#re-preview-tabular-prompt');
     
     if (selectAllBtn) {
       selectAllBtn.addEventListener('click', () => this.selectAllColumns());
@@ -3537,34 +3646,118 @@ Or enter your own property URL:`);
       clearAllBtn.addEventListener('click', () => this.clearAllColumns());
     }
     
-    if (saveColumnsBtn) {
-      saveColumnsBtn.addEventListener('click', () => this.saveColumnConfiguration());
+    // Prompt template management
+    const saveTemplateBtn = this.panel.querySelector('#re-save-tabular-template');
+    const resetTemplateBtn = this.panel.querySelector('#re-reset-tabular-template');
+    const previewTemplateBtn = this.panel.querySelector('#re-preview-tabular-template');
+    
+    if (saveTemplateBtn) {
+      saveTemplateBtn.addEventListener('click', () => this.saveTabularTemplate());
     }
     
-    if (resetColumnsBtn) {
-      resetColumnsBtn.addEventListener('click', () => this.resetColumnConfiguration());
+    if (resetTemplateBtn) {
+      resetTemplateBtn.addEventListener('click', () => this.resetTabularTemplate());
     }
     
-    if (previewTabularBtn) {
-      previewTabularBtn.addEventListener('click', () => this.previewTabularPrompt());
+    if (previewTemplateBtn) {
+      previewTemplateBtn.addEventListener('click', () => this.previewTabularTemplate());
     }
+    
+    // Custom columns management
+    const addColumnBtn = this.panel.querySelector('#re-add-custom-column');
+    const saveCustomColumnBtn = this.panel.querySelector('#re-save-custom-column');
+    const cancelCustomColumnBtn = this.panel.querySelector('#re-cancel-custom-column');
+    
+    if (addColumnBtn) {
+      addColumnBtn.addEventListener('click', () => this.showAddColumnForm());
+    }
+    
+    if (saveCustomColumnBtn) {
+      saveCustomColumnBtn.addEventListener('click', () => this.saveCustomColumn());
+    }
+    
+    if (cancelCustomColumnBtn) {
+      cancelCustomColumnBtn.addEventListener('click', () => this.hideAddColumnForm());
+    }
+    
+    // Global actions
+    const saveAllBtn = this.panel.querySelector('#re-save-all-tabular');
+    const resetAllBtn = this.panel.querySelector('#re-reset-all-tabular');
+    const previewCompleteBtn = this.panel.querySelector('#re-preview-complete-tabular');
+    
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener('click', () => this.saveAllTabularConfiguration());
+    }
+    
+    if (resetAllBtn) {
+      resetAllBtn.addEventListener('click', () => this.resetAllTabularConfiguration());
+    }
+    
+    if (previewCompleteBtn) {
+      previewCompleteBtn.addEventListener('click', () => this.previewCompleteTabularConfiguration());
+    }
+  }
+
+  setupTabularTabs() {
+    const tabs = this.panel.querySelectorAll('.re-tabular-tab');
+    const tabContents = this.panel.querySelectorAll('.re-tabular-tab-content');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+        
+        // Update tab styles
+        tabs.forEach(t => {
+          t.classList.remove('re-tabular-tab-active');
+          t.style.borderBottomColor = 'transparent';
+          t.style.fontWeight = 'normal';
+        });
+        
+        tab.classList.add('re-tabular-tab-active');
+        tab.style.borderBottomColor = 'var(--chatgpt-accent)';
+        tab.style.fontWeight = '500';
+        
+        // Show/hide content
+        tabContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-tabular-${targetTab}-tab`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to tabs
+          if (targetTab === 'prompt') {
+            this.loadTabularTemplate();
+          } else if (targetTab === 'custom-columns') {
+            this.loadCustomColumns();
+          }
+        }
+      });
+    });
   }
 
   async loadTabularColumns() {
     try {
-      // Load saved column configuration
+      // Load saved column configuration and custom columns
       const result = await safeChromeFall(
-        () => chrome.storage.local.get(['tabularColumnConfiguration']),
-        { tabularColumnConfiguration: null }
+        () => chrome.storage.local.get(['tabularColumnConfiguration', 'customColumns']),
+        { tabularColumnConfiguration: null, customColumns: [] }
       );
       
       // Get default columns
       const defaultColumns = getTabularDataColumns();
       
+      // Get custom columns
+      const customColumns = result.customColumns || [];
+      
+      // Combine all columns
+      const allColumns = [...defaultColumns, ...customColumns];
+      
       // Merge with saved configuration
-      let columns = defaultColumns;
+      let columns = allColumns;
       if (result.tabularColumnConfiguration) {
-        columns = this.mergeColumnConfigurations(defaultColumns, result.tabularColumnConfiguration);
+        columns = this.mergeColumnConfigurations(allColumns, result.tabularColumnConfiguration);
       }
       
       // Render columns UI
@@ -3856,6 +4049,463 @@ Or enter your own property URL:`);
       this.showChatGPTMessage('error', 'Failed to generate prompt preview');
     }
   }
+
+  // Tabular Template Management
+  async loadTabularTemplate() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularPromptTemplate']),
+        { tabularPromptTemplate: null }
+      );
+      
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (templateTextarea) {
+        if (result.tabularPromptTemplate) {
+          templateTextarea.value = result.tabularPromptTemplate;
+        } else {
+          // Load default template
+          templateTextarea.value = getDefaultTabularPromptTemplate();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to load tabular template:', error);
+    }
+  }
+
+  async saveTabularTemplate() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ tabularPromptTemplate: template || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Tabular prompt template saved successfully!');
+      console.log('💾 Tabular prompt template saved');
+      
+    } catch (error) {
+      console.error('Failed to save tabular template:', error);
+      this.showChatGPTMessage('error', 'Failed to save tabular prompt template');
+    }
+  }
+
+  async resetTabularTemplate() {
+    if (confirm('Are you sure you want to reset the tabular prompt template to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularPromptTemplate']),
+          null
+        );
+        
+        // Reload with default template
+        this.loadTabularTemplate();
+        
+        this.showChatGPTMessage('success', 'Tabular prompt template reset to default');
+        console.log('🔄 Tabular prompt template reset');
+        
+      } catch (error) {
+        console.error('Failed to reset tabular template:', error);
+        this.showChatGPTMessage('error', 'Failed to reset tabular prompt template');
+      }
+    }
+  }
+
+  async previewTabularTemplate() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Get enabled columns for preview
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      // Generate column sections
+      let columnsSection = 'No columns selected';
+      if (enabledColumns.length > 0) {
+        const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+        const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+        columnsSection = this.generateColumnsSectionForTemplate(selectedColumns);
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{\{COLUMNS\}\}/g, columnsSection)
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `tabular template (${enabledColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview tabular template:', error);
+      this.showChatGPTMessage('error', 'Failed to preview template');
+    }
+  }
+
+  // Custom Columns Management
+  async loadCustomColumns() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      
+      const customColumns = result.customColumns || [];
+      this.renderCustomColumnsList(customColumns);
+      
+    } catch (error) {
+      console.error('Failed to load custom columns:', error);
+    }
+  }
+
+  renderCustomColumnsList(customColumns) {
+    const container = this.panel.querySelector('#re-custom-columns-list');
+    if (!container) return;
+    
+    if (customColumns.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--chatgpt-text-secondary);">
+          <div style="font-size: 48px; margin-bottom: 8px;">📋</div>
+          <div>No custom columns yet</div>
+          <div style="font-size: 12px; margin-top: 4px;">Click "Add Column" to create your first custom data point</div>
+        </div>
+      `;
+      return;
+    }
+    
+    container.innerHTML = '';
+    
+    customColumns.forEach((column, index) => {
+      const columnElement = this.createCustomColumnElement(column, index);
+      container.appendChild(columnElement);
+    });
+  }
+
+  createCustomColumnElement(column, index) {
+    const element = document.createElement('div');
+    element.className = 're-custom-column-item';
+    element.style.cssText = `
+      border: 1px solid var(--chatgpt-border-light);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--chatgpt-surface-primary);
+    `;
+    
+    element.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; margin-bottom: 4px;">
+            ${column.name}
+            <span style="font-size: 11px; background: var(--chatgpt-surface-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">
+              ${column.category || 'custom'}
+            </span>
+          </div>
+          <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+            ${column.description || 'No description provided'}
+          </div>
+        </div>
+        <div style="display: flex; gap: 4px; margin-left: 12px;">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.editCustomColumn(${index})" title="Edit">
+            ✏️
+          </button>
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.deleteCustomColumn(${index})" title="Delete">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+    
+    return element;
+  }
+
+  showAddColumnForm() {
+    const form = this.panel.querySelector('#re-add-column-form');
+    if (form) {
+      form.style.display = 'block';
+      
+      // Clear form
+      this.panel.querySelector('#re-new-column-name').value = '';
+      this.panel.querySelector('#re-new-column-category').value = 'custom';
+      this.panel.querySelector('#re-new-column-description').value = '';
+      
+      // Focus on name field
+      this.panel.querySelector('#re-new-column-name').focus();
+    }
+  }
+
+  hideAddColumnForm() {
+    const form = this.panel.querySelector('#re-add-column-form');
+    if (form) {
+      form.style.display = 'none';
+    }
+  }
+
+  async saveCustomColumn() {
+    try {
+      const nameField = this.panel.querySelector('#re-new-column-name');
+      const categoryField = this.panel.querySelector('#re-new-column-category');
+      const descriptionField = this.panel.querySelector('#re-new-column-description');
+      
+      const name = nameField.value.trim();
+      const category = categoryField.value;
+      const description = descriptionField.value.trim();
+      
+      if (!name) {
+        this.showChatGPTMessage('warning', 'Please enter a column name');
+        nameField.focus();
+        return;
+      }
+      
+      // Load existing custom columns
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      
+      const customColumns = result.customColumns || [];
+      
+      // Check for duplicate names
+      if (customColumns.some(col => col.name.toLowerCase() === name.toLowerCase())) {
+        this.showChatGPTMessage('warning', 'A column with this name already exists');
+        nameField.focus();
+        return;
+      }
+      
+      // Create new column
+      const newColumn = {
+        id: `custom_${Date.now()}`,
+        name: name,
+        category: category,
+        description: description,
+        type: 'text',
+        isCustom: true,
+        enabled: true,
+        required: false
+      };
+      
+      // Add to list
+      customColumns.push(newColumn);
+      
+      // Save
+      await safeChromeFall(
+        () => chrome.storage.local.set({ customColumns: customColumns }),
+        null
+      );
+      
+      // Reload the list
+      this.loadCustomColumns();
+      
+      // Hide form
+      this.hideAddColumnForm();
+      
+      // Reload columns in the main tab
+      this.loadTabularColumns();
+      
+      this.showChatGPTMessage('success', 'Custom column added successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save custom column:', error);
+      this.showChatGPTMessage('error', 'Failed to save custom column');
+    }
+  }
+
+  async getCustomColumns() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      return result.customColumns || [];
+    } catch (error) {
+      console.error('Failed to get custom columns:', error);
+      return [];
+    }
+  }
+
+  async deleteCustomColumn(index) {
+    if (confirm('Are you sure you want to delete this custom column?')) {
+      try {
+        const result = await safeChromeFall(
+          () => chrome.storage.local.get(['customColumns']),
+          { customColumns: [] }
+        );
+        
+        const customColumns = result.customColumns || [];
+        customColumns.splice(index, 1);
+        
+        await safeChromeFall(
+          () => chrome.storage.local.set({ customColumns: customColumns }),
+          null
+        );
+        
+        this.loadCustomColumns();
+        this.loadTabularColumns(); // Refresh main columns list
+        
+        this.showChatGPTMessage('success', 'Custom column deleted');
+        
+      } catch (error) {
+        console.error('Failed to delete custom column:', error);
+        this.showChatGPTMessage('error', 'Failed to delete custom column');
+      }
+    }
+  }
+
+  generateColumnsSectionForTemplate(columns) {
+    // Group columns by category for organized output
+    const categorized = {};
+    columns.forEach(col => {
+      const category = col.category || 'other';
+      if (!categorized[category]) {
+        categorized[category] = [];
+      }
+      categorized[category].push(col);
+    });
+    
+    const sections = [];
+    const categoryNames = {
+      'core': 'BASIC PROPERTY INFORMATION',
+      'location': 'LOCATION & GEOGRAPHY', 
+      'financial': 'FINANCIAL DATA',
+      'features': 'PROPERTY FEATURES',
+      'analysis': 'INVESTMENT ANALYSIS',
+      'market': 'MARKET ANALYSIS',
+      'calculated': 'CALCULATED METRICS',
+      'risk': 'RISK ASSESSMENT',
+      'scoring': 'SCORING & RATINGS',
+      'custom': 'CUSTOM DATA POINTS'
+    };
+    
+    Object.entries(categorized).forEach(([category, cols]) => {
+      const sectionName = categoryNames[category] || category.toUpperCase();
+      const dataPoints = cols.map((col, index) => {
+        const description = col.description || `Extract ${col.name}`;
+        return `${index + 1}. ${col.name}: ${description}`;
+      });
+      
+      sections.push(`**${sectionName}:**\n${dataPoints.join('\n')}`);
+    });
+    
+    return sections.join('\n\n');
+  }
+
+  // Global Tabular Configuration Management
+  async saveAllTabularConfiguration() {
+    try {
+      // Save all components
+      await this.saveColumnConfiguration();
+      await this.saveTabularTemplate();
+      
+      this.showChatGPTMessage('success', 'All tabular configuration saved successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save all tabular configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to save configuration');
+    }
+  }
+
+  async resetAllTabularConfiguration() {
+    if (confirm('Are you sure you want to reset ALL tabular configuration (columns, template, and custom columns) to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularColumnConfiguration', 'tabularPromptTemplate', 'customColumns']),
+          null
+        );
+        
+        // Reload all components
+        this.loadTabularColumns();
+        this.loadTabularTemplate();
+        this.loadCustomColumns();
+        
+        this.showChatGPTMessage('success', 'All tabular configuration reset to default');
+        
+      } catch (error) {
+        console.error('Failed to reset all tabular configuration:', error);
+        this.showChatGPTMessage('error', 'Failed to reset configuration');
+      }
+    }
+  }
+
+  async previewCompleteTabularConfiguration() {
+    try {
+      // Get the complete configuration
+      const promptTemplate = await this.getCompleteTabularPrompt();
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'Failed to generate complete configuration preview');
+        return;
+      }
+      
+      // Show preview with sample data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Count enabled columns
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `complete tabular (${enabledCount} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview complete tabular configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to generate preview');
+    }
+  }
+
+  async getCompleteTabularPrompt() {
+    try {
+      // Get custom template if available
+      const templateResult = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularPromptTemplate']),
+        { tabularPromptTemplate: null }
+      );
+      
+      let template = templateResult.tabularPromptTemplate;
+      if (!template) {
+        template = getDefaultTabularPromptTemplate();
+      }
+      
+      // Get enabled columns
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      if (enabledColumns.length === 0) {
+        return template; // Return template without columns replacement
+      }
+      
+      // Get all columns (built-in + custom)
+      const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+      const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+      
+      // Generate columns section
+      const columnsSection = this.generateColumnsSectionForTemplate(selectedColumns);
+      
+      // Replace template variables
+      return template.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+      
+    } catch (error) {
+      console.error('Error generating complete tabular prompt:', error);
+      return null;
+    }
+  }
   
   showPromptPreviewModal(previewText, promptType = 'custom') {
     // Remove existing modal if any
@@ -4071,6 +4721,7 @@ if (isChatGPTSite()) {
       setTimeout(() => {
         embeddedUI = new REAnalyzerEmbeddedUI();
         window.embeddedUI = embeddedUI; // Make globally available
+        window.reAnalyzer = embeddedUI; // Make accessible for custom column management
       }, 1000);
     });
   } else {
@@ -4078,6 +4729,7 @@ if (isChatGPTSite()) {
     setTimeout(() => {
       embeddedUI = new REAnalyzerEmbeddedUI();
       window.embeddedUI = embeddedUI; // Make globally available
+      window.reAnalyzer = embeddedUI; // Make accessible for custom column management
     }, 1000);
   }
 } else {
@@ -4664,6 +5316,31 @@ Analysis Date: {DATE}
 Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
 }
 
+// Default tabular prompt template with placeholder for columns
+function getDefaultTabularPromptTemplate() {
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+{{COLUMNS}}
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**OUTPUT FORMAT:**
+Please provide your analysis in a structured format with clear labels for each requested data point. Organize the information clearly and ensure accuracy.
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+}
+
 // Function to generate tabular prompt with selected columns
 async function getTabularDataExtractionPromptWithColumns(enabledColumnIds) {
   try {
@@ -4869,20 +5546,88 @@ function buildCalculatedMetricsSection(columns) {
   return '';
 }
 
+// Helper function to generate columns section for prompt templates
+function generateColumnsSectionForPrompt(columns) {
+  // Group columns by category for organized output
+  const categorized = {};
+  columns.forEach(col => {
+    const category = col.category || 'other';
+    if (!categorized[category]) {
+      categorized[category] = [];
+    }
+    categorized[category].push(col);
+  });
+  
+  const sections = [];
+  const categoryNames = {
+    'core': 'BASIC PROPERTY INFORMATION',
+    'location': 'LOCATION & GEOGRAPHY', 
+    'financial': 'FINANCIAL DATA',
+    'features': 'PROPERTY FEATURES',
+    'analysis': 'INVESTMENT ANALYSIS',
+    'market': 'MARKET ANALYSIS',
+    'calculated': 'CALCULATED METRICS',
+    'risk': 'RISK ASSESSMENT',
+    'scoring': 'SCORING & RATINGS',
+    'custom': 'CUSTOM DATA POINTS'
+  };
+  
+  Object.entries(categorized).forEach(([category, cols]) => {
+    const sectionName = categoryNames[category] || category.toUpperCase();
+    const dataPoints = cols.map((col, index) => {
+      const description = col.description || `Extract ${col.name}`;
+      return `${index + 1}. ${col.name}: ${description}`;
+    });
+    
+    sections.push(`**${sectionName}:**\n${dataPoints.join('\n')}`);
+  });
+  
+  return sections.join('\n\n');
+}
+
 // Function to get the selected prompt based on user preference
 async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
   try {
     switch (promptType) {
       case 'tabular':
-        // Check if we have saved column configuration
-        const columnResult = await safeChromeFall(
-          () => chrome.storage.local.get(['tabularColumnConfiguration']),
-          { tabularColumnConfiguration: null }
+        // Check if we have a custom template
+        const templateResult = await safeChromeFall(
+          () => chrome.storage.local.get(['tabularPromptTemplate', 'tabularColumnConfiguration', 'customColumns']),
+          { tabularPromptTemplate: null, tabularColumnConfiguration: null, customColumns: [] }
         );
         
-        if (columnResult.tabularColumnConfiguration) {
-          // Use columns selected by user
-          const enabledColumns = columnResult.tabularColumnConfiguration
+        // Use custom template if available
+        if (templateResult.tabularPromptTemplate) {
+          // Get enabled columns
+          let enabledColumns = [];
+          if (templateResult.tabularColumnConfiguration) {
+            enabledColumns = templateResult.tabularColumnConfiguration
+              .filter(col => col.enabled)
+              .map(col => col.id);
+          }
+          
+          // Get all columns (built-in + custom)
+          const defaultColumns = getTabularDataColumns();
+          const customColumns = templateResult.customColumns || [];
+          const allColumns = [...defaultColumns, ...customColumns];
+          
+          // Generate columns section if we have enabled columns
+          if (enabledColumns.length > 0) {
+            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+            const columnsSection = generateColumnsSectionForPrompt(selectedColumns);
+            
+            // Replace template placeholders
+            return templateResult.tabularPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+          } else {
+            // Return template without columns replacement
+            return templateResult.tabularPromptTemplate;
+          }
+        }
+        
+        // Check if we have saved column configuration for default prompt
+        if (templateResult.tabularColumnConfiguration) {
+          // Use columns selected by user with default prompt structure
+          const enabledColumns = templateResult.tabularColumnConfiguration
             .filter(col => col.enabled)
             .map(col => col.id);
           
