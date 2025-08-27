@@ -1594,8 +1594,8 @@ class REAnalyzerEmbeddedUI {
           <div>${property.date || 'Unknown date'}</div>
         </div>
         <div class="re-property-actions">
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="window.open('${property.url}', '_blank')">
-            View
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+            View Analysis
           </button>
           ${hasAnalysis ? `
             <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
@@ -2343,10 +2343,376 @@ Or enter your own property URL:`);
   }
 
   // Property action methods
-  viewProperty(url) {
-    console.log('📖 View property:', url);
-    // This could open a detailed view modal or navigate to the property
-    window.open(url, '_blank');
+  async viewProperty(url) {
+    console.log('📖 View saved analysis for property:', url);
+    
+    try {
+      // Load property data from storage
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (!property) {
+        this.showChatGPTMessage('error', 'Property not found in saved data');
+        return;
+      }
+      
+      if (!property.analysis || !property.analysis.fullResponse) {
+        this.showChatGPTMessage('warning', 'No saved ChatGPT analysis found for this property. Click "Analyze" to generate analysis.');
+        return;
+      }
+      
+      // Show the saved ChatGPT analysis in a modal
+      this.showAnalysisModal(property);
+      
+    } catch (error) {
+      console.error('❌ Failed to load property analysis:', error);
+      this.showChatGPTMessage('error', 'Failed to load saved analysis');
+    }
+  }
+
+  showAnalysisModal(property) {
+    console.log('🖼️ Showing analysis modal for:', property.url);
+    
+    // Remove existing modal if any
+    const existingModal = document.querySelector('#re-analysis-modal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+    
+    // Create modal HTML
+    const modal = document.createElement('div');
+    modal.id = 're-analysis-modal';
+    modal.className = 're-modal-overlay';
+    
+    const analysisData = property.analysis;
+    const extractedData = analysisData.extractedData || {};
+    
+    // Format the analysis data for display
+    const propertyDetails = this.formatPropertyDetails(extractedData);
+    const analysisText = analysisData.fullResponse || 'No full analysis text available';
+    
+    modal.innerHTML = `
+      <div class="re-modal">
+        <div class="re-modal-header">
+          <h3>Saved ChatGPT Analysis</h3>
+          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+        </div>
+        
+        <div class="re-modal-content">
+          <!-- Property URL -->
+          <div class="re-analysis-section">
+            <h4>🔗 Property</h4>
+            <a href="${property.url}" target="_blank" class="re-property-link">${property.url}</a>
+          </div>
+          
+          <!-- Extracted Data -->
+          ${propertyDetails ? `
+            <div class="re-analysis-section">
+              <h4>📊 Extracted Key Data</h4>
+              <div class="re-property-grid">
+                ${propertyDetails}
+              </div>
+            </div>
+          ` : ''}
+          
+          <!-- Full Analysis -->
+          <div class="re-analysis-section">
+            <h4>🤖 Full ChatGPT Analysis</h4>
+            <div class="re-analysis-text">
+              ${this.formatAnalysisText(analysisText)}
+            </div>
+          </div>
+          
+          <!-- Analysis Metadata -->
+          <div class="re-analysis-section">
+            <h4>📅 Analysis Details</h4>
+            <div class="re-analysis-meta">
+              <div><strong>Date:</strong> ${property.date || 'Unknown'}</div>
+              <div><strong>Domain:</strong> ${property.domain || 'Unknown'}</div>
+              <div><strong>Data Points:</strong> ${Object.keys(extractedData).length}</div>
+              <div><strong>Analysis Length:</strong> ${analysisText.length} characters</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="re-modal-footer">
+          <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+            📋 Copy Analysis
+          </button>
+          <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
+            🔗 Open Original Listing
+          </button>
+          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+            Close
+          </button>
+        </div>
+      </div>
+    `;
+    
+    // Add modal styles if they don't exist
+    this.addModalStyles();
+    
+    // Add modal to page
+    document.body.appendChild(modal);
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    console.log('✅ Analysis modal displayed');
+  }
+
+  formatPropertyDetails(extractedData) {
+    const details = [];
+    
+    // Key property details
+    const fields = [
+      { key: 'price', label: '💰 Price', format: (val) => val },
+      { key: 'bedrooms', label: '🛏️ Bedrooms', format: (val) => val },
+      { key: 'bathrooms', label: '🚿 Bathrooms', format: (val) => val },
+      { key: 'squareFeet', label: '📐 Sq Ft', format: (val) => val },
+      { key: 'yearBuilt', label: '🏗️ Year Built', format: (val) => val },
+      { key: 'propertyType', label: '🏠 Type', format: (val) => val },
+      { key: 'neighborhood', label: '📍 Neighborhood', format: (val) => val },
+      { key: 'locationScore', label: '⭐ Location Score', format: (val) => val },
+      { key: 'estimatedRentalIncome', label: '💵 Est. Rental Income', format: (val) => val }
+    ];
+    
+    fields.forEach(field => {
+      if (extractedData[field.key]) {
+        details.push(`
+          <div class="re-property-detail">
+            <span class="re-detail-label">${field.label}</span>
+            <span class="re-detail-value">${field.format(extractedData[field.key])}</span>
+          </div>
+        `);
+      }
+    });
+    
+    return details.join('');
+  }
+
+  formatAnalysisText(text) {
+    // Basic formatting to make the analysis more readable
+    return text
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^/, '<p>')
+      .replace(/$/, '</p>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
+      .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Italic text
+  }
+
+  addModalStyles() {
+    // Check if styles already exist
+    if (document.querySelector('#re-modal-styles')) {
+      return;
+    }
+    
+    const styles = document.createElement('style');
+    styles.id = 're-modal-styles';
+    styles.textContent = `
+      .re-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 20px;
+      }
+      
+      .re-modal {
+        background: var(--chatgpt-bg-primary, white);
+        border-radius: 12px;
+        max-width: 800px;
+        max-height: 90vh;
+        width: 100%;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .re-modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+      }
+      
+      .re-modal-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: var(--chatgpt-text-primary, #333);
+      }
+      
+      .re-modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--chatgpt-text-secondary, #666);
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+      
+      .re-modal-close:hover {
+        background: var(--chatgpt-bg-hover, #e5e5e5);
+      }
+      
+      .re-modal-content {
+        padding: 20px;
+        overflow-y: auto;
+        flex: 1;
+      }
+      
+      .re-analysis-section {
+        margin-bottom: 24px;
+      }
+      
+      .re-analysis-section h4 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: var(--chatgpt-text-primary, #333);
+        border-bottom: 2px solid var(--chatgpt-accent, #10a37f);
+        padding-bottom: 4px;
+      }
+      
+      .re-property-link {
+        color: var(--chatgpt-accent, #10a37f);
+        text-decoration: none;
+        word-break: break-all;
+        font-size: 14px;
+      }
+      
+      .re-property-link:hover {
+        text-decoration: underline;
+      }
+      
+      .re-property-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+      
+      .re-property-detail {
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        padding: 12px;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      
+      .re-detail-label {
+        font-size: 12px;
+        color: var(--chatgpt-text-secondary, #666);
+        font-weight: 500;
+      }
+      
+      .re-detail-value {
+        font-size: 14px;
+        color: var(--chatgpt-text-primary, #333);
+        font-weight: 600;
+      }
+      
+      .re-analysis-text {
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--chatgpt-text-primary, #333);
+        max-height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      
+      .re-analysis-text p {
+        margin: 0 0 12px 0;
+      }
+      
+      .re-analysis-text p:last-child {
+        margin-bottom: 0;
+      }
+      
+      .re-analysis-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 8px;
+        font-size: 14px;
+        color: var(--chatgpt-text-secondary, #666);
+      }
+      
+      .re-modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        background: var(--chatgpt-bg-secondary, #f7f7f7);
+      }
+      
+      @media (max-width: 768px) {
+        .re-modal {
+          margin: 10px;
+          max-height: 95vh;
+        }
+        
+        .re-property-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .re-modal-footer {
+          flex-direction: column;
+        }
+      }
+    `;
+    
+    document.head.appendChild(styles);
+  }
+
+  async copyAnalysisToClipboard(url) {
+    try {
+      // Load property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const property = properties.find(p => p.url === url);
+      
+      if (property && property.analysis) {
+        const analysisText = property.analysis.fullResponse || 'No analysis available';
+        await navigator.clipboard.writeText(analysisText);
+        this.showChatGPTMessage('success', 'Analysis copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('❌ Failed to copy analysis:', error);
+      this.showChatGPTMessage('error', 'Failed to copy analysis to clipboard');
+    }
   }
 
   viewCategoryProperties(domain) {
