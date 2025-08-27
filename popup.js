@@ -452,6 +452,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set up prompt splitting listeners
   addPromptSplittingEventListeners();
   
+  // Set up close default prompt button
+  const closeDefaultPromptBtn = document.getElementById('closeDefaultPromptBtn');
+  if (closeDefaultPromptBtn) {
+    closeDefaultPromptBtn.addEventListener('click', () => {
+      const defaultPromptDisplay = document.getElementById('defaultPromptDisplay');
+      if (defaultPromptDisplay) {
+        defaultPromptDisplay.classList.add('hidden');
+      }
+    });
+  }
+  
   // Set up periodic refresh for pending analyses
   setInterval(async () => {
     await loadPropertyHistory();
@@ -4653,7 +4664,7 @@ async function showLatestAnalysis(property) {
               </div>
               
               <div class="create-category-option">
-                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('manageCategoriesBtn').click()">
+                <button class="btn btn-ghost btn-sm" id="latestCreateCategoryBtn">
                   ➕ Create New Category
                 </button>
               </div>
@@ -4670,7 +4681,7 @@ async function showLatestAnalysis(property) {
         <button class="btn btn-secondary btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
           📄 Export to Word
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="dismissLatestAnalysis()">
+        <button class="btn btn-ghost btn-sm" id="latestAnalysisDoneBtn">
           ✅ Done for Now
         </button>
       </div>
@@ -4727,6 +4738,21 @@ function removePropertiesTabNotification() {
 function setupLatestAnalysisEventListeners() {
   const latestContent = document.getElementById('latestAnalysisContent');
   if (!latestContent) return;
+  
+  // Set up done button event listener
+  const doneBtn = document.getElementById('latestAnalysisDoneBtn');
+  if (doneBtn) {
+    doneBtn.addEventListener('click', dismissLatestAnalysis);
+  }
+  
+  // Set up create category button event listener
+  const createCategoryBtn = document.getElementById('latestCreateCategoryBtn');
+  if (createCategoryBtn) {
+    createCategoryBtn.addEventListener('click', () => {
+      const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+      if (manageCategoriesBtn) manageCategoriesBtn.click();
+    });
+  }
   
   // Use event delegation for all actions
   latestContent.addEventListener('click', async (event) => {
@@ -5263,11 +5289,20 @@ async function renderEnhancedCategoryGrid() {
       <div class="empty-state">
         <div class="empty-state-icon">📁</div>
         <p>No categories created yet</p>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('manageCategoriesBtn').click()">
+        <button class="btn btn-primary btn-sm" id="emptyCategoriesCreateBtn">
           Create Categories
         </button>
       </div>
     `;
+    
+    // Add event listener for the create categories button
+    const createBtn = document.getElementById('emptyCategoriesCreateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+        if (manageCategoriesBtn) manageCategoriesBtn.click();
+      });
+    }
     return;
   }
   
@@ -5297,11 +5332,11 @@ async function renderEnhancedCategoryGrid() {
                      <span class="property-status-icon ${property.analysis ? 'analyzed' : 'pending'}">
                        ${property.analysis ? '●' : '○'}
                      </span>
-                     <span class="property-domain-clickable" onclick="window.open('${property.url}', '_blank')">
+                     <span class="property-domain-clickable" data-url="${property.url}">
                        ${extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname}
                      </span>
                    </div>
-                   <button class="property-edit-category-btn" onclick="event.stopPropagation(); openCategorizationModal('${property.id || property.url}')" title="Edit Category">
+                   <button class="property-edit-category-btn" data-property-id="${property.id || property.url}" title="Edit Category">
                      📝
                    </button>
                  </div>
@@ -5332,6 +5367,27 @@ async function renderEnhancedCategoryGrid() {
   categoryGrid.querySelectorAll('.category-card').forEach(card => {
     card.addEventListener('click', (e) => {
       const categoryId = card.dataset.categoryId;
+      
+      // Check if clicked on edit category button
+      if (e.target.closest('.property-edit-category-btn')) {
+        e.stopPropagation();
+        const propertyId = e.target.closest('.property-edit-category-btn').dataset.propertyId;
+        if (propertyId) {
+          openCategorizationModal(propertyId);
+        }
+        return;
+      }
+      
+      // Check if clicked on property domain (to open URL)
+      if (e.target.closest('.property-domain-clickable')) {
+        e.stopPropagation();
+        const url = e.target.closest('.property-domain-clickable').dataset.url;
+        if (url) {
+          window.open(url, '_blank');
+        }
+        return;
+      }
+      
       if (e.target.closest('.category-property-item')) {
         // Clicked on a property item
         const propertyId = e.target.closest('.category-property-item').dataset.propertyId;
@@ -5678,11 +5734,22 @@ function populateCategoryOptions() {
     categoryOptions.innerHTML = `
       <div class="no-categories-message">
         <p>No categories available. Please create categories first.</p>
-        <button class="btn btn-primary" onclick="document.getElementById('manageCategoriesBtn').click(); document.getElementById('categorizationModal').style.display='none';">
+        <button class="btn btn-primary" id="noCategoriesCreateBtn">
           Create Categories
         </button>
       </div>
     `;
+    
+    // Add event listener for create categories button
+    const createBtn = document.getElementById('noCategoriesCreateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        const manageCategoriesBtn = document.getElementById('manageCategoriesBtn');
+        if (manageCategoriesBtn) manageCategoriesBtn.click();
+        const modal = document.getElementById('categorizationModal');
+        if (modal) modal.style.display = 'none';
+      });
+    }
     return;
   }
   
