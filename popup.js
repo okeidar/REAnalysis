@@ -4527,70 +4527,151 @@ async function showLatestAnalysis(property) {
   // Get all categories for quick selection
   const allCategories = categoryManager.getAllCategories();
   
+  const address = extractAddressFromUrl(property.url) || property.address || property.domain || new URL(property.url).hostname;
+  
   latestContent.innerHTML = `
     <div class="latest-analysis-content">
-      <div class="latest-property-header">
-        <div class="latest-property-info">
-          <a href="${property.url}" target="_blank" class="latest-property-url">
-            ${property.domain || new URL(property.url).hostname}
-          </a>
-          <div class="latest-property-meta">
-            <div class="latest-property-timestamp">
-              <span>🕒</span>
-              <span>Analyzed ${getTimeAgo(property.updatedAt || property.timestamp)}</span>
-            </div>
-            <div class="current-category" style="color: ${currentCategory?.color || '#6B7280'};">
-              ${currentCategory?.icon || '📋'} ${currentCategory?.name || 'Uncategorized'}
+      <!-- Property Summary -->
+      <div class="property-summary-card">
+        <div class="property-summary-header">
+          <div class="property-icon">🏠</div>
+          <div class="property-info">
+            <h3 class="property-address">
+              <a href="${property.url}" target="_blank" class="property-link">${address}</a>
+            </h3>
+            <div class="property-details">
+              <span class="analysis-status">✅ Analysis Complete</span>
+              <span class="analysis-time">📅 ${getTimeAgo(property.updatedAt || property.timestamp)}</span>
             </div>
           </div>
         </div>
-      </div>
-      
-      <div class="latest-analysis-preview">
-        <div class="latest-analysis-text">
-          ${property.analysis.fullResponse.substring(0, 300)}${property.analysis.fullResponse.length > 300 ? '...' : ''}
-        </div>
-      </div>
-      
-      <div class="latest-categorization-section">
-        <div class="categorization-header">
-          <span>🏷️</span>
-          Organize This Property
-          <div class="categorization-subtitle">Take your time to choose the right category</div>
-          ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? 
-            `<div class="ai-suggestion">💡 AI suggests: ${suggestedCategoryObj?.icon} ${suggestedCategoryObj?.name}</div>` : ''}
-        </div>
         
-        <div class="quick-categorization">
-          ${allCategories.map(category => `
-            <button class="quick-category-btn ${category.id === suggestedCategory && category.id !== property.categoryId ? 'suggested' : ''}" 
-                    data-action="quick-categorize" 
-                    data-property-id="${property.id || property.url}" 
-                    data-category-id="${category.id}"
-                    style="color: ${category.color};">
-              ${category.icon} ${category.name}
+        <div class="analysis-preview-section">
+          <div class="analysis-preview-header">
+            <span class="preview-icon">📊</span>
+            <span class="preview-title">Key Insights</span>
+            <button class="btn-link" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
+              View Full Analysis →
             </button>
-          `).join('')}
-        </div>
-        
-        <div class="custom-categorization">
-          <select class="category-select-latest" id="latestCategorySelect">
-            ${allCategories.map(cat => 
-              `<option value="${cat.id}" ${property.categoryId === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
-            ).join('')}
-          </select>
-          <button class="btn btn-primary btn-sm" data-action="apply-category" data-property-id="${property.id || property.url}">
-            Apply
-          </button>
+          </div>
+          <div class="analysis-preview-text">
+            ${property.analysis.fullResponse.substring(0, 280)}${property.analysis.fullResponse.length > 280 ? '...' : ''}
+          </div>
         </div>
       </div>
-      
-      <div class="latest-actions">
-        <button class="btn btn-ghost btn-sm" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
-          👁️ View Full Analysis
+
+      <!-- Categorization Workflow -->
+      <div class="categorization-workflow">
+        <div class="workflow-step-header">
+          <div class="step-number">2</div>
+          <div class="step-info">
+            <h3 class="step-title">Organize Your Property</h3>
+            <p class="step-description">Choose where this property belongs in your portfolio</p>
+          </div>
+        </div>
+
+        <!-- Current Status -->
+        <div class="current-status">
+          <div class="status-label">Currently in:</div>
+          <div class="current-category-display" style="border-color: ${currentCategory?.color || '#6B7280'};">
+            <span class="category-icon" style="color: ${currentCategory?.color || '#6B7280'};">${currentCategory?.icon || '📋'}</span>
+            <span class="category-name">${currentCategory?.name || 'Uncategorized'}</span>
+          </div>
+        </div>
+
+        <!-- AI Suggestion (if available) -->
+        ${suggestedCategory !== 'uncategorized' && suggestedCategory !== property.categoryId ? `
+          <div class="ai-suggestion-card">
+            <div class="suggestion-header">
+              <span class="ai-icon">🤖</span>
+              <span class="suggestion-title">Smart Suggestion</span>
+            </div>
+            <div class="suggestion-content">
+              <div class="suggested-category" style="border-color: ${suggestedCategoryObj?.color};">
+                <span class="category-icon" style="color: ${suggestedCategoryObj?.color};">${suggestedCategoryObj?.icon}</span>
+                <span class="category-name">${suggestedCategoryObj?.name}</span>
+              </div>
+              <div class="suggestion-reason">Based on the property analysis</div>
+              <button class="btn btn-primary btn-sm suggestion-apply-btn" 
+                      data-action="quick-categorize" 
+                      data-property-id="${property.id || property.url}" 
+                      data-category-id="${suggestedCategory}">
+                Use This Category
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Category Options -->
+        <div class="category-selection-section">
+          <div class="selection-header">
+            <span class="selection-icon">📁</span>
+            <span class="selection-title">Choose Category</span>
+          </div>
+          
+          <div class="category-grid">
+            ${allCategories.map(category => `
+              <div class="category-option-card ${category.id === property.categoryId ? 'current' : ''} ${category.id === suggestedCategory && category.id !== property.categoryId ? 'suggested' : ''}" 
+                   data-action="quick-categorize" 
+                   data-property-id="${property.id || property.url}" 
+                   data-category-id="${category.id}">
+                <div class="category-option-header">
+                  <span class="category-option-icon" style="color: ${category.color};">${category.icon}</span>
+                  <div class="category-option-status">
+                    ${category.id === property.categoryId ? '<span class="current-badge">Current</span>' : ''}
+                    ${category.id === suggestedCategory && category.id !== property.categoryId ? '<span class="suggested-badge">Suggested</span>' : ''}
+                  </div>
+                </div>
+                <div class="category-option-name">${category.name}</div>
+                <div class="category-option-description">${category.description}</div>
+                <div class="category-property-count">${categoryManager.getPropertiesByCategory(category.id).length} properties</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Advanced Options -->
+        <div class="advanced-categorization">
+          <details class="advanced-options">
+            <summary class="advanced-summary">
+              <span class="advanced-icon">⚙️</span>
+              <span>Advanced Options</span>
+            </summary>
+            <div class="advanced-content">
+              <div class="dropdown-categorization">
+                <label for="latestCategorySelect" class="dropdown-label">Select from dropdown:</label>
+                <div class="dropdown-group">
+                  <select class="category-select-latest" id="latestCategorySelect">
+                    ${allCategories.map(cat => 
+                      `<option value="${cat.id}" ${property.categoryId === cat.id ? 'selected' : ''}>${cat.icon} ${cat.name}</option>`
+                    ).join('')}
+                  </select>
+                  <button class="btn btn-secondary btn-sm" data-action="apply-category" data-property-id="${property.id || property.url}">
+                    Apply
+                  </button>
+                </div>
+              </div>
+              
+              <div class="create-category-option">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('manageCategoriesBtn').click()">
+                  ➕ Create New Category
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions-bar">
+        <button class="btn btn-secondary btn-sm" data-action="view-full-analysis" data-property-id="${property.id || property.url}">
+          📖 Read Full Analysis
         </button>
-        <button class="btn btn-ghost btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
+        <button class="btn btn-secondary btn-sm" data-action="export-property" data-property-id="${property.id || property.url}">
           📄 Export to Word
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="dismissLatestAnalysis()">
+          ✅ Done for Now
         </button>
       </div>
     </div>
