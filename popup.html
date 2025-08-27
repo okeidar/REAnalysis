@@ -681,6 +681,32 @@
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
     }
+
+    /* Export Dialog Enhancements */
+    .export-category-item {
+      border: 2px solid var(--border) !important;
+      transition: all 0.2s ease-in-out !important;
+    }
+
+    .export-category-item:hover {
+      border-color: var(--primary) !important;
+      background: rgba(16, 163, 127, 0.05) !important;
+      transform: translateY(-1px);
+    }
+
+    .export-category-item input[type="checkbox"]:checked + div {
+      color: var(--primary);
+    }
+
+    /* Ensure clear text visibility */
+    .modal-body p,
+    .modal-body div {
+      line-height: 1.5;
+    }
+
+    #exportSummary {
+      font-weight: var(--font-weight-semibold);
+    }
     
     /* Properties Dashboard Enhancements */
     .section-controls {
@@ -3066,7 +3092,17 @@
 
     .action-controls {
       display: flex;
-      gap: var(--space-sm);
+      gap: var(--space-md);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .action-controls .btn {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      padding: var(--space-md) var(--space-lg);
+      min-width: 140px;
+      box-shadow: var(--shadow-sm);
     }
 
     /* Enhanced Category Grid */
@@ -4343,25 +4379,13 @@
             </div>
             
             <div class="action-controls">
-              <button id="testCategorizationBtn" class="btn btn-primary btn-sm" title="Test categorization with a sample property">
-                <span class="btn-icon">🧪</span>
-                Test Categorization
-              </button>
-              <button id="manageCategoriesBtn" class="btn btn-secondary btn-sm">
+              <button id="manageCategoriesBtn" class="btn btn-primary btn-sm">
                 <span class="btn-icon">⚙️</span>
                 Manage Categories
               </button>
-              <button id="exportWordBtn" class="btn btn-secondary btn-sm">
+              <button id="exportWordBtn" class="btn btn-primary btn-sm">
                 <span class="btn-icon">📄</span>
                 Export to Word
-              </button>
-              <button id="exportAllCategoriesBtn" class="btn btn-primary btn-sm" title="Export all analyzed properties from all categories to Word">
-                <span class="btn-icon">📄</span>
-                Export All Analyzed Properties
-              </button>
-              <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
-                <span class="btn-icon">🗑️</span>
-                Clear All
               </button>
             </div>
           </div>

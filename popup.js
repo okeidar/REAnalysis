@@ -359,27 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Word export button event listener
   const exportWordBtn = document.getElementById('exportWordBtn');
-  if (exportWordBtn) exportWordBtn.addEventListener('click', async function() {
-    try {
-      const result = await chrome.storage.local.get(['propertyHistory']);
-      const history = result.propertyHistory || [];
-      const analyzedProperties = history.filter(item => item.analysis && item.analysis.fullResponse);
-      
-      if (analyzedProperties.length === 0) {
-        showError('No analyzed properties available for Word export');
-        return;
-      }
-      
-      if (window.WordExportModule) {
-        window.WordExportModule.showExportOptionsModal(analyzedProperties);
-      } else {
-        showError('Word export module not loaded. Please refresh the extension.');
-      }
-    } catch (error) {
-      console.error('Error initiating Word export:', error);
-      showError('Failed to initiate Word export');
-    }
-  });
+  if (exportWordBtn) exportWordBtn.addEventListener('click', showCategoryExportDialog);
   if (analyzeBtn) analyzeBtn.addEventListener('click', handleAnalyzeClick);
   if (pasteBtn) pasteBtn.addEventListener('click', async function() {
     try {
@@ -3720,11 +3700,7 @@ function initializeCategoryUI() {
     manageCategoriesBtn.addEventListener('click', openCategoryManagementModal);
   }
   
-  // Set up export all categories button
-  const exportAllCategoriesBtn = document.getElementById('exportAllCategoriesBtn');
-  if (exportAllCategoriesBtn) {
-    exportAllCategoriesBtn.addEventListener('click', exportAllCategoriesToWord);
-  }
+
   
   // Set up category filter
   if (categoryFilter) {
@@ -4254,6 +4230,230 @@ async function exportAllCategoriesToWord() {
   } catch (error) {
     console.error('Failed to export all categories:', error);
     showError('Failed to export all categories to Word');
+  }
+}
+
+// Show category export selection dialog
+async function showCategoryExportDialog() {
+  try {
+    await categoryManager.initialize();
+    const categories = categoryManager.getAllCategories();
+    
+    // Filter categories that have analyzed properties
+    const exportableCategories = [];
+    for (const category of categories) {
+      const properties = categoryManager.getPropertiesByCategory(category.id);
+      const analyzedProperties = properties.filter(property => property.analysis && property.analysis.fullResponse);
+      if (analyzedProperties.length > 0) {
+        exportableCategories.push({
+          ...category,
+          analyzedCount: analyzedProperties.length,
+          properties: analyzedProperties
+        });
+      }
+    }
+    
+    if (exportableCategories.length === 0) {
+      showError('No analyzed properties available for Word export. Please analyze some properties first.');
+      return;
+    }
+    
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 style="margin: 0; color: var(--text-primary);">📄 Export to Word</h3>
+          <button class="modal-close" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary);">×</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom: var(--space-lg); color: var(--text-primary); font-size: var(--font-size-base);">
+            Select which categories you'd like to export to a Word document:
+          </p>
+          
+          <div class="category-export-list">
+            ${exportableCategories.map(category => `
+              <div class="export-category-item" style="
+                display: flex;
+                align-items: center;
+                gap: var(--space-md);
+                padding: var(--space-md);
+                border: 2px solid var(--border);
+                border-radius: var(--radius-md);
+                margin-bottom: var(--space-sm);
+                background: var(--background);
+                cursor: pointer;
+                transition: all 0.2s ease-in-out;
+              " data-category-id="${category.id}">
+                <input type="checkbox" id="export-${category.id}" style="margin: 0; transform: scale(1.2);">
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs);">
+                    <span style="font-size: 20px;">${category.icon}</span>
+                    <strong style="color: var(--text-primary); font-size: var(--font-size-base);">${category.name}</strong>
+                    <span style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 12px; font-size: var(--font-size-sm);">
+                      ${category.analyzedCount} analyzed
+                    </span>
+                  </div>
+                  <div style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                    ${category.description}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div style="margin-top: var(--space-lg); padding-top: var(--space-md); border-top: 1px solid var(--border);">
+            <div style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-md);">
+              <button id="selectAllCategories" class="btn btn-ghost btn-sm">Select All</button>
+              <button id="selectNoneCategories" class="btn btn-ghost btn-sm">Select None</button>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-md);">
+              <div id="exportSummary" style="color: var(--text-secondary); font-size: var(--font-size-sm);">
+                Select categories to export
+              </div>
+              <div style="display: flex; gap: var(--space-sm);">
+                <button id="cancelExport" class="btn btn-secondary btn-sm">Cancel</button>
+                <button id="confirmExport" class="btn btn-primary btn-sm" disabled>Export Selected</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    const closeBtn = modal.querySelector('.modal-close');
+    const cancelBtn = modal.querySelector('#cancelExport');
+    const confirmBtn = modal.querySelector('#confirmExport');
+    const selectAllBtn = modal.querySelector('#selectAllCategories');
+    const selectNoneBtn = modal.querySelector('#selectNoneCategories');
+    const checkboxes = modal.querySelectorAll('input[type="checkbox"]');
+    const exportSummary = modal.querySelector('#exportSummary');
+    
+    const closeModal = () => modal.remove();
+    
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    
+    // Handle category item clicks
+    modal.querySelectorAll('.export-category-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.type !== 'checkbox') {
+          const checkbox = item.querySelector('input[type="checkbox"]');
+          checkbox.checked = !checkbox.checked;
+          updateExportSummary();
+        }
+      });
+    });
+    
+    // Handle checkbox changes
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updateExportSummary);
+    });
+    
+    // Select all/none handlers
+    selectAllBtn.addEventListener('click', () => {
+      checkboxes.forEach(cb => cb.checked = true);
+      updateExportSummary();
+    });
+    
+    selectNoneBtn.addEventListener('click', () => {
+      checkboxes.forEach(cb => cb.checked = false);
+      updateExportSummary();
+    });
+    
+    // Export confirmation
+    confirmBtn.addEventListener('click', async () => {
+      const selectedCategories = [];
+      checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+          const categoryId = checkbox.id.replace('export-', '');
+          const category = exportableCategories.find(cat => cat.id === categoryId);
+          if (category) {
+            selectedCategories.push(category);
+          }
+        }
+      });
+      
+      if (selectedCategories.length > 0) {
+        closeModal();
+        await exportSelectedCategories(selectedCategories);
+      }
+    });
+    
+    function updateExportSummary() {
+      const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+      const totalProperties = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .reduce((total, cb) => {
+          const categoryId = cb.id.replace('export-', '');
+          const category = exportableCategories.find(cat => cat.id === categoryId);
+          return total + (category ? category.analyzedCount : 0);
+        }, 0);
+      
+      if (selectedCount === 0) {
+        exportSummary.textContent = 'Select categories to export';
+        confirmBtn.disabled = true;
+      } else {
+        exportSummary.textContent = `${selectedCount} categories selected (${totalProperties} properties)`;
+        confirmBtn.disabled = false;
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error showing category export dialog:', error);
+    showError('Failed to show export options');
+  }
+}
+
+// Export selected categories
+async function exportSelectedCategories(selectedCategories) {
+  try {
+    const totalProperties = selectedCategories.reduce((total, cat) => total + cat.analyzedCount, 0);
+    showSuccess(`Exporting ${totalProperties} properties from ${selectedCategories.length} categories to Word document...`);
+    
+    if (window.WordExportModule) {
+      const exportData = {
+        isMultiCategory: selectedCategories.length > 1,
+        isCategoryExport: true,
+        selectedCategories: selectedCategories,
+        totalProperties: totalProperties
+      };
+      
+      if (selectedCategories.length === 1) {
+        // Single category export
+        const category = selectedCategories[0];
+        exportData.categoryName = category.name;
+        exportData.categoryIcon = category.icon;
+        exportData.categoryDescription = category.description;
+        exportData.properties = category.properties;
+      } else {
+        // Multiple categories export
+        const categorizedProperties = {};
+        selectedCategories.forEach(category => {
+          categorizedProperties[category.id] = {
+            name: category.name,
+            icon: category.icon,
+            description: category.description,
+            properties: category.properties
+          };
+        });
+        exportData.categories = categorizedProperties;
+      }
+      
+      window.WordExportModule.showExportOptionsModal(exportData);
+    } else {
+      showError('Word export module not loaded. Please refresh the extension.');
+    }
+  } catch (error) {
+    console.error('Error exporting selected categories:', error);
+    showError('Failed to export categories to Word');
   }
 }
 
