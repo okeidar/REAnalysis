@@ -1321,15 +1321,28 @@ class REAnalyzerEmbeddedUI {
   async quickPasteAndAnalyze() {
     try {
       const text = await navigator.clipboard.readText();
-      if (this.isValidPropertyLink(text)) {
-        this.showPanel();
-        this.switchTab('analyzer');
-        await this.analyzeProperty(text);
-      } else {
-        this.showMessage('error', 'Clipboard does not contain a valid property link');
+      const cleanText = text.trim();
+      
+      if (!cleanText) {
+        this.showChatGPTMessage('error', 'Clipboard is empty');
+        return;
+      }
+      
+      try {
+        if (this.isValidPropertyLink(cleanText)) {
+          this.showPanel();
+          this.switchTab('analyzer');
+          await this.analyzeProperty(cleanText);
+        } else {
+          this.showChatGPTMessage('error', 'Clipboard does not contain a valid property link');
+        }
+      } catch (validationError) {
+        console.error('❌ Validation error in quick paste:', validationError);
+        this.showChatGPTMessage('error', 'Invalid URL format in clipboard');
       }
     } catch (err) {
-      this.showMessage('error', 'Unable to access clipboard');
+      console.error('❌ Clipboard access error:', err);
+      this.showChatGPTMessage('error', 'Unable to access clipboard');
     }
   }
 
@@ -1428,12 +1441,27 @@ class REAnalyzerEmbeddedUI {
       return;
     }
     
-    if (this.isValidPropertyLink(url)) {
-      validation.textContent = '✓ Valid property URL';
-      validation.className = 're-form-validation re-valid';
-    } else {
-      validation.textContent = '⚠ Please enter a valid property URL from a supported site';
-      validation.className = 're-form-validation re-invalid';
+    // Only validate if the input looks like it might be a complete URL
+    // This prevents errors while user is still typing
+    if (url.length < 5 || (!url.includes('.') && !url.startsWith('http'))) {
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      return;
+    }
+    
+    try {
+      if (this.isValidPropertyLink(url)) {
+        validation.textContent = '✓ Valid property URL';
+        validation.className = 're-form-validation re-valid';
+      } else {
+        validation.textContent = '⚠ Please enter a valid property URL from a supported site';
+        validation.className = 're-form-validation re-invalid';
+      }
+    } catch (error) {
+      // Don't show validation errors while user is still typing
+      validation.textContent = '';
+      validation.className = 're-form-validation';
+      console.log('⏸️ Validation skipped for incomplete input:', url);
     }
   }
 
@@ -1752,14 +1780,50 @@ Or enter your own property URL:`);
 
   isValidPropertyLink(url) {
     try {
+      // Check if URL is empty, null, or undefined
+      if (!url || typeof url !== 'string' || url.trim().length === 0) {
+        console.log('❌ Empty or invalid URL provided');
+        return false;
+      }
+      
+      // Clean the URL
+      url = url.trim();
+      
       // Check if bypass is enabled
       const allowAnyUrl = this.panel?.querySelector('#re-allow-any-url')?.checked;
       if (allowAnyUrl) {
         console.log('🔓 URL validation bypassed - allowing any URL');
-        return true;
+        // Still need to validate it's a proper URL format for bypass mode
+        try {
+          new URL(url);
+          return true;
+        } catch (e) {
+          // Try adding https:// if it doesn't have a protocol
+          try {
+            new URL('https://' + url);
+            return true;
+          } catch (e2) {
+            console.log('❌ Invalid URL format even with bypass enabled');
+            return false;
+          }
+        }
       }
       
-      const urlObj = new URL(url);
+      // Try to construct URL, add https:// if missing
+      let urlObj;
+      try {
+        urlObj = new URL(url);
+      } catch (e) {
+        // If URL construction fails, try adding https://
+        try {
+          urlObj = new URL('https://' + url);
+          console.log('🔧 Added https:// prefix to URL');
+        } catch (e2) {
+          console.log('❌ Invalid URL format:', url);
+          return false;
+        }
+      }
+      
       const hostname = urlObj.hostname.toLowerCase();
       
       console.log('🔍 Validating URL:', url);
