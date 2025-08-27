@@ -6427,6 +6427,7 @@ function calculateDataQuality(data) {
 
 // Function to monitor for new ChatGPT messages with completion detection
 function setupResponseMonitor() {
+  console.log('🚀 Setting up response monitor...');
   let lastMessageCount = 0;
   let responseBuffer = new Map(); // Buffer to track response completion
   let completionTimers = new Map(); // Timers for each property analysis
@@ -7540,12 +7541,13 @@ function setupResponseMonitor() {
     }
   }, 3000); // Check every 3 seconds during active analysis
   
-  // Cleanup function
-  return function() {
-    clearInterval(intervalId);
-    clearInterval(contextCheckInterval);
-    clearInterval(contentChecker);
-    observer.disconnect();
+  // Cleanup function - return the cleanup function
+  return function cleanupMonitor() {
+    console.log('🧹 Cleaning up response monitor...');
+    if (typeof intervalId !== 'undefined') clearInterval(intervalId);
+    if (typeof contextCheckInterval !== 'undefined') clearInterval(contextCheckInterval);
+    if (typeof contentChecker !== 'undefined') clearInterval(contentChecker);
+    if (typeof observer !== 'undefined') observer.disconnect();
   };
 }
 
