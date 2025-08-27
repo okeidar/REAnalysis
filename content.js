@@ -110,6 +110,9 @@ class REAnalyzerEmbeddedUI {
       // Initialize status
       this.updateChatGPTConnectionStatus();
       
+      // Check extension context and warn user if needed
+      this.checkExtensionContext();
+      
       // Load initial data
       await this.loadChatGPTPropertyData();
       
@@ -125,14 +128,34 @@ class REAnalyzerEmbeddedUI {
     try {
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['embeddedUISettings']),
-        { embeddedUISettings: {} }
+        null
       );
       
-      if (result.embeddedUISettings) {
+      let settingsLoaded = false;
+      
+      if (result && result.embeddedUISettings) {
         uiSettings = { ...uiSettings, ...result.embeddedUISettings };
+        settingsLoaded = true;
+        console.log('📋 Loaded UI settings from extension storage:', uiSettings);
+      } else {
+        // Fallback to localStorage if extension context is invalidated
+        try {
+          const localSettings = localStorage.getItem('reAnalyzerSettings');
+          if (localSettings) {
+            const parsedSettings = JSON.parse(localSettings);
+            uiSettings = { ...uiSettings, ...parsedSettings };
+            settingsLoaded = true;
+            console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+          }
+        } catch (localError) {
+          console.warn('Failed to load settings from localStorage:', localError);
+        }
       }
       
-      console.log('📋 Loaded UI settings:', uiSettings);
+      if (!settingsLoaded) {
+        console.log('📋 Using default UI settings:', uiSettings);
+      }
+      
     } catch (error) {
       console.warn('Failed to load UI settings:', error);
     }
@@ -1103,21 +1126,17 @@ class REAnalyzerEmbeddedUI {
       height: window.innerHeight
     };
     
-    // Adjust panel size for small screens
+    // For ChatGPT-style sidebar, we don't need to change position as much
+    // Just adjust for mobile
     if (viewport.width < 768) {
       this.panel.classList.add('re-mobile-mode');
-      this.updatePanelPosition('bottom');
+      // Don't call updatePanelPosition to avoid saving settings repeatedly
+      uiSettings.position = 'mobile';
     } else {
       this.panel.classList.remove('re-mobile-mode');
-      
-      // Auto-position based on available space
-      if (viewport.width < 1200) {
-        // On medium screens, prefer bottom position
-        this.updatePanelPosition('bottom');
-      } else {
-        // On large screens, prefer side position
-        const preferredSide = this.detectOptimalSide();
-        this.updatePanelPosition(preferredSide);
+      // Restore position without saving
+      if (uiSettings.position === 'mobile') {
+        uiSettings.position = 'left'; // Default for ChatGPT-style sidebar
       }
     }
     
@@ -1440,11 +1459,19 @@ class REAnalyzerEmbeddedUI {
       // Load property history from storage
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['propertyHistory']),
-        { propertyHistory: [] }
+        null
       );
       
-      const properties = result.propertyHistory || [];
-      console.log(`📚 Loaded ${properties.length} properties for ChatGPT display`);
+      let properties = [];
+      
+      if (result && result.propertyHistory) {
+        properties = result.propertyHistory;
+        console.log(`📚 Loaded ${properties.length} properties from extension storage`);
+      } else {
+        // If extension context is invalidated, show a message but continue with empty state
+        console.log('📚 Extension context invalidated, showing empty property state');
+        this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+      }
       
       // Update stats
       const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
@@ -1585,6 +1612,30 @@ class REAnalyzerEmbeddedUI {
         this.showChatGPTMessage('success', 'All property data has been cleared');
         this.loadChatGPTPropertyData();
       });
+    }
+  }
+
+  checkExtensionContext() {
+    if (!isExtensionContextValid()) {
+      console.warn('⚠️ Extension context invalidated during initialization');
+      this.showChatGPTMessage('warning', 'Extension was updated. Please reload the page for full functionality.');
+      
+      // Add a reload button to the warning message
+      setTimeout(() => {
+        const warningMsg = this.panel.querySelector('#re-warning-msg');
+        if (warningMsg && !warningMsg.classList.contains('re-hidden')) {
+          const reloadBtn = document.createElement('button');
+          reloadBtn.className = 're-btn re-btn-secondary re-btn-sm';
+          reloadBtn.innerHTML = '<span>🔄</span><span>Reload Page</span>';
+          reloadBtn.style.marginTop = '8px';
+          reloadBtn.onclick = () => window.location.reload();
+          
+          const content = warningMsg.querySelector('.re-message-content');
+          if (content) {
+            content.appendChild(reloadBtn);
+          }
+        }
+      }, 100);
     }
   }
 
@@ -1731,6 +1782,11 @@ class REAnalyzerEmbeddedUI {
 
   async sendAnalysisToBackground(url) {
     try {
+      // Check extension context before analysis
+      if (!isExtensionContextValid()) {
+        throw new Error('Extension context invalidated. Please reload the page.');
+      }
+      
       // Use the existing insertPropertyAnalysisPrompt function from the original content script
       console.log('🔗 Connecting to existing analysis functionality...');
       
@@ -2103,14 +2159,21 @@ class REAnalyzerEmbeddedUI {
   updatePanelPosition(position) {
     if (!this.panel) return;
     
-    // Remove old position classes
+    // Remove old position classes (not needed for ChatGPT-style sidebar)
     this.panel.classList.remove('re-panel-right', 're-panel-left', 're-panel-bottom');
     
-    // Add new position class
-    this.panel.classList.add(`re-panel-${position}`);
-    
+    // For ChatGPT-style sidebar, position is mainly handled by CSS
+    // Just update the setting
     uiSettings.position = position;
-    this.saveSettings();
+    
+    // Only save settings if the extension context is valid, otherwise just update locally
+    if (isExtensionContextValid()) {
+      this.saveSettings();
+    } else {
+      // Store in localStorage as fallback
+      localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      console.log('💾 Position updated in local cache:', position);
+    }
   }
 
   toggleCompactMode(enabled) {
@@ -2126,16 +2189,22 @@ class REAnalyzerEmbeddedUI {
 
   async saveSettings() {
     try {
-      await safeChromeFall(
+      const result = await safeChromeFall(
         () => chrome.storage.local.set({ embeddedUISettings: uiSettings }),
         null
       );
       
-      this.showMessage('success', 'Settings saved successfully!');
-      console.log('💾 Settings saved:', uiSettings);
+      if (result !== null) {
+        this.showChatGPTMessage('success', 'Settings saved successfully!');
+        console.log('💾 Settings saved:', uiSettings);
+      } else {
+        console.log('💾 Settings saved to local cache (extension context invalidated)');
+        // Store settings in localStorage as fallback
+        localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      }
     } catch (error) {
       console.error('Failed to save settings:', error);
-      this.showMessage('error', 'Failed to save settings');
+      this.showChatGPTMessage('error', 'Failed to save settings');
     }
   }
 
