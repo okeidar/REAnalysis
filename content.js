@@ -7415,9 +7415,9 @@ function setupResponseMonitor() {
         }
       }
       
-      lastMessageCount = messages.length;
+      // Note: lastMessageCount is managed in checkForNewMessages function
     }
-  };
+  }; // End of processExtractedMessage function
   
   // Check for new messages every 500ms for better completion detection
   const intervalId = setInterval(checkForNewMessages, 500);
@@ -8755,5 +8755,3 @@ window.testPromptSplitting = function(propertyLink) {
   console.log('🧪 Testing prompt splitting with link:', testLink);
   insertPropertyAnalysisPrompt(testLink);
 };
-
-} // End of multiple execution prevention block
