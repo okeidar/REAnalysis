@@ -4070,9 +4070,11 @@ async function renderCategoryGrid() {
   const categoryHTML = categories.map(category => {
     const properties = categoryManager.getPropertiesByCategory(category.id);
     const propertyCount = properties.length;
+    const analyzedProperties = properties.filter(property => property.analysis && property.analysis.fullResponse);
+    const analyzedCount = analyzedProperties.length;
     
     return `
-      <div class="category-card" data-action="open-category" data-category-id="${category.id}" style="border-color: ${category.color}20;">
+      <div class="category-card" data-category-id="${category.id}" style="border-color: ${category.color}20;">
         <div class="category-header">
           <div style="display: flex; align-items: center;">
             <span class="category-icon">${category.icon}</span>
@@ -4081,18 +4083,29 @@ async function renderCategoryGrid() {
           <span class="category-count">${propertyCount}</span>
         </div>
         <p class="category-description">${category.description}</p>
-        <div class="category-actions">
-          ${propertyCount > 0 ? `
-            <button class="btn btn-ghost btn-sm" data-action="export-category" data-category-id="${category.id}" title="Export to Word">
-              📄
+        ${analyzedCount > 0 ? `
+          <div class="category-export-section">
+            <button class="btn btn-primary btn-sm" data-action="export-category" data-category-id="${category.id}" title="Export ${analyzedCount} analyzed properties to Word" style="width: 100%; margin-bottom: 8px;">
+              📄 Export to Word (${analyzedCount} analyzed)
             </button>
-          ` : ''}
+          </div>
+        ` : propertyCount > 0 ? `
+          <div class="category-export-section">
+            <div style="width: 100%; padding: 8px; margin-bottom: 8px; background: #fef3c7; border-radius: 4px; text-align: center; font-size: 12px; color: #92400e;">
+              No analyzed properties to export
+            </div>
+          </div>
+        ` : ''}
+        <div class="category-actions">
+          <button class="btn btn-ghost btn-sm" data-action="view-category" data-category-id="${category.id}" title="View Properties">
+            👁️ View
+          </button>
           <button class="btn btn-ghost btn-sm" data-action="edit-category" data-category-id="${category.id}" title="Edit">
-            ✏️
+            ✏️ Edit
           </button>
           ${category.id !== 'uncategorized' ? `
             <button class="btn btn-ghost btn-sm" data-action="delete-category" data-category-id="${category.id}" title="Delete">
-              🗑️
+              🗑️ Delete
             </button>
           ` : ''}
         </div>
@@ -4135,12 +4148,9 @@ function setupCategoryCardEventListeners() {
     const categoryId = target.dataset.categoryId;
     
     // Handle category card actions
-    if (action === 'open-category' || target.closest('[data-action="open-category"]')) {
-      const cardElement = target.closest('[data-action="open-category"]');
-      if (cardElement) {
-        const cardCategoryId = cardElement.dataset.categoryId;
-        openCategoryView(cardCategoryId);
-      }
+    if (action === 'view-category') {
+      event.stopPropagation();
+      openCategoryView(categoryId);
     } else if (action === 'edit-category') {
       event.stopPropagation();
       editCategory(categoryId);
@@ -4170,9 +4180,12 @@ async function exportCategoryToWord(categoryId) {
     const analyzedProperties = properties.filter(property => property.analysis && property.analysis.fullResponse);
     
     if (analyzedProperties.length === 0) {
-      showError(`No analyzed properties found in category "${category.name}"`);
+      showError(`No analyzed properties found in category "${category.name}". Only analyzed properties can be exported to Word.`);
       return;
     }
+    
+    // Show success message indicating what will be exported
+    showSuccess(`Exporting ${analyzedProperties.length} analyzed properties from "${category.name}" to Word document...`);
     
     if (window.WordExportModule) {
       // Add category context to the export
@@ -4180,7 +4193,8 @@ async function exportCategoryToWord(categoryId) {
         categoryName: category.name,
         categoryIcon: category.icon,
         categoryDescription: category.description,
-        properties: analyzedProperties
+        properties: analyzedProperties,
+        isCategoryExport: true
       };
       window.WordExportModule.showExportOptionsModal(exportData);
     } else {
@@ -4200,14 +4214,18 @@ async function exportAllCategoriesToWord() {
     const analyzedProperties = allProperties.filter(property => property.analysis && property.analysis.fullResponse);
     
     if (analyzedProperties.length === 0) {
-      showError('No analyzed properties available for export');
+      showError('No analyzed properties available for export. Please analyze some properties first.');
       return;
     }
+    
+    // Show success message indicating what will be exported
+    showSuccess(`Exporting ${analyzedProperties.length} analyzed properties from all categories to Word document...`);
     
     if (window.WordExportModule) {
       // Group properties by category for organized export
       const categorizedProperties = {};
       const categories = categoryManager.getAllCategories();
+      let categoriesWithProperties = 0;
       
       categories.forEach(category => {
         const categoryProperties = analyzedProperties.filter(property => property.categoryId === category.id);
@@ -4218,13 +4236,15 @@ async function exportAllCategoriesToWord() {
             description: category.description,
             properties: categoryProperties
           };
+          categoriesWithProperties++;
         }
       });
       
       const exportData = {
         isMultiCategory: true,
         categories: categorizedProperties,
-        totalProperties: analyzedProperties.length
+        totalProperties: analyzedProperties.length,
+        totalCategories: categoriesWithProperties
       };
       
       window.WordExportModule.showExportOptionsModal(exportData);

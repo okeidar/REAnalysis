@@ -664,6 +664,23 @@
       outline: 2px solid var(--primary);
       outline-offset: 2px;
     }
+
+    /* Category Export Section */
+    .category-export-section {
+      margin: var(--space-md) 0;
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--border);
+    }
+
+    .category-export-section .btn {
+      font-weight: var(--font-weight-semibold);
+      transition: all 0.2s ease-in-out;
+    }
+
+    .category-export-section .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+    }
     
     /* Properties Dashboard Enhancements */
     .section-controls {
@@ -4338,9 +4355,9 @@
                 <span class="btn-icon">📄</span>
                 Export to Word
               </button>
-              <button id="exportAllCategoriesBtn" class="btn btn-primary btn-sm" title="Export all categories to Word">
+              <button id="exportAllCategoriesBtn" class="btn btn-primary btn-sm" title="Export all analyzed properties from all categories to Word">
                 <span class="btn-icon">📄</span>
-                Export All Categories
+                Export All Analyzed Properties
               </button>
               <button id="clearHistoryBtn" class="btn btn-ghost btn-sm" title="Clear all history">
                 <span class="btn-icon">🗑️</span>
