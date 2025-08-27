@@ -107,7 +107,7 @@
   gap: var(--chatgpt-space-2);
   font-size: var(--chatgpt-font-size-md);
   font-weight: var(--chatgpt-font-weight-semibold);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-sidebar-logo {
@@ -132,13 +132,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   transition: all 0.15s ease;
 }
 
 .re-sidebar-close:hover {
   background: var(--chatgpt-hover-bg);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 /* Sidebar Navigation (matches ChatGPT's nav) */
@@ -156,7 +156,7 @@
   border-radius: var(--chatgpt-radius-sm);
   cursor: pointer;
   font-size: var(--chatgpt-font-size-sm);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   transition: all 0.15s ease;
   border: none;
   background: transparent;
@@ -166,7 +166,7 @@
 
 .re-nav-item:hover {
   background: var(--chatgpt-hover-bg);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-nav-item.re-nav-active {
@@ -247,13 +247,13 @@
 .re-section-title {
   font-size: var(--chatgpt-font-size-base);
   font-weight: var(--chatgpt-font-weight-semibold);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   margin-bottom: var(--chatgpt-space-1);
 }
 
 .re-section-subtitle {
   font-size: var(--chatgpt-font-size-sm);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   line-height: 1.4;
 }
 
@@ -269,7 +269,7 @@
   display: block;
   font-size: var(--chatgpt-font-size-sm);
   font-weight: var(--chatgpt-font-weight-medium);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   margin-bottom: var(--chatgpt-space-2);
 }
 
@@ -281,7 +281,7 @@
   font-size: var(--chatgpt-font-size-sm);
   font-family: var(--chatgpt-font-family);
   background: var(--chatgpt-background);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   transition: all 0.15s ease;
 }
 
@@ -292,7 +292,7 @@
 }
 
 .re-form-input::placeholder {
-  color: var(--chatgpt-text-tertiary);
+  color: #9ca3af;
 }
 
 .re-input-group {
@@ -310,13 +310,13 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   transition: all 0.15s ease;
 }
 
 .re-input-addon:hover {
   background: var(--chatgpt-active-bg);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-form-validation {
@@ -372,7 +372,7 @@
 
 .re-btn-secondary {
   background: var(--chatgpt-background);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   border-color: var(--chatgpt-border);
 }
 
@@ -382,12 +382,12 @@
 
 .re-btn-ghost {
   background: transparent;
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
 }
 
 .re-btn-ghost:hover {
   background: var(--chatgpt-hover-bg);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-btn-sm {
@@ -454,12 +454,12 @@
 
 .re-status-title {
   font-weight: var(--chatgpt-font-weight-medium);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-status-subtitle {
   font-size: var(--chatgpt-font-size-xs);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   margin-top: 2px;
 }
 
@@ -492,7 +492,7 @@
 .re-property-title {
   font-size: var(--chatgpt-font-size-base);
   font-weight: var(--chatgpt-font-weight-semibold);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   margin: 0;
   flex: 1;
   line-height: 1.4;
@@ -521,13 +521,13 @@
   flex-wrap: wrap;
   gap: var(--chatgpt-space-3);
   font-size: var(--chatgpt-font-size-xs);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   margin-bottom: var(--chatgpt-space-3);
 }
 
 .re-property-domain {
   font-weight: var(--chatgpt-font-weight-medium);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
 }
 
 .re-property-actions {
@@ -557,13 +557,13 @@
 .re-progress-title {
   font-size: var(--chatgpt-font-size-base);
   font-weight: var(--chatgpt-font-weight-semibold);
-  color: var(--chatgpt-text-primary);
+  color: #ffffff;
   margin: 0;
 }
 
 .re-progress-time {
   font-size: var(--chatgpt-font-size-xs);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
   background: var(--chatgpt-background);
   padding: 2px var(--chatgpt-space-2);
@@ -583,7 +583,7 @@
   padding: var(--chatgpt-space-2);
   border-radius: var(--chatgpt-radius-sm);
   font-size: var(--chatgpt-font-size-sm);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   transition: all 0.15s ease;
 }
 
@@ -605,7 +605,7 @@
   border-radius: 50%;
   font-size: 12px;
   background: var(--chatgpt-border);
-  color: var(--chatgpt-text-secondary);
+  color: #d1d5db;
   transition: all 0.15s ease;
 }
 

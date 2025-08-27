@@ -33,7 +33,9 @@ function isExtensionContextValid() {
 function safeChromeFall(apiCall, fallbackValue = null) {
   try {
     if (!isExtensionContextValid()) {
-      console.warn('⚠️ Extension context invalidated, skipping chrome API call');
+      console.warn('⚠️ Extension context invalidated, using fallback value');
+      // Notify user about context invalidation
+      notifyContextInvalidation();
       return Promise.resolve(fallbackValue);
     }
     return apiCall();
@@ -41,10 +43,77 @@ function safeChromeFall(apiCall, fallbackValue = null) {
     if (err && (err.message && err.message.includes('Extension context invalidated') || 
                err.message && err.message.includes('Unexpected token'))) {
       console.warn('⚠️ Extension context invalidated during API call:', err.message);
+      notifyContextInvalidation();
       return Promise.resolve(fallbackValue);
     }
     console.error('Chrome API call failed:', err);
     throw err;
+  }
+}
+
+// Track if we've already notified about context invalidation to avoid spam
+let contextInvalidationNotified = false;
+
+// Function to notify user about context invalidation
+function notifyContextInvalidation() {
+  if (contextInvalidationNotified) return;
+  contextInvalidationNotified = true;
+  
+  console.log('🔄 Extension context invalidated - switching to fallback mode');
+  
+  // Show user-friendly message in UI if available
+  if (window.embeddedUI && window.embeddedUI.showChatGPTMessage) {
+    window.embeddedUI.showChatGPTMessage('warning', 
+      'Extension context lost. Please refresh the page to restore full functionality.');
+  }
+  
+  // Try to save current state to localStorage as backup
+  try {
+    backupStateToLocalStorage();
+  } catch (backupError) {
+    console.warn('Failed to backup state to localStorage:', backupError);
+  }
+}
+
+// Backup current state to localStorage as fallback
+function backupStateToLocalStorage() {
+  try {
+    // Backup UI settings
+    if (uiSettings) {
+      localStorage.setItem('reAnalyzer_backup_uiSettings', JSON.stringify(uiSettings));
+    }
+    
+    // Backup current property analysis if available
+    if (currentPropertyAnalysis) {
+      localStorage.setItem('reAnalyzer_backup_currentAnalysis', JSON.stringify(currentPropertyAnalysis));
+    }
+    
+    console.log('💾 State backed up to localStorage');
+  } catch (error) {
+    console.warn('Failed to backup to localStorage:', error);
+  }
+}
+
+// Restore state from localStorage fallback
+function restoreStateFromLocalStorage() {
+  try {
+    // Restore UI settings
+    const backupSettings = localStorage.getItem('reAnalyzer_backup_uiSettings');
+    if (backupSettings) {
+      const parsedSettings = JSON.parse(backupSettings);
+      uiSettings = { ...uiSettings, ...parsedSettings };
+      console.log('📋 Restored UI settings from localStorage backup');
+    }
+    
+    // Restore current analysis
+    const backupAnalysis = localStorage.getItem('reAnalyzer_backup_currentAnalysis');
+    if (backupAnalysis) {
+      currentPropertyAnalysis = JSON.parse(backupAnalysis);
+      console.log('📋 Restored current analysis from localStorage backup');
+    }
+    
+  } catch (error) {
+    console.warn('Failed to restore from localStorage:', error);
   }
 }
 
@@ -127,6 +196,7 @@ class REAnalyzerEmbeddedUI {
 
   async loadSettings() {
     try {
+      // Try extension storage first
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['embeddedUISettings']),
         null
@@ -141,12 +211,22 @@ class REAnalyzerEmbeddedUI {
       } else {
         // Fallback to localStorage if extension context is invalidated
         try {
-          const localSettings = localStorage.getItem('reAnalyzerSettings');
-          if (localSettings) {
-            const parsedSettings = JSON.parse(localSettings);
+          // First try the backup from context invalidation
+          const backupSettings = localStorage.getItem('reAnalyzer_backup_uiSettings');
+          if (backupSettings) {
+            const parsedSettings = JSON.parse(backupSettings);
             uiSettings = { ...uiSettings, ...parsedSettings };
             settingsLoaded = true;
-            console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+            console.log('📋 Loaded UI settings from context invalidation backup:', uiSettings);
+          } else {
+            // Try regular localStorage fallback
+            const localSettings = localStorage.getItem('reAnalyzerSettings');
+            if (localSettings) {
+              const parsedSettings = JSON.parse(localSettings);
+              uiSettings = { ...uiSettings, ...parsedSettings };
+              settingsLoaded = true;
+              console.log('📋 Loaded UI settings from localStorage fallback:', uiSettings);
+            }
           }
         } catch (localError) {
           console.warn('Failed to load settings from localStorage:', localError);
@@ -157,8 +237,17 @@ class REAnalyzerEmbeddedUI {
         console.log('📋 Using default UI settings:', uiSettings);
       }
       
+      // Always backup current settings to localStorage for future fallback
+      try {
+        localStorage.setItem('reAnalyzerSettings', JSON.stringify(uiSettings));
+      } catch (backupError) {
+        console.warn('Failed to backup settings to localStorage:', backupError);
+      }
+      
     } catch (error) {
       console.warn('Failed to load UI settings:', error);
+      // Try to restore from localStorage backup as last resort
+      restoreStateFromLocalStorage();
     }
   }
 
@@ -404,6 +493,7 @@ class REAnalyzerEmbeddedUI {
     return `
       <!-- Settings Section -->
       <div class="re-section re-hidden" id="re-settings-section">
+        
         <!-- Interface Settings -->
         <div class="re-section">
           <div class="re-section-header">
@@ -425,7 +515,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
               <span class="re-form-label" style="margin: 0;">Compact Mode</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Use smaller interface elements to save space
             </div>
           </div>
@@ -443,7 +533,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Automatically switch to Properties tab after analysis
             </div>
           </div>
@@ -453,37 +543,56 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Show Notifications</span>
             </label>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
               Display notifications when analysis completes
             </div>
           </div>
         </div>
         
-        <!-- Custom Prompt Settings -->
+        <!-- Prompt Configuration -->
         <div class="re-section">
           <div class="re-section-header">
-            <div class="re-section-title">Custom Analysis Prompt</div>
-            <div class="re-section-subtitle">Customize the prompt sent to ChatGPT for property analysis</div>
+            <div class="re-section-title">Analysis Prompts</div>
+            <div class="re-section-subtitle">Choose how ChatGPT analyzes properties</div>
           </div>
           
           <div class="re-form-group">
+            <label class="re-form-label">Prompt Type</label>
+            <select class="re-form-input" id="re-prompt-type-select">
+              <option value="default">Default - Standard Analysis</option>
+              <option value="dynamic">Dynamic - Column-Based</option>
+              <option value="tabular">Tabular - Data Extraction</option>
+              <option value="custom">Custom - User-Defined</option>
+            </select>
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+              Select the type of analysis prompt to use
+            </div>
+          </div>
+
+          <div class="re-form-group" id="re-prompt-description">
+            <div id="re-prompt-desc-content" style="font-size: 12px; color: #d1d5db; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+              Standard real estate investment analysis with basic property data extraction
+            </div>
+          </div>
+          
+          <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
             <label class="re-form-label">Custom Prompt Template</label>
-            <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
+            <textarea id="re-custom-prompt" class="re-form-input" rows="6" 
                       placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
                       style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Leave empty to use the default AI-generated prompt. Variables: {PROPERTY_URL}, {DATE}
+            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+              Variables: {PROPERTY_URL}, {DATE}
             </div>
           </div>
           
           <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
               <div>💾</div>
-              <span>Save Prompt</span>
+              <span>Save</span>
             </button>
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
               <div>🔄</div>
-              <span>Reset to Default</span>
+              <span>Reset</span>
             </button>
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-prompt">
               <div>👁️</div>
@@ -492,26 +601,238 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
 
-        <!-- Actions -->
+        <!-- Advanced Prompt Editing -->
+        <div class="re-section">
+          <div class="re-section-header">
+            <div class="re-section-title">Advanced Prompt Editing</div>
+            <div class="re-section-subtitle">Customize prompt templates</div>
+          </div>
+          
+          <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-default-prompt">
+              📄 Edit Default
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-dynamic-prompt">
+              🔄 Edit Dynamic
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-goto-tabular-config">
+              📊 Configure Tabular
+            </button>
+          </div>
+          
+          <!-- Default Prompt Editor -->
+          <div id="re-default-editor" class="re-prompt-editor" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Default Analysis Prompt</label>
+              <textarea id="re-default-prompt-template" class="re-form-input" rows="8" 
+                        placeholder="Enter your default analysis prompt..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">Preview</button>
+            </div>
+          </div>
+          
+          <!-- Dynamic Prompt Editor -->
+          <div id="re-dynamic-editor" class="re-prompt-editor" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Dynamic Prompt Template</label>
+              <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="6" 
+                        placeholder="Enter dynamic template with {{COLUMNS}} placeholder..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
+            </div>
+            
+            <div class="re-form-group">
+              <label class="re-form-label">Data Points</label>
+              <div id="re-dynamic-columns-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 6px; font-size: 12px;">
+                <!-- Dynamic columns will be populated here -->
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">Preview</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabular Data Configuration -->
+        <div class="re-section" id="re-tabular-columns-section" style="display: none;">
+          <div class="re-section-header">
+            <div class="re-section-title">Tabular Data Configuration</div>
+            <div class="re-section-subtitle">Advanced data extraction settings</div>
+          </div>
+          
+          <!-- Tabular Configuration Tabs -->
+          <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 12px;">
+            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500; font-size: 12px; color: #ffffff;">
+              📊 Columns
+            </button>
+            <button class="re-tabular-tab" data-tab="prompt" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
+              📝 Template
+            </button>
+            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
+              ➕ Custom
+            </button>
+          </div>
+          
+          <!-- Data Columns Tab -->
+          <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
+            <div class="re-form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 11px; color: #d1d5db;">
+                  Select data points to extract
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all" style="font-size: 11px; padding: 4px 8px;">
+                    All
+                  </button>
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all" style="font-size: 11px; padding: 4px 8px;">
+                    None
+                  </button>
+                </div>
+              </div>
+              
+              <div id="re-columns-stats" style="font-size: 11px; color: #d1d5db; margin-bottom: 6px;">
+                Loading columns...
+              </div>
+            </div>
+            
+            <!-- Column Categories -->
+            <div id="re-columns-container">
+              <!-- Categories will be dynamically populated -->
+            </div>
+          </div>
+          
+          <!-- Prompt Template Tab -->
+          <div id="re-tabular-prompt-tab" class="re-tabular-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <label class="re-form-label">Tabular Prompt Template</label>
+              <textarea id="re-tabular-prompt-template" class="re-form-input" rows="8" 
+                        placeholder="Enter tabular prompt template..."
+                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
+              <div style="font-size: 11px; color: #d1d5db; margin-top: 4px;">
+                Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 6px; margin-top: 8px;">
+              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">Save</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">Reset</button>
+              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">Preview</button>
+            </div>
+          </div>
+          
+          <!-- Custom Columns Tab -->
+          <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
+            <div class="re-form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 12px; font-weight: 500; color: #ffffff;">Custom Data Columns</div>
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column" style="font-size: 11px; padding: 4px 8px;">
+                  ➕ Add
+                </button>
+              </div>
+            </div>
+            
+            <!-- Custom Columns List -->
+            <div id="re-custom-columns-list">
+              <!-- Custom columns will be populated here -->
+            </div>
+            
+            <!-- Add Custom Column Form -->
+            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px; margin-top: 8px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                  <label class="re-form-label" style="font-size: 11px;">Column Name</label>
+                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees" style="font-size: 11px;">
+                </div>
+                <div>
+                  <label class="re-form-label" style="font-size: 11px;">Category</label>
+                  <select id="re-new-column-category" class="re-form-input" style="font-size: 11px;">
+                    <option value="core">Core Info</option>
+                    <option value="location">Location</option>
+                    <option value="financial">Financial</option>
+                    <option value="features">Features</option>
+                    <option value="analysis">Analysis</option>
+                    <option value="market">Market</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="re-form-group">
+                <label class="re-form-label" style="font-size: 11px;">Description</label>
+                <textarea id="re-new-column-description" class="re-form-input" rows="2" 
+                          placeholder="What should ChatGPT extract?"
+                          style="font-size: 11px;"></textarea>
+              </div>
+              
+              <div style="display: flex; gap: 6px;">
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column" style="font-size: 11px;">
+                  Save
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column" style="font-size: 11px;">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Tabular Action Buttons -->
+          <div style="display: flex; gap: 6px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--chatgpt-border-light);">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-tabular">
+              💾 Save All
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-tabular">
+              🔄 Reset All
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-complete-tabular">
+              👁️ Preview
+            </button>
+          </div>
+        </div>
+
+        <!-- Data Management -->
         <div class="re-section">
           <div class="re-section-header">
             <div class="re-section-title">Data Management</div>
           </div>
           
-          <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
             <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
               <div>📄</div>
-              <span>Export All Properties</span>
+              <span>Export JSON</span>
             </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
+              <div>📊</div>
+              <span>Export CSV</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
+              <div>📤</div>
+              <span>Export Settings</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-import-prompts">
+              <div>📥</div>
+              <span>Import Settings</span>
+            </button>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
             <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
               <div>🧪</div>
               <span>Test Analysis</span>
             </button>
-            <label class="re-setting-item" style="margin: 8px 0; font-size: 14px; cursor: pointer;">
-              <input type="checkbox" id="re-allow-any-url" style="margin-right: 8px;">
-              <span>Allow any URL (bypass domain validation)</span>
+            
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: #ffffff;">
+              <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
+              <span>Allow any URL (bypass validation)</span>
             </label>
-            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data">
+            
+            <button class="re-btn re-btn-ghost re-btn-full" id="re-clear-data" style="color: #ff6b6b; border-color: #ff6b6b;">
               <div>🗑️</div>
               <span>Clear All Data</span>
             </button>
@@ -519,8 +840,8 @@ class REAnalyzerEmbeddedUI {
         </div>
 
         <!-- Version Info -->
-        <div style="text-align: center; padding: 16px; color: var(--chatgpt-text-tertiary); font-size: 12px;">
-          RE Analyzer v2.0.0 - Native Integration
+        <div style="text-align: center; padding: 12px; color: #9ca3af; font-size: 11px;">
+          RE Analyzer v2.0.0
         </div>
       </div>
     `;
@@ -944,11 +1265,16 @@ class REAnalyzerEmbeddedUI {
 
     // Action buttons
     const exportBtn = this.panel.querySelector('#re-export-all');
+    const exportCsvBtn = this.panel.querySelector('#re-export-csv');
     const testBtn = this.panel.querySelector('#re-test-analysis');
     const clearBtn = this.panel.querySelector('#re-clear-data');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.exportAllProperties());
+    }
+
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', () => this.exportPropertiesToCSV());
     }
 
     if (testBtn) {
@@ -1531,17 +1857,34 @@ class REAnalyzerEmbeddedUI {
     
     if (!statusElement) return;
     
-    // Check if we're on ChatGPT
-    if (isChatGPTSite()) {
+    // Check extension context first
+    if (!isExtensionContextValid()) {
+      statusElement.className = 're-status re-status-warning';
+      if (statusIcon) statusIcon.textContent = '⚠️';
+      if (statusTitle) statusTitle.textContent = 'Limited Functionality';
+      if (statusSubtitle) statusSubtitle.textContent = 'Extension context lost - refresh page to restore features';
+      
+      // Add visual warning styling
+      statusElement.style.borderLeft = '3px solid #ffa726';
+      statusElement.style.backgroundColor = 'rgba(255, 167, 38, 0.1)';
+    } else if (isChatGPTSite()) {
       statusElement.className = 're-status re-status-connected';
       if (statusIcon) statusIcon.textContent = '✅';
       if (statusTitle) statusTitle.textContent = 'Connected to ChatGPT';
       if (statusSubtitle) statusSubtitle.textContent = 'Ready to analyze properties';
+      
+      // Remove any warning styling
+      statusElement.style.borderLeft = '';
+      statusElement.style.backgroundColor = '';
     } else {
       statusElement.className = 're-status re-status-error';
       if (statusIcon) statusIcon.textContent = '❌';
       if (statusTitle) statusTitle.textContent = 'Not on ChatGPT';
       if (statusSubtitle) statusSubtitle.textContent = 'Please open ChatGPT to use this extension';
+      
+      // Remove any warning styling
+      statusElement.style.borderLeft = '';
+      statusElement.style.backgroundColor = '';
     }
   }
 
@@ -1558,10 +1901,33 @@ class REAnalyzerEmbeddedUI {
       if (result && result.propertyHistory) {
         properties = result.propertyHistory;
         console.log(`📚 Loaded ${properties.length} properties from extension storage`);
+        
+        // Backup to localStorage for future fallback
+        try {
+          localStorage.setItem('reAnalyzer_backup_properties', JSON.stringify(properties));
+        } catch (backupError) {
+          console.warn('Failed to backup properties to localStorage:', backupError);
+        }
       } else {
-        // If extension context is invalidated, show a message but continue with empty state
-        console.log('📚 Extension context invalidated, showing empty property state');
-        this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+        // Try localStorage fallback for properties
+        try {
+          const localProperties = localStorage.getItem('reAnalyzer_backup_properties');
+          if (localProperties) {
+            properties = JSON.parse(localProperties);
+            console.log(`📚 Loaded ${properties.length} properties from localStorage backup`);
+            
+            if (properties.length > 0) {
+              this.showChatGPTMessage('warning', 
+                `Loaded ${properties.length} properties from backup. Please refresh to restore full functionality.`);
+            }
+          } else {
+            console.log('📚 No properties found in storage or backup');
+            this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+          }
+        } catch (localError) {
+          console.warn('Failed to load properties from localStorage:', localError);
+          this.showChatGPTMessage('warning', 'Extension context lost. Please reload the page to access saved properties.');
+        }
       }
       
       // Update stats
@@ -1705,19 +2071,22 @@ class REAnalyzerEmbeddedUI {
         return;
       }
       
-      // Create comprehensive export data
+      // Create comprehensive export data with calculated metrics
       const exportData = {
         exportDate: new Date().toISOString(),
         totalProperties: properties.length,
         analyzedCount: properties.filter(p => p.analysis && p.analysis.extractedData).length,
+        calculatedMetricsCount: properties.filter(p => p.analysis && p.analysis.calculatedMetrics).length,
         properties: properties.map(property => ({
           url: property.url,
           domain: property.domain,
           date: property.date,
           timestamp: property.timestamp,
           extractedData: property.analysis?.extractedData || {},
+          calculatedMetrics: property.analysis?.calculatedMetrics || {},
           fullAnalysis: property.analysis?.fullResponse || property.analysis?.fullAnalysis || 'No analysis available',
-          hasAnalysis: !!(property.analysis && property.analysis.extractedData)
+          hasAnalysis: !!(property.analysis && property.analysis.extractedData),
+          hasCalculatedMetrics: !!(property.analysis && property.analysis.calculatedMetrics)
         }))
       };
       
@@ -1733,11 +2102,101 @@ class REAnalyzerEmbeddedUI {
       link.click();
       document.body.removeChild(link);
       
-      this.showChatGPTMessage('success', `Exported ${properties.length} properties successfully!`);
+      const metricsCount = properties.filter(p => p.analysis && p.analysis.calculatedMetrics).length;
+      this.showChatGPTMessage('success', `Exported ${properties.length} properties with ${metricsCount} having calculated metrics!`);
       
     } catch (error) {
       console.error('❌ Failed to export all properties:', error);
       this.showChatGPTMessage('error', 'Failed to export properties');
+    }
+  }
+
+  async exportPropertiesToCSV() {
+    try {
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Get comprehensive column set for tabular data
+      const columns = getTabularDataColumns();
+      
+      // Create CSV headers
+      const headers = [
+        'URL',
+        'Domain', 
+        'Analysis Date',
+        ...columns.map(col => col.name)
+      ];
+      
+      // Create CSV rows
+      const rows = [headers];
+      
+      properties.forEach(property => {
+        if (property.analysis) {
+          const row = [
+            property.url || '',
+            property.domain || '',
+            property.date || ''
+          ];
+          
+          // Add extracted data columns
+          columns.forEach(col => {
+            let value = '';
+            
+            if (col.isCalculated) {
+              // Get from calculated metrics
+              value = property.analysis.calculatedMetrics?.[col.id] || '';
+            } else {
+              // Get from extracted data
+              value = property.analysis.extractedData?.[col.id] || '';
+            }
+            
+            // Format value for CSV
+            if (typeof value === 'number') {
+              value = value.toString();
+            } else if (typeof value === 'string') {
+              // Escape commas and quotes for CSV
+              if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                value = `"${value.replace(/"/g, '""')}"`;
+              }
+            }
+            
+            row.push(value);
+          });
+          
+          rows.push(row);
+        }
+      });
+      
+      // Convert to CSV string
+      const csvContent = rows.map(row => row.join(',')).join('\n');
+      
+      // Create and download file
+      const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `property-analysis-comprehensive-${Date.now()}.csv`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      this.showChatGPTMessage('success', `Exported ${analyzedCount} analyzed properties to CSV with ${columns.length} columns!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export properties to CSV:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties to CSV');
     }
   }
 
@@ -1851,6 +2310,9 @@ Or enter your own property URL:`);
       console.warn('⚠️ Extension context invalidated during initialization');
       this.showChatGPTMessage('warning', 'Extension was updated. Please reload the page for full functionality.');
       
+      // Show persistent warning banner
+      this.showExtensionContextWarning();
+      
       // Add a reload button to the warning message
       setTimeout(() => {
         const warningMsg = this.panel.querySelector('#re-warning-msg');
@@ -1868,6 +2330,74 @@ Or enter your own property URL:`);
         }
       }, 100);
     }
+  }
+
+  showExtensionContextWarning() {
+    // Remove existing warning if any
+    const existingWarning = document.getElementById('re-context-warning');
+    if (existingWarning) {
+      existingWarning.remove();
+    }
+
+    // Create warning banner
+    const warningBanner = document.createElement('div');
+    warningBanner.id = 're-context-warning';
+    warningBanner.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(90deg, #ff6b6b, #ffa726);
+      color: white;
+      padding: 12px 16px;
+      text-align: center;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 10001;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+    `;
+    
+    warningBanner.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+        <span>⚠️ RE Analyzer: Extension context lost - some features may not work</span>
+        <button onclick="window.location.reload()" style="
+          background: rgba(255,255,255,0.2);
+          border: 1px solid rgba(255,255,255,0.4);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+        ">
+          🔄 Refresh Page
+        </button>
+        <button onclick="document.getElementById('re-context-warning').remove()" style="
+          background: transparent;
+          border: none;
+          color: white;
+          padding: 6px;
+          cursor: pointer;
+          font-size: 16px;
+          opacity: 0.8;
+        ">
+          ×
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(warningBanner);
+    
+    // Auto-fade after 10 seconds to be less intrusive
+    setTimeout(() => {
+      if (document.getElementById('re-context-warning')) {
+        warningBanner.style.opacity = '0.8';
+      }
+    }, 10000);
+    
+    console.log('📢 Context invalidation warning banner displayed');
   }
 
   // Helper methods for UI functionality will be added in the next part...
@@ -3157,103 +3687,1839 @@ Or enter your own property URL:`);
     const savePromptBtn = this.panel.querySelector('#re-save-prompt');
     const resetPromptBtn = this.panel.querySelector('#re-reset-prompt');
     const previewPromptBtn = this.panel.querySelector('#re-preview-prompt');
+    const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+    const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
+    const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
     
-    // Load existing custom prompt
-    this.loadCustomPrompt();
+    // Load existing settings
+    this.loadPromptSettings();
+    
+    // Prompt type selection handler
+    if (promptTypeSelect) {
+      promptTypeSelect.addEventListener('change', (e) => {
+        this.handlePromptTypeChange(e.target.value);
+      });
+    }
     
     if (savePromptBtn) {
-      savePromptBtn.addEventListener('click', () => this.saveCustomPrompt());
+      savePromptBtn.addEventListener('click', () => this.savePromptSettings());
     }
     
     if (resetPromptBtn) {
-      resetPromptBtn.addEventListener('click', () => this.resetCustomPrompt());
+      resetPromptBtn.addEventListener('click', () => this.resetPromptSettings());
     }
     
     if (previewPromptBtn) {
-      previewPromptBtn.addEventListener('click', () => this.previewCustomPrompt());
+      previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
+    
+    // Setup simplified prompt editor events
+    this.setupSimplifiedPromptEvents();
+    
+    // Column configuration event listeners
+    this.setupColumnConfigurationEvents();
   }
   
-  async loadCustomPrompt() {
+  async loadPromptSettings() {
     try {
       const result = await safeChromeFall(
-        () => chrome.storage.local.get(['customPrompt']),
-        { customPrompt: null }
+        () => chrome.storage.local.get(['customPrompt', 'promptType']),
+        { customPrompt: null, promptType: 'default' }
       );
       
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
       const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      // Set prompt type
+      if (promptTypeSelect) {
+        promptTypeSelect.value = result.promptType || 'default';
+      }
+      
+      // Set custom prompt content
       if (customPromptTextarea && result.customPrompt) {
         customPromptTextarea.value = result.customPrompt;
       }
+      
+      // Update UI based on prompt type
+      this.handlePromptTypeChange(result.promptType || 'default');
+      
     } catch (error) {
-      console.error('Failed to load custom prompt:', error);
+      console.error('Failed to load prompt settings:', error);
     }
   }
+
+  handlePromptTypeChange(promptType) {
+    const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
+    const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
+    const tabularColumnsSection = this.panel.querySelector('#re-tabular-columns-section');
+    
+    // Show/hide custom prompt textarea
+    if (customPromptGroup) {
+      customPromptGroup.style.display = promptType === 'custom' ? 'block' : 'none';
+    }
+    
+    // Show/hide tabular columns configuration
+    if (tabularColumnsSection) {
+      tabularColumnsSection.style.display = promptType === 'tabular' ? 'block' : 'none';
+      
+      // Load columns when tabular is selected
+      if (promptType === 'tabular') {
+        this.loadTabularColumns();
+      }
+    }
+    
+    // Update description
+    if (promptDescContent) {
+      const descriptions = {
+        'default': 'Standard real estate investment analysis with basic property data extraction',
+        'dynamic': 'Adaptive prompt that generates based on your selected column configuration',
+        'tabular': 'Comprehensive data extraction with customizable data points for detailed spreadsheet analysis',
+        'custom': 'Use your own custom prompt template with full control over analysis structure'
+      };
+      
+      promptDescContent.textContent = descriptions[promptType] || descriptions.default;
+    }
+  }
+
+  async loadCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.loadPromptSettings();
+  }
   
-  async saveCustomPrompt() {
-    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-    if (!customPromptTextarea) return;
-    
-    const promptText = customPromptTextarea.value.trim();
-    
+  async savePromptSettings() {
     try {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
+      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
+      
       await safeChromeFall(
-        () => chrome.storage.local.set({ customPrompt: promptText || null }),
+        () => chrome.storage.local.set({ 
+          promptType: promptType,
+          customPrompt: customPrompt || null 
+        }),
         null
       );
       
-      this.showChatGPTMessage('success', 'Custom prompt saved successfully!');
-      console.log('💾 Custom prompt saved');
+      this.showChatGPTMessage('success', 'Prompt settings saved successfully!');
+      console.log('💾 Prompt settings saved:', { promptType, hasCustomPrompt: !!customPrompt });
     } catch (error) {
-      console.error('Failed to save custom prompt:', error);
-      this.showChatGPTMessage('error', 'Failed to save custom prompt');
+      console.error('Failed to save prompt settings:', error);
+      this.showChatGPTMessage('error', 'Failed to save prompt settings');
     }
   }
+
+  async saveCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.savePromptSettings();
+  }
   
-  async resetCustomPrompt() {
-    if (confirm('Are you sure you want to reset the custom prompt to default?')) {
+  async resetPromptSettings() {
+    if (confirm('Are you sure you want to reset all prompt settings to default?')) {
       try {
         await safeChromeFall(
-          () => chrome.storage.local.remove(['customPrompt']),
+          () => chrome.storage.local.remove(['customPrompt', 'promptType']),
           null
         );
         
+        const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
         const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+        
+        if (promptTypeSelect) {
+          promptTypeSelect.value = 'default';
+        }
+        
         if (customPromptTextarea) {
           customPromptTextarea.value = '';
         }
         
-        this.showChatGPTMessage('success', 'Custom prompt reset to default');
-        console.log('🔄 Custom prompt reset');
+        this.handlePromptTypeChange('default');
+        
+        this.showChatGPTMessage('success', 'Prompt settings reset to default');
+        console.log('🔄 Prompt settings reset');
       } catch (error) {
-        console.error('Failed to reset custom prompt:', error);
-        this.showChatGPTMessage('error', 'Failed to reset custom prompt');
+        console.error('Failed to reset prompt settings:', error);
+        this.showChatGPTMessage('error', 'Failed to reset prompt settings');
       }
     }
   }
+
+  async resetCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.resetPromptSettings();
+  }
   
+  async previewPrompt() {
+    try {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
+      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
+      
+      // Get the actual prompt that would be used
+      const promptTemplate = await getSelectedPrompt(promptType, customPrompt, null);
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'No prompt to preview');
+        return;
+      }
+      
+      // Show preview with example data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Create and show preview modal with prompt type info
+      this.showPromptPreviewModal(previewText, promptType);
+    } catch (error) {
+      console.error('Failed to preview prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to generate prompt preview');
+    }
+  }
+
   previewCustomPrompt() {
-    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-    if (!customPromptTextarea) return;
+    // This method is kept for backward compatibility
+    this.previewPrompt();
+  }
+
+  // Simplified Prompt Configuration Events
+  setupSimplifiedPromptEvents() {
+    // Advanced prompt editor toggles
+    const editDefaultBtn = this.panel.querySelector('#re-edit-default-prompt');
+    const editDynamicBtn = this.panel.querySelector('#re-edit-dynamic-prompt');
+    const defaultEditor = this.panel.querySelector('#re-default-editor');
+    const dynamicEditor = this.panel.querySelector('#re-dynamic-editor');
     
-    const promptText = customPromptTextarea.value.trim();
+    if (editDefaultBtn) {
+      editDefaultBtn.addEventListener('click', () => {
+        const isVisible = defaultEditor.style.display !== 'none';
+        defaultEditor.style.display = isVisible ? 'none' : 'block';
+        editDefaultBtn.textContent = isVisible ? '📄 Edit Default' : '📄 Hide Editor';
+        
+        if (!isVisible) {
+          this.loadDefaultPrompt();
+          // Hide other editors
+          if (dynamicEditor) {
+            dynamicEditor.style.display = 'none';
+            if (editDynamicBtn) editDynamicBtn.textContent = '🔄 Edit Dynamic';
+          }
+        }
+      });
+    }
     
-    if (!promptText) {
-      this.showChatGPTMessage('warning', 'No custom prompt to preview. The default AI-generated prompt will be used.');
+    if (editDynamicBtn) {
+      editDynamicBtn.addEventListener('click', () => {
+        const isVisible = dynamicEditor.style.display !== 'none';
+        dynamicEditor.style.display = isVisible ? 'none' : 'block';
+        editDynamicBtn.textContent = isVisible ? '🔄 Edit Dynamic' : '🔄 Hide Editor';
+        
+        if (!isVisible) {
+          this.loadDynamicPrompt();
+          // Hide other editors
+          if (defaultEditor) {
+            defaultEditor.style.display = 'none';
+            if (editDefaultBtn) editDefaultBtn.textContent = '📄 Edit Default';
+          }
+        }
+      });
+    }
+    
+    // Update existing button event handlers to use correct IDs
+    const savePromptBtn = this.panel.querySelector('#re-save-prompt-selection');
+    if (savePromptBtn) {
+      savePromptBtn.addEventListener('click', () => this.savePromptSettings());
+    }
+  }
+
+  // Settings Navigation Management
+  setupSettingsNavigation() {
+    // Main settings navigation
+    const navButtons = this.panel.querySelectorAll('.re-settings-nav-btn');
+    const contentSections = this.panel.querySelectorAll('.re-settings-content');
+    
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetSection = btn.dataset.section;
+        
+        // Update navigation buttons
+        navButtons.forEach(b => {
+          b.classList.remove('re-settings-nav-active');
+          b.style.background = 'transparent';
+          b.style.boxShadow = 'none';
+        });
+        
+        btn.classList.add('re-settings-nav-active');
+        btn.style.background = 'var(--chatgpt-surface-primary)';
+        btn.style.boxShadow = '0 1px 2px rgba(0,0,0,0.1)';
+        
+        // Show/hide content sections
+        contentSections.forEach(section => {
+          section.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-${targetSection}-settings`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching sections
+          if (targetSection === 'prompts') {
+            this.loadPromptSettings();
+            this.updatePromptTypeUI();
+          } else if (targetSection === 'basic') {
+            this.updateConfigurationSummary();
+          }
+        }
+      });
+    });
+    
+    // Prompt type radio buttons
+    const promptOptions = this.panel.querySelectorAll('.re-prompt-option');
+    promptOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        // Update radio button states
+        promptOptions.forEach(opt => {
+          opt.style.borderColor = 'var(--chatgpt-border-light)';
+          opt.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = opt.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        option.style.borderColor = 'var(--chatgpt-accent)';
+        option.style.background = 'var(--chatgpt-hover-bg)';
+        const radio = option.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+        
+        // Update prompt type selector
+        const promptType = option.dataset.type;
+        const quickSelector = this.panel.querySelector('#re-quick-prompt-type');
+        if (quickSelector) {
+          quickSelector.value = promptType;
+        }
+      });
+    });
+    
+    // Prompt customization tabs
+    const customizeBtns = this.panel.querySelectorAll('.re-customize-btn');
+    const customizeContents = this.panel.querySelectorAll('.re-customize-content');
+    
+    customizeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetCustomize = btn.dataset.customize;
+        
+        // Update customize buttons
+        customizeBtns.forEach(b => {
+          b.classList.remove('re-customize-active');
+          b.style.background = 'transparent';
+        });
+        
+        btn.classList.add('re-customize-active');
+        btn.style.background = 'var(--chatgpt-surface-primary)';
+        
+        // Show/hide customize content
+        customizeContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-customize-${targetCustomize}`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to customization tabs
+          if (targetCustomize === 'default') {
+            this.loadDefaultPrompt();
+          } else if (targetCustomize === 'dynamic') {
+            this.loadDynamicPrompt();
+          }
+        }
+      });
+    });
+    
+    // Quick setup synchronization
+    const quickPromptType = this.panel.querySelector('#re-quick-prompt-type');
+    if (quickPromptType) {
+      quickPromptType.addEventListener('change', () => {
+        const selectedType = quickPromptType.value;
+        
+        // Update prompt option selection
+        promptOptions.forEach(option => {
+          option.style.borderColor = 'var(--chatgpt-border-light)';
+          option.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = option.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        const matchingOption = this.panel.querySelector(`.re-prompt-option[data-type="${selectedType}"]`);
+        if (matchingOption) {
+          matchingOption.style.borderColor = 'var(--chatgpt-accent)';
+          matchingOption.style.background = 'var(--chatgpt-hover-bg)';
+          const radio = matchingOption.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+        }
+      });
+    }
+  }
+
+  updateConfigurationSummary() {
+    // Update the current configuration display
+    const promptTypeDisplay = this.panel.querySelector('#re-current-prompt-type');
+    if (promptTypeDisplay) {
+      // Get current prompt type from storage or UI
+      const quickSelector = this.panel.querySelector('#re-quick-prompt-type');
+      if (quickSelector) {
+        const promptType = quickSelector.value;
+        const typeNames = {
+          'default': 'Standard Analysis',
+          'tabular': 'Data Extraction',
+          'dynamic': 'Custom Data Points'
+        };
+        promptTypeDisplay.textContent = typeNames[promptType] || 'Standard Analysis';
+      }
+    }
+  }
+
+  updatePromptTypeUI() {
+    // Sync prompt type across different UI elements
+    this.loadPromptSettings().then(() => {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const quickPromptType = this.panel.querySelector('#re-quick-prompt-type');
+      
+      if (promptTypeSelect && quickPromptType) {
+        quickPromptType.value = promptTypeSelect.value;
+        
+        // Update radio buttons
+        const promptOptions = this.panel.querySelectorAll('.re-prompt-option');
+        promptOptions.forEach(option => {
+          option.style.borderColor = 'var(--chatgpt-border-light)';
+          option.style.background = 'var(--chatgpt-surface-primary)';
+          const radio = option.querySelector('input[type="radio"]');
+          if (radio) radio.checked = false;
+        });
+        
+        const matchingOption = this.panel.querySelector(`.re-prompt-option[data-type="${promptTypeSelect.value}"]`);
+        if (matchingOption) {
+          matchingOption.style.borderColor = 'var(--chatgpt-accent)';
+          matchingOption.style.background = 'var(--chatgpt-hover-bg)';
+          const radio = matchingOption.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+        }
+      }
+      
+      this.updateConfigurationSummary();
+    });
+  }
+
+  // Enhanced Prompt Configuration Management
+  setupPromptConfigurationEvents() {
+    // Prompt configuration tab switching
+    this.setupPromptTabs();
+    
+    // Default prompt management
+    const saveDefaultBtn = this.panel.querySelector('#re-save-default-prompt');
+    const resetDefaultBtn = this.panel.querySelector('#re-reset-default-prompt');
+    const previewDefaultBtn = this.panel.querySelector('#re-preview-default-prompt');
+    
+    if (saveDefaultBtn) {
+      saveDefaultBtn.addEventListener('click', () => this.saveDefaultPrompt());
+    }
+    
+    if (resetDefaultBtn) {
+      resetDefaultBtn.addEventListener('click', () => this.resetDefaultPrompt());
+    }
+    
+    if (previewDefaultBtn) {
+      previewDefaultBtn.addEventListener('click', () => this.previewDefaultPrompt());
+    }
+    
+    // Dynamic prompt management
+    const saveDynamicBtn = this.panel.querySelector('#re-save-dynamic-prompt');
+    const resetDynamicBtn = this.panel.querySelector('#re-reset-dynamic-prompt');
+    const previewDynamicBtn = this.panel.querySelector('#re-preview-dynamic-prompt');
+    
+    if (saveDynamicBtn) {
+      saveDynamicBtn.addEventListener('click', () => this.saveDynamicPrompt());
+    }
+    
+    if (resetDynamicBtn) {
+      resetDynamicBtn.addEventListener('click', () => this.resetDynamicPrompt());
+    }
+    
+    if (previewDynamicBtn) {
+      previewDynamicBtn.addEventListener('click', () => this.previewDynamicPrompt());
+    }
+    
+    // Prompt selection management
+    const saveSelectionBtn = this.panel.querySelector('#re-save-prompt-selection');
+    const previewCurrentBtn = this.panel.querySelector('#re-preview-current-prompt');
+    
+    if (saveSelectionBtn) {
+      saveSelectionBtn.addEventListener('click', () => this.savePromptSettings());
+    }
+    
+    if (previewCurrentBtn) {
+      previewCurrentBtn.addEventListener('click', () => this.previewPrompt());
+    }
+    
+    // Global prompt actions
+    const saveAllPromptsBtn = this.panel.querySelector('#re-save-all-prompts');
+    const resetAllPromptsBtn = this.panel.querySelector('#re-reset-all-prompts');
+    const exportPromptsBtn = this.panel.querySelector('#re-export-prompts');
+    const importPromptsBtn = this.panel.querySelector('#re-import-prompts');
+    const gotoTabularBtn = this.panel.querySelector('#re-goto-tabular-config');
+    
+    if (saveAllPromptsBtn) {
+      saveAllPromptsBtn.addEventListener('click', () => this.saveAllPrompts());
+    }
+    
+    if (resetAllPromptsBtn) {
+      resetAllPromptsBtn.addEventListener('click', () => this.resetAllPrompts());
+    }
+    
+    if (exportPromptsBtn) {
+      exportPromptsBtn.addEventListener('click', () => this.exportPrompts());
+    }
+    
+    if (importPromptsBtn) {
+      importPromptsBtn.addEventListener('click', () => this.importPrompts());
+    }
+    
+    if (gotoTabularBtn) {
+      gotoTabularBtn.addEventListener('click', () => this.scrollToTabularConfig());
+    }
+  }
+
+  setupPromptTabs() {
+    const tabs = this.panel.querySelectorAll('.re-prompt-tab');
+    const tabContents = this.panel.querySelectorAll('.re-prompt-tab-content');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+        
+        // Update tab styles
+        tabs.forEach(t => {
+          t.classList.remove('re-prompt-tab-active');
+          t.style.borderBottomColor = 'transparent';
+          t.style.fontWeight = 'normal';
+        });
+        
+        tab.classList.add('re-prompt-tab-active');
+        tab.style.borderBottomColor = 'var(--chatgpt-accent)';
+        tab.style.fontWeight = '500';
+        
+        // Show/hide content
+        tabContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-prompt-${targetTab}-tab`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to tabs
+          if (targetTab === 'default') {
+            this.loadDefaultPrompt();
+          } else if (targetTab === 'dynamic') {
+            this.loadDynamicPrompt();
+          }
+        }
+      });
+    });
+  }
+
+  // Default Prompt Management
+  async loadDefaultPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['defaultPromptTemplate']),
+        { defaultPromptTemplate: null }
+      );
+      
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (templateTextarea) {
+        if (result.defaultPromptTemplate) {
+          templateTextarea.value = result.defaultPromptTemplate;
+        } else {
+          // Load built-in default template
+          templateTextarea.value = getDefaultPromptTemplate();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to load default prompt:', error);
+    }
+  }
+
+  async saveDefaultPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ defaultPromptTemplate: template || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Default prompt template saved successfully!');
+      console.log('💾 Default prompt template saved');
+      
+    } catch (error) {
+      console.error('Failed to save default prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save default prompt template');
+    }
+  }
+
+  async resetDefaultPrompt() {
+    if (confirm('Are you sure you want to reset the default prompt template?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['defaultPromptTemplate']),
+          null
+        );
+        
+        // Reload with built-in default
+        this.loadDefaultPrompt();
+        
+        this.showChatGPTMessage('success', 'Default prompt template reset');
+        console.log('🔄 Default prompt template reset');
+        
+      } catch (error) {
+        console.error('Failed to reset default prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset default prompt template');
+      }
+    }
+  }
+
+  async previewDefaultPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-default-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, 'default prompt');
+      
+    } catch (error) {
+      console.error('Failed to preview default prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to preview default prompt');
+    }
+  }
+
+  // Dynamic Prompt Management
+  async loadDynamicPrompt() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+        { dynamicPromptTemplate: null, dynamicPromptColumns: null }
+      );
+      
+      // Load template
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (templateTextarea) {
+        if (result.dynamicPromptTemplate) {
+          templateTextarea.value = result.dynamicPromptTemplate;
+        } else {
+          // Load built-in dynamic template
+          templateTextarea.value = getDefaultDynamicPromptTemplate();
+        }
+      }
+      
+      // Load and render column selection
+      await this.loadDynamicColumnsSelection(result.dynamicPromptColumns);
+      
+    } catch (error) {
+      console.error('Failed to load dynamic prompt:', error);
+    }
+  }
+
+  async loadDynamicColumnsSelection(savedColumns) {
+    try {
+      const container = this.panel.querySelector('#re-dynamic-columns-container');
+      if (!container) return;
+      
+      // Get all available columns
+      const allColumns = getTabularDataColumns();
+      const customColumns = await this.getCustomColumns();
+      const availableColumns = [...allColumns, ...customColumns];
+      
+      // Create column checkboxes
+      container.innerHTML = '';
+      
+      availableColumns.forEach(column => {
+        const isEnabled = savedColumns ? 
+          savedColumns.includes(column.id) : 
+          column.enabled !== false; // Default to enabled unless explicitly disabled
+        
+        const columnDiv = document.createElement('div');
+        columnDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding: 4px 8px; border-radius: 4px; transition: background-color 0.2s;';
+        columnDiv.innerHTML = `
+          <input type="checkbox" id="dynamic-col-${column.id}" ${isEnabled ? 'checked' : ''} 
+                 style="margin: 0;" data-column-id="${column.id}">
+          <label for="dynamic-col-${column.id}" style="flex: 1; font-size: 12px; cursor: pointer; margin: 0;">
+            ${column.name}
+            ${column.required ? '<span style="color: var(--chatgpt-accent); font-size: 10px;">[REQUIRED]</span>' : ''}
+            ${column.isCalculated ? '<span style="color: var(--chatgpt-text-secondary); font-size: 10px;">[CALCULATED]</span>' : ''}
+          </label>
+        `;
+        
+        // Add hover effect
+        columnDiv.addEventListener('mouseenter', () => {
+          columnDiv.style.backgroundColor = 'var(--chatgpt-hover-bg)';
+        });
+        columnDiv.addEventListener('mouseleave', () => {
+          columnDiv.style.backgroundColor = 'transparent';
+        });
+        
+        container.appendChild(columnDiv);
+      });
+      
+    } catch (error) {
+      console.error('Failed to load dynamic columns selection:', error);
+    }
+  }
+
+  async saveDynamicPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      // Get selected columns
+      const selectedColumns = Array.from(this.panel.querySelectorAll('#re-dynamic-columns-container input[type="checkbox"]:checked'))
+        .map(cb => cb.dataset.columnId);
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ 
+          dynamicPromptTemplate: template || null,
+          dynamicPromptColumns: selectedColumns
+        }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Dynamic prompt configuration saved successfully!');
+      console.log('💾 Dynamic prompt configuration saved');
+      
+    } catch (error) {
+      console.error('Failed to save dynamic prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to save dynamic prompt configuration');
+    }
+  }
+
+  async resetDynamicPrompt() {
+    if (confirm('Are you sure you want to reset the dynamic prompt configuration?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+          null
+        );
+        
+        // Reload with defaults
+        this.loadDynamicPrompt();
+        
+        this.showChatGPTMessage('success', 'Dynamic prompt configuration reset');
+        console.log('🔄 Dynamic prompt configuration reset');
+        
+      } catch (error) {
+        console.error('Failed to reset dynamic prompt:', error);
+        this.showChatGPTMessage('error', 'Failed to reset dynamic prompt configuration');
+      }
+    }
+  }
+
+  async previewDynamicPrompt() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-dynamic-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Get selected columns
+      const selectedColumns = Array.from(this.panel.querySelectorAll('#re-dynamic-columns-container input[type="checkbox"]:checked'))
+        .map(cb => cb.dataset.columnId);
+      
+      // Generate columns section
+      let columnsSection = 'No columns selected';
+      if (selectedColumns.length > 0) {
+        const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+        const enabledColumns = allColumns.filter(col => selectedColumns.includes(col.id));
+        columnsSection = generateColumnsSectionForPrompt(enabledColumns);
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{\{COLUMNS\}\}/g, columnsSection)
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `dynamic prompt (${selectedColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview dynamic prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to preview dynamic prompt');
+    }
+  }
+
+  // Global Prompt Management
+  async saveAllPrompts() {
+    try {
+      // Save all prompt configurations
+      await this.saveDefaultPrompt();
+      await this.saveDynamicPrompt();
+      await this.saveTabularTemplate();
+      await this.savePromptSettings();
+      
+      this.showChatGPTMessage('success', 'All prompt configurations saved successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save all prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to save all prompt configurations');
+    }
+  }
+
+  async resetAllPrompts() {
+    if (confirm('Are you sure you want to reset ALL prompt configurations to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove([
+            'defaultPromptTemplate',
+            'dynamicPromptTemplate', 
+            'dynamicPromptColumns',
+            'tabularPromptTemplate',
+            'customPrompt',
+            'promptType'
+          ]),
+          null
+        );
+        
+        // Reload all tabs
+        this.loadDefaultPrompt();
+        this.loadDynamicPrompt();
+        this.loadTabularTemplate();
+        this.loadPromptSettings();
+        
+        this.showChatGPTMessage('success', 'All prompt configurations reset to default');
+        
+      } catch (error) {
+        console.error('Failed to reset all prompts:', error);
+        this.showChatGPTMessage('error', 'Failed to reset all prompt configurations');
+      }
+    }
+  }
+
+  async exportPrompts() {
+    try {
+      // Get all prompt configurations
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get([
+          'defaultPromptTemplate',
+          'dynamicPromptTemplate',
+          'dynamicPromptColumns', 
+          'tabularPromptTemplate',
+          'customPrompt',
+          'promptType',
+          'customColumns',
+          'tabularColumnConfiguration'
+        ]),
+        {}
+      );
+      
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        version: '2.0.0',
+        prompts: result
+      };
+      
+      // Create and download file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `re-analyzer-prompts-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      this.showChatGPTMessage('success', 'Prompt configurations exported successfully!');
+      
+    } catch (error) {
+      console.error('Failed to export prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to export prompt configurations');
+    }
+  }
+
+  async importPrompts() {
+    try {
+      // Create file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      
+      input.onchange = async (event) => {
+        try {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const text = await file.text();
+          const importData = JSON.parse(text);
+          
+          if (!importData.prompts) {
+            throw new Error('Invalid prompt configuration file');
+          }
+          
+          // Confirm import
+          if (!confirm('This will overwrite your current prompt configurations. Continue?')) {
+            return;
+          }
+          
+          // Save imported data
+          await safeChromeFall(
+            () => chrome.storage.local.set(importData.prompts),
+            null
+          );
+          
+          // Reload all configurations
+          this.loadDefaultPrompt();
+          this.loadDynamicPrompt();
+          this.loadTabularTemplate();
+          this.loadPromptSettings();
+          this.loadTabularColumns();
+          this.loadCustomColumns();
+          
+          this.showChatGPTMessage('success', 'Prompt configurations imported successfully!');
+          
+        } catch (error) {
+          console.error('Failed to import prompts:', error);
+          this.showChatGPTMessage('error', 'Failed to import prompt configurations');
+        }
+      };
+      
+      input.click();
+      
+    } catch (error) {
+      console.error('Failed to import prompts:', error);
+      this.showChatGPTMessage('error', 'Failed to import prompt configurations');
+    }
+  }
+
+  scrollToTabularConfig() {
+    const tabularSection = this.panel.querySelector('#re-tabular-columns-section');
+    if (tabularSection) {
+      // Show the tabular section first
+      tabularSection.style.display = 'block';
+      
+      // Scroll to it
+      tabularSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
+      // Switch to settings tab if not already there
+      this.switchTab('settings');
+      
+      this.showChatGPTMessage('success', 'Scrolled to Tabular Data Configuration');
+    }
+  }
+
+  // Enhanced Tabular Configuration Methods
+  setupColumnConfigurationEvents() {
+    // Tab switching
+    this.setupTabularTabs();
+    
+    // Column management (existing)
+    const selectAllBtn = this.panel.querySelector('#re-columns-select-all');
+    const clearAllBtn = this.panel.querySelector('#re-columns-clear-all');
+    
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', () => this.selectAllColumns());
+    }
+    
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => this.clearAllColumns());
+    }
+    
+    // Prompt template management
+    const saveTemplateBtn = this.panel.querySelector('#re-save-tabular-template');
+    const resetTemplateBtn = this.panel.querySelector('#re-reset-tabular-template');
+    const previewTemplateBtn = this.panel.querySelector('#re-preview-tabular-template');
+    
+    if (saveTemplateBtn) {
+      saveTemplateBtn.addEventListener('click', () => this.saveTabularTemplate());
+    }
+    
+    if (resetTemplateBtn) {
+      resetTemplateBtn.addEventListener('click', () => this.resetTabularTemplate());
+    }
+    
+    if (previewTemplateBtn) {
+      previewTemplateBtn.addEventListener('click', () => this.previewTabularTemplate());
+    }
+    
+    // Custom columns management
+    const addColumnBtn = this.panel.querySelector('#re-add-custom-column');
+    const saveCustomColumnBtn = this.panel.querySelector('#re-save-custom-column');
+    const cancelCustomColumnBtn = this.panel.querySelector('#re-cancel-custom-column');
+    
+    if (addColumnBtn) {
+      addColumnBtn.addEventListener('click', () => this.showAddColumnForm());
+    }
+    
+    if (saveCustomColumnBtn) {
+      saveCustomColumnBtn.addEventListener('click', () => this.saveCustomColumn());
+    }
+    
+    if (cancelCustomColumnBtn) {
+      cancelCustomColumnBtn.addEventListener('click', () => this.hideAddColumnForm());
+    }
+    
+    // Global actions
+    const saveAllBtn = this.panel.querySelector('#re-save-all-tabular');
+    const resetAllBtn = this.panel.querySelector('#re-reset-all-tabular');
+    const previewCompleteBtn = this.panel.querySelector('#re-preview-complete-tabular');
+    
+    if (saveAllBtn) {
+      saveAllBtn.addEventListener('click', () => this.saveAllTabularConfiguration());
+    }
+    
+    if (resetAllBtn) {
+      resetAllBtn.addEventListener('click', () => this.resetAllTabularConfiguration());
+    }
+    
+    if (previewCompleteBtn) {
+      previewCompleteBtn.addEventListener('click', () => this.previewCompleteTabularConfiguration());
+    }
+  }
+
+  setupTabularTabs() {
+    const tabs = this.panel.querySelectorAll('.re-tabular-tab');
+    const tabContents = this.panel.querySelectorAll('.re-tabular-tab-content');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+        
+        // Update tab styles
+        tabs.forEach(t => {
+          t.classList.remove('re-tabular-tab-active');
+          t.style.borderBottomColor = 'transparent';
+          t.style.fontWeight = 'normal';
+          t.style.color = '#d1d5db';
+        });
+        
+        tab.classList.add('re-tabular-tab-active');
+        tab.style.borderBottomColor = 'var(--chatgpt-accent)';
+        tab.style.fontWeight = '500';
+        tab.style.color = '#ffffff';
+        
+        // Show/hide content
+        tabContents.forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = this.panel.querySelector(`#re-tabular-${targetTab}-tab`);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+          
+          // Load content when switching to tabs
+          if (targetTab === 'prompt') {
+            this.loadTabularTemplate();
+          } else if (targetTab === 'custom-columns') {
+            this.loadCustomColumns();
+          }
+        }
+      });
+    });
+  }
+
+  async loadTabularColumns() {
+    try {
+      // Load saved column configuration and custom columns
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularColumnConfiguration', 'customColumns']),
+        { tabularColumnConfiguration: null, customColumns: [] }
+      );
+      
+      // Get default columns
+      const defaultColumns = getTabularDataColumns();
+      
+      // Get custom columns
+      const customColumns = result.customColumns || [];
+      
+      // Combine all columns
+      const allColumns = [...defaultColumns, ...customColumns];
+      
+      // Merge with saved configuration
+      let columns = allColumns;
+      if (result.tabularColumnConfiguration) {
+        columns = this.mergeColumnConfigurations(allColumns, result.tabularColumnConfiguration);
+      }
+      
+      // Render columns UI
+      this.renderColumnsUI(columns);
+      this.updateColumnStats();
+      
+    } catch (error) {
+      console.error('Failed to load tabular columns:', error);
+    }
+  }
+
+  mergeColumnConfigurations(defaultColumns, savedConfig) {
+    return defaultColumns.map(defaultCol => {
+      const savedCol = savedConfig.find(saved => saved.id === defaultCol.id);
+      return savedCol ? { ...defaultCol, ...savedCol } : defaultCol;
+    });
+  }
+
+  renderColumnsUI(columns) {
+    const container = this.panel.querySelector('#re-columns-container');
+    if (!container) return;
+    
+    // Group columns by category
+    const categorizedColumns = this.groupColumnsByCategory(columns);
+    
+    container.innerHTML = '';
+    
+    // Render each category
+    Object.entries(categorizedColumns).forEach(([category, categoryColumns]) => {
+      const categorySection = this.createCategorySection(category, categoryColumns);
+      container.appendChild(categorySection);
+    });
+  }
+
+  groupColumnsByCategory(columns) {
+    const categories = {};
+    const categoryNames = {
+      'core': '🏠 Core Property Information',
+      'location': '📍 Location & Geography', 
+      'financial': '💰 Financial Data',
+      'features': '🔧 Property Features',
+      'analysis': '📊 Analysis Data',
+      'market': '📈 Market Analysis',
+      'calculated': '🧮 Calculated Metrics',
+      'risk': '⚠️ Risk Assessment',
+      'scoring': '⭐ Scoring & Ratings'
+    };
+    
+    columns.forEach(column => {
+      const category = column.category || 'other';
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(column);
+    });
+    
+    // Sort categories in logical order
+    const sortedCategories = {};
+    const categoryOrder = ['core', 'location', 'financial', 'features', 'analysis', 'market', 'calculated', 'risk', 'scoring'];
+    
+    categoryOrder.forEach(cat => {
+      if (categories[cat]) {
+        sortedCategories[categoryNames[cat] || cat] = categories[cat];
+      }
+    });
+    
+    // Add any remaining categories
+    Object.entries(categories).forEach(([cat, cols]) => {
+      if (!categoryOrder.includes(cat)) {
+        sortedCategories[categoryNames[cat] || cat] = cols;
+      }
+    });
+    
+    return sortedCategories;
+  }
+
+  createCategorySection(categoryName, columns) {
+    const section = document.createElement('div');
+    section.className = 're-column-category';
+    section.style.cssText = `
+      margin-bottom: 16px; 
+      border: 1px solid var(--chatgpt-border-light); 
+      border-radius: 8px; 
+      overflow: hidden;
+    `;
+    
+    // Category header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: var(--chatgpt-surface-secondary); 
+      padding: 8px 12px; 
+      font-weight: 500; 
+      font-size: 14px;
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    `;
+    
+    const enabledCount = columns.filter(col => col.enabled).length;
+    header.innerHTML = `
+      <span>${categoryName}</span>
+      <span style="font-size: 12px; color: #d1d5db;">${enabledCount}/${columns.length}</span>
+    `;
+    
+    // Category content
+    const content = document.createElement('div');
+    content.style.cssText = `
+      padding: 8px; 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+      gap: 4px;
+    `;
+    
+    columns.forEach(column => {
+      const columnItem = this.createColumnItem(column);
+      content.appendChild(columnItem);
+    });
+    
+    // Toggle category
+    let isExpanded = true;
+    header.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      content.style.display = isExpanded ? 'grid' : 'none';
+      header.style.opacity = isExpanded ? '1' : '0.7';
+    });
+    
+    section.appendChild(header);
+    section.appendChild(content);
+    
+    return section;
+  }
+
+  createColumnItem(column) {
+    const item = document.createElement('label');
+    item.className = 're-column-item';
+    item.style.cssText = `
+      display: flex; 
+      align-items: flex-start; 
+      gap: 8px; 
+      padding: 6px 8px; 
+      border-radius: 4px; 
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.2s;
+    `;
+    
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = 'var(--chatgpt-surface-secondary)';
+    });
+    
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+    });
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = column.enabled !== false;
+    checkbox.dataset.columnId = column.id;
+    checkbox.style.cssText = 'margin: 2px 0 0 0; flex-shrink: 0;';
+    
+    checkbox.addEventListener('change', () => {
+      column.enabled = checkbox.checked;
+      this.updateColumnStats();
+    });
+    
+    const label = document.createElement('div');
+    label.style.cssText = 'flex: 1; line-height: 1.3;';
+    
+    const badges = [];
+    if (column.required) badges.push('<span style="background: #ef4444; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">REQUIRED</span>');
+    if (column.isCalculated) badges.push('<span style="background: #3b82f6; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">CALCULATED</span>');
+    
+    label.innerHTML = `
+      <div style="font-weight: 500; color: #ffffff;">
+        ${column.name} ${badges.join(' ')}
+      </div>
+      ${column.description ? `<div style="font-size: 11px; color: #d1d5db; margin-top: 2px;">${column.description || ''}</div>` : ''}
+    `;
+    
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    
+    return item;
+  }
+
+  updateColumnStats() {
+    const statsElement = this.panel.querySelector('#re-columns-stats');
+    if (!statsElement) return;
+    
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const totalCount = checkboxes.length;
+    
+    statsElement.textContent = `${enabledCount} of ${totalCount} columns selected`;
+  }
+
+  selectAllColumns() {
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  }
+
+  clearAllColumns() {
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  }
+
+  async saveColumnConfiguration() {
+    try {
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const columnConfig = Array.from(checkboxes).map(checkbox => ({
+        id: checkbox.dataset.columnId,
+        enabled: checkbox.checked
+      }));
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ tabularColumnConfiguration: columnConfig }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Column configuration saved successfully!');
+      console.log('💾 Tabular column configuration saved:', columnConfig);
+      
+    } catch (error) {
+      console.error('Failed to save column configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to save column configuration');
+    }
+  }
+
+  async resetColumnConfiguration() {
+    if (confirm('Are you sure you want to reset all columns to default settings?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularColumnConfiguration']),
+          null
+        );
+        
+        // Reload columns with defaults
+        this.loadTabularColumns();
+        
+        this.showChatGPTMessage('success', 'Column configuration reset to default');
+        console.log('🔄 Tabular column configuration reset');
+        
+      } catch (error) {
+        console.error('Failed to reset column configuration:', error);
+        this.showChatGPTMessage('error', 'Failed to reset column configuration');
+      }
+    }
+  }
+
+  async previewTabularPrompt() {
+    try {
+      // Get current column configuration
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      if (enabledColumns.length === 0) {
+        this.showChatGPTMessage('warning', 'No columns selected. Please select at least one column to preview.');
+        return;
+      }
+      
+      // Generate tabular prompt with selected columns
+      const promptTemplate = await getTabularDataExtractionPromptWithColumns(enabledColumns);
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'Failed to generate prompt preview');
+        return;
+      }
+      
+      // Show preview with sample data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Show preview modal with column info
+      this.showPromptPreviewModal(previewText, `tabular (${enabledColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview tabular prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to generate prompt preview');
+    }
+  }
+
+  // Tabular Template Management
+  async loadTabularTemplate() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularPromptTemplate']),
+        { tabularPromptTemplate: null }
+      );
+      
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (templateTextarea) {
+        if (result.tabularPromptTemplate) {
+          templateTextarea.value = result.tabularPromptTemplate;
+        } else {
+          // Load default template
+          templateTextarea.value = getDefaultTabularPromptTemplate();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Failed to load tabular template:', error);
+    }
+  }
+
+  async saveTabularTemplate() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ tabularPromptTemplate: template || null }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Tabular prompt template saved successfully!');
+      console.log('💾 Tabular prompt template saved');
+      
+    } catch (error) {
+      console.error('Failed to save tabular template:', error);
+      this.showChatGPTMessage('error', 'Failed to save tabular prompt template');
+    }
+  }
+
+  async resetTabularTemplate() {
+    if (confirm('Are you sure you want to reset the tabular prompt template to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularPromptTemplate']),
+          null
+        );
+        
+        // Reload with default template
+        this.loadTabularTemplate();
+        
+        this.showChatGPTMessage('success', 'Tabular prompt template reset to default');
+        console.log('🔄 Tabular prompt template reset');
+        
+      } catch (error) {
+        console.error('Failed to reset tabular template:', error);
+        this.showChatGPTMessage('error', 'Failed to reset tabular prompt template');
+      }
+    }
+  }
+
+  async previewTabularTemplate() {
+    try {
+      const templateTextarea = this.panel.querySelector('#re-tabular-prompt-template');
+      if (!templateTextarea) return;
+      
+      const template = templateTextarea.value.trim();
+      if (!template) {
+        this.showChatGPTMessage('warning', 'No template to preview');
+        return;
+      }
+      
+      // Get enabled columns for preview
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      // Generate column sections
+      let columnsSection = 'No columns selected';
+      if (enabledColumns.length > 0) {
+        const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+        const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+        columnsSection = this.generateColumnsSectionForTemplate(selectedColumns);
+      }
+      
+      // Replace template variables
+      const previewText = template
+        .replace(/\{\{COLUMNS\}\}/g, columnsSection)
+        .replace(/\{PROPERTY_URL\}/g, 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/')
+        .replace(/\{DATE\}/g, new Date().toLocaleDateString());
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `tabular template (${enabledColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview tabular template:', error);
+      this.showChatGPTMessage('error', 'Failed to preview template');
+    }
+  }
+
+  // Custom Columns Management
+  async loadCustomColumns() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      
+      const customColumns = result.customColumns || [];
+      this.renderCustomColumnsList(customColumns);
+      
+    } catch (error) {
+      console.error('Failed to load custom columns:', error);
+    }
+  }
+
+  renderCustomColumnsList(customColumns) {
+    const container = this.panel.querySelector('#re-custom-columns-list');
+    if (!container) return;
+    
+    if (customColumns.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--chatgpt-text-secondary);">
+          <div style="font-size: 48px; margin-bottom: 8px;">📋</div>
+          <div>No custom columns yet</div>
+          <div style="font-size: 12px; margin-top: 4px;">Click "Add Column" to create your first custom data point</div>
+        </div>
+      `;
       return;
     }
     
-    // Show preview with example data
-    const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
-    const previewText = promptText
-      .replace('{PROPERTY_URL}', exampleUrl)
-      .replace('{DATE}', new Date().toLocaleDateString());
+    container.innerHTML = '';
     
-    // Create and show preview modal
-    this.showPromptPreviewModal(previewText);
+    customColumns.forEach((column, index) => {
+      const columnElement = this.createCustomColumnElement(column, index);
+      container.appendChild(columnElement);
+    });
+  }
+
+  createCustomColumnElement(column, index) {
+    const element = document.createElement('div');
+    element.className = 're-custom-column-item';
+    element.style.cssText = `
+      border: 1px solid var(--chatgpt-border-light);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--chatgpt-surface-primary);
+    `;
+    
+    element.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div style="flex: 1;">
+          <div style="font-weight: 500; margin-bottom: 4px;">
+            ${column.name}
+            <span style="font-size: 11px; background: var(--chatgpt-surface-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">
+              ${column.category || 'custom'}
+            </span>
+          </div>
+          <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+            ${column.description || 'No description provided'}
+          </div>
+        </div>
+        <div style="display: flex; gap: 4px; margin-left: 12px;">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.editCustomColumn(${index})" title="Edit">
+            ✏️
+          </button>
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.deleteCustomColumn(${index})" title="Delete">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+    
+    return element;
+  }
+
+  showAddColumnForm() {
+    const form = this.panel.querySelector('#re-add-column-form');
+    if (form) {
+      form.style.display = 'block';
+      
+      // Clear form
+      this.panel.querySelector('#re-new-column-name').value = '';
+      this.panel.querySelector('#re-new-column-category').value = 'custom';
+      this.panel.querySelector('#re-new-column-description').value = '';
+      
+      // Focus on name field
+      this.panel.querySelector('#re-new-column-name').focus();
+    }
+  }
+
+  hideAddColumnForm() {
+    const form = this.panel.querySelector('#re-add-column-form');
+    if (form) {
+      form.style.display = 'none';
+    }
+  }
+
+  async saveCustomColumn() {
+    try {
+      const nameField = this.panel.querySelector('#re-new-column-name');
+      const categoryField = this.panel.querySelector('#re-new-column-category');
+      const descriptionField = this.panel.querySelector('#re-new-column-description');
+      
+      const name = nameField.value.trim();
+      const category = categoryField.value;
+      const description = descriptionField.value.trim();
+      
+      if (!name) {
+        this.showChatGPTMessage('warning', 'Please enter a column name');
+        nameField.focus();
+        return;
+      }
+      
+      // Load existing custom columns
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      
+      const customColumns = result.customColumns || [];
+      
+      // Check for duplicate names
+      if (customColumns.some(col => col.name.toLowerCase() === name.toLowerCase())) {
+        this.showChatGPTMessage('warning', 'A column with this name already exists');
+        nameField.focus();
+        return;
+      }
+      
+      // Create new column
+      const newColumn = {
+        id: `custom_${Date.now()}`,
+        name: name,
+        category: category,
+        description: description,
+        type: 'text',
+        isCustom: true,
+        enabled: true,
+        required: false
+      };
+      
+      // Add to list
+      customColumns.push(newColumn);
+      
+      // Save
+      await safeChromeFall(
+        () => chrome.storage.local.set({ customColumns: customColumns }),
+        null
+      );
+      
+      // Reload the list
+      this.loadCustomColumns();
+      
+      // Hide form
+      this.hideAddColumnForm();
+      
+      // Reload columns in the main tab
+      this.loadTabularColumns();
+      
+      this.showChatGPTMessage('success', 'Custom column added successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save custom column:', error);
+      this.showChatGPTMessage('error', 'Failed to save custom column');
+    }
+  }
+
+  async getCustomColumns() {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      return result.customColumns || [];
+    } catch (error) {
+      console.error('Failed to get custom columns:', error);
+      return [];
+    }
+  }
+
+  async deleteCustomColumn(index) {
+    if (confirm('Are you sure you want to delete this custom column?')) {
+      try {
+        const result = await safeChromeFall(
+          () => chrome.storage.local.get(['customColumns']),
+          { customColumns: [] }
+        );
+        
+        const customColumns = result.customColumns || [];
+        customColumns.splice(index, 1);
+        
+        await safeChromeFall(
+          () => chrome.storage.local.set({ customColumns: customColumns }),
+          null
+        );
+        
+        this.loadCustomColumns();
+        this.loadTabularColumns(); // Refresh main columns list
+        
+        this.showChatGPTMessage('success', 'Custom column deleted');
+        
+      } catch (error) {
+        console.error('Failed to delete custom column:', error);
+        this.showChatGPTMessage('error', 'Failed to delete custom column');
+      }
+    }
+  }
+
+  generateColumnsSectionForTemplate(columns) {
+    // Group columns by category for organized output
+    const categorized = {};
+    columns.forEach(col => {
+      const category = col.category || 'other';
+      if (!categorized[category]) {
+        categorized[category] = [];
+      }
+      categorized[category].push(col);
+    });
+    
+    const sections = [];
+    const categoryNames = {
+      'core': 'BASIC PROPERTY INFORMATION',
+      'location': 'LOCATION & GEOGRAPHY', 
+      'financial': 'FINANCIAL DATA',
+      'features': 'PROPERTY FEATURES',
+      'analysis': 'INVESTMENT ANALYSIS',
+      'market': 'MARKET ANALYSIS',
+      'calculated': 'CALCULATED METRICS',
+      'risk': 'RISK ASSESSMENT',
+      'scoring': 'SCORING & RATINGS',
+      'custom': 'CUSTOM DATA POINTS'
+    };
+    
+    Object.entries(categorized).forEach(([category, cols]) => {
+      const sectionName = categoryNames[category] || category.toUpperCase();
+      const dataPoints = cols.map((col, index) => {
+        const description = col.description || `Extract ${col.name}`;
+        return `${index + 1}. ${col.name}: ${description}`;
+      });
+      
+      sections.push(`**${sectionName}:**\n${dataPoints.join('\n')}`);
+    });
+    
+    return sections.join('\n\n');
+  }
+
+  // Global Tabular Configuration Management
+  async saveAllTabularConfiguration() {
+    try {
+      // Save all components
+      await this.saveColumnConfiguration();
+      await this.saveTabularTemplate();
+      
+      this.showChatGPTMessage('success', 'All tabular configuration saved successfully!');
+      
+    } catch (error) {
+      console.error('Failed to save all tabular configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to save configuration');
+    }
+  }
+
+  async resetAllTabularConfiguration() {
+    if (confirm('Are you sure you want to reset ALL tabular configuration (columns, template, and custom columns) to default?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularColumnConfiguration', 'tabularPromptTemplate', 'customColumns']),
+          null
+        );
+        
+        // Reload all components
+        this.loadTabularColumns();
+        this.loadTabularTemplate();
+        this.loadCustomColumns();
+        
+        this.showChatGPTMessage('success', 'All tabular configuration reset to default');
+        
+      } catch (error) {
+        console.error('Failed to reset all tabular configuration:', error);
+        this.showChatGPTMessage('error', 'Failed to reset configuration');
+      }
+    }
+  }
+
+  async previewCompleteTabularConfiguration() {
+    try {
+      // Get the complete configuration
+      const promptTemplate = await this.getCompleteTabularPrompt();
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'Failed to generate complete configuration preview');
+        return;
+      }
+      
+      // Show preview with sample data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Count enabled columns
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+      
+      // Show preview modal
+      this.showPromptPreviewModal(previewText, `complete tabular (${enabledCount} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview complete tabular configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to generate preview');
+    }
+  }
+
+  async getCompleteTabularPrompt() {
+    try {
+      // Get custom template if available
+      const templateResult = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularPromptTemplate']),
+        { tabularPromptTemplate: null }
+      );
+      
+      let template = templateResult.tabularPromptTemplate;
+      if (!template) {
+        template = getDefaultTabularPromptTemplate();
+      }
+      
+      // Get enabled columns
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      if (enabledColumns.length === 0) {
+        return template; // Return template without columns replacement
+      }
+      
+      // Get all columns (built-in + custom)
+      const allColumns = [...getTabularDataColumns(), ...await this.getCustomColumns()];
+      const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+      
+      // Generate columns section
+      const columnsSection = this.generateColumnsSectionForTemplate(selectedColumns);
+      
+      // Replace template variables
+      return template.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+      
+    } catch (error) {
+      console.error('Error generating complete tabular prompt:', error);
+      return null;
+    }
   }
   
-  showPromptPreviewModal(previewText) {
+  showPromptPreviewModal(previewText, promptType = 'custom') {
     // Remove existing modal if any
     const existingModal = document.querySelector('#re-prompt-preview-modal');
     if (existingModal) {
@@ -3270,7 +5536,11 @@ Or enter your own property URL:`);
           <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
         </div>
         <div class="re-modal-content">
-          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your custom prompt will appear when sent to ChatGPT:</p>
+          <div style="margin-bottom: 16px; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+            <strong>Prompt Type:</strong> ${promptType.toUpperCase()}<br>
+            <strong>Length:</strong> ${previewText.length} characters
+          </div>
+          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your ${promptType} prompt will appear when sent to ChatGPT:</p>
           <div class="re-analysis-text" style="max-height: 400px;">
             ${previewText.replace(/\n/g, '<br>')}
           </div>
@@ -3463,6 +5733,7 @@ if (isChatGPTSite()) {
       setTimeout(() => {
         embeddedUI = new REAnalyzerEmbeddedUI();
         window.embeddedUI = embeddedUI; // Make globally available
+        window.reAnalyzer = embeddedUI; // Make accessible for custom column management
       }, 1000);
     });
   } else {
@@ -3470,6 +5741,7 @@ if (isChatGPTSite()) {
     setTimeout(() => {
       embeddedUI = new REAnalyzerEmbeddedUI();
       window.embeddedUI = embeddedUI; // Make globally available
+      window.reAnalyzer = embeddedUI; // Make accessible for custom column management
     }, 1000);
   }
 } else {
@@ -3827,11 +6099,13 @@ async function handleSplittingFallback() {
     }
     
     // Get the original prompt template  
+    // Get prompt selection and configuration
     const result = await safeChromeFall(
-      () => chrome.storage.local.get(['customPrompt']),
-      { customPrompt: null }
+      () => chrome.storage.local.get(['customPrompt', 'promptType', 'columnConfiguration']),
+      { customPrompt: null, promptType: 'default', columnConfiguration: null }
     );
-    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
+    
+    const promptTemplate = await getSelectedPrompt(result.promptType, result.customPrompt, result.columnConfiguration);
     
     // Create the full prompt with link
     const fullPrompt = promptTemplate
@@ -3939,6 +6213,534 @@ Focus on data accuracy and practical investment considerations that would be val
 Property Link: {PROPERTY_URL}`;
 }
 
+// Third prompt: Tabular Data Extraction Template
+function getTabularDataExtractionPrompt() {
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+**BASIC PROPERTY INFORMATION:**
+1. Property Address: Extract the complete street address
+2. Asking Price: Extract the exact asking price (include currency symbol)
+3. Property Type: Classify as House, Apartment, Condo, Townhouse, etc.
+4. Bedrooms: Number of bedrooms (numeric only)
+5. Bathrooms: Number of bathrooms (include half baths as .5)
+6. Square Footage: Total square footage (numeric only)
+7. Year Built: Construction year (4-digit year)
+8. Lot Size: Lot size in square feet (if available)
+9. Neighborhood: Property neighborhood or area name
+10. City: City name
+11. State: State name
+12. ZIP Code: ZIP code (if available)
+
+**MARKET DATA:**
+13. Estimated Monthly Rent: Your professional estimate based on local market rates
+14. Location Score: Rate location quality 1-10 (consider schools, safety, amenities, transportation)
+15. Market Trend: Current market direction (Rising, Stable, Declining)
+16. Days on Market: Number of days listed (if available)
+17. Price History: Any price changes (if available)
+
+**PROPERTY FEATURES:**
+18. Parking Spaces: Number of parking spaces
+19. Garage Type: Attached, Detached, None
+20. Heating Type: Type of heating system
+21. Cooling Type: Type of cooling system
+22. Appliances Included: List of included appliances
+23. Amenities: Property amenities and features
+
+**INVESTMENT ANALYSIS:**
+24. Key Advantages: Top 3 property advantages for investment
+25. Key Concerns: Top 3 property limitations or concerns
+26. Red Flags: Any warning signs or risk indicators
+27. Investment Grade: Overall investment grade (A, B, C, D)
+28. Rental Potential: Rental market assessment
+29. Appreciation Potential: Long-term appreciation outlook
+
+**MARKET ANALYSIS:**
+30. Market Type: Buyer's market, Seller's market, or Balanced
+31. Market Cycle: Current market cycle phase
+32. Inventory Level: Current inventory level (Low, Medium, High)
+33. Demand Level: Current demand level (Low, Medium, High)
+34. Job Growth Rate: Local job growth percentage
+35. Population Growth Rate: Local population growth percentage
+36. Income Growth Rate: Local income growth percentage
+37. Unemployment Rate: Local unemployment rate
+38. New Construction Level: Level of new construction activity
+39. Infrastructure Development: Infrastructure development status
+40. Commercial Development: Commercial development activity
+41. School Quality Rating: Local school quality (1-10)
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**CALCULATION INSTRUCTIONS:**
+For the following calculated metrics, provide the calculation steps:
+
+**Basic Calculations:**
+- Price per Square Foot = Asking Price ÷ Square Footage
+- Rent per Square Foot = Estimated Monthly Rent ÷ Square Footage
+- Property Age = Current Year - Year Built
+- Bedroom Ratio = Bedrooms ÷ (Bedrooms + Bathrooms)
+
+**Investment Metrics:**
+- Gross Rent Multiplier = Asking Price ÷ (Estimated Monthly Rent × 12)
+- Cap Rate = (Estimated Monthly Rent × 12) ÷ Asking Price × 100
+- 1% Rule Ratio = Estimated Monthly Rent ÷ Asking Price × 100
+- Price-to-Rent Ratio = Asking Price ÷ (Estimated Monthly Rent × 12)
+
+**Risk Assessment:**
+- Vacancy Risk Score: 1-10 based on market demand and property appeal
+- Maintenance Risk Score: 1-10 based on property age and condition
+- Market Risk Score: 1-10 based on market stability and trends
+- Overall Risk Score = (Vacancy Risk + Maintenance Risk + Market Risk) ÷ 3
+
+**Market Analysis:**
+- Location Premium = (Location Score - 5) × 2
+- Days on Market Score: 1-10 based on DOM relative to market average
+- Price Trend Score: 1-10 based on price history and market direction
+
+**OUTPUT FORMAT:**
+Please provide your analysis in the following structured format:
+
+**PROPERTY DATA SUMMARY:**
+[Extract all requested data points with clear labels]
+
+**CALCULATED METRICS:**
+[Provide all calculated metrics with formulas shown]
+
+**RISK ASSESSMENT:**
+[Provide risk scores with justification]
+
+**MARKET ANALYSIS:**
+[Provide market analysis data with supporting information]
+
+**INVESTMENT RECOMMENDATION:**
+[Overall investment assessment with key factors]
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+}
+
+// Default dynamic prompt template with column placeholders
+function getDefaultDynamicPromptTemplate() {
+  return `You are a professional real estate analyst. Please analyze the provided property listing and extract the following specific data points for investment analysis.
+
+**PROPERTY ANALYSIS REQUEST:**
+
+Please extract the following information from the property listing:
+
+{{COLUMNS}}
+
+**INSTRUCTIONS:**
+- Provide accurate, specific data for each requested field
+- Use "N/A" if information is not available in the listing
+- Include currency symbols for monetary values ($)
+- Use consistent formats for dates, percentages, and numbers
+- Focus on extracting factual data rather than subjective assessments
+
+**OUTPUT FORMAT:**
+Please organize your response with clear labels for each data point, making it easy to extract the specific information requested.
+
+Property URL: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Thank you for providing accurate, structured data for investment analysis.`;
+}
+
+// Default tabular prompt template with placeholder for columns
+function getDefaultTabularPromptTemplate() {
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+{{COLUMNS}}
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**OUTPUT FORMAT:**
+Please provide your analysis in a structured format with clear labels for each requested data point. Organize the information clearly and ensure accuracy.
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+}
+
+// Function to generate tabular prompt with selected columns
+async function getTabularDataExtractionPromptWithColumns(enabledColumnIds) {
+  try {
+    // Get all available columns
+    const allColumns = getTabularDataColumns();
+    
+    // Filter to enabled columns
+    const enabledColumns = allColumns.filter(col => enabledColumnIds.includes(col.id));
+    
+    if (enabledColumns.length === 0) {
+      return getTabularDataExtractionPrompt(); // Fallback to full prompt
+    }
+    
+    // Group columns by category for organized prompt
+    const categorizedColumns = {};
+    enabledColumns.forEach(col => {
+      const category = col.category || 'other';
+      if (!categorizedColumns[category]) {
+        categorizedColumns[category] = [];
+      }
+      categorizedColumns[category].push(col);
+    });
+    
+    // Build prompt sections
+    let promptSections = [];
+    
+    // Build sections based on enabled columns
+    if (categorizedColumns.core) {
+      promptSections.push(buildBasicPropertySection(categorizedColumns.core));
+    }
+    
+    if (categorizedColumns.location) {
+      promptSections.push(buildLocationSection(categorizedColumns.location));
+    }
+    
+    if (categorizedColumns.financial || categorizedColumns.market) {
+      const marketCols = [...(categorizedColumns.financial || []), ...(categorizedColumns.market || [])];
+      promptSections.push(buildMarketDataSection(marketCols));
+    }
+    
+    if (categorizedColumns.features) {
+      promptSections.push(buildPropertyFeaturesSection(categorizedColumns.features));
+    }
+    
+    if (categorizedColumns.analysis) {
+      promptSections.push(buildInvestmentAnalysisSection(categorizedColumns.analysis));
+    }
+    
+    if (categorizedColumns.calculated || categorizedColumns.risk || categorizedColumns.scoring) {
+      const analysisCols = [...(categorizedColumns.calculated || []), ...(categorizedColumns.risk || []), ...(categorizedColumns.scoring || [])];
+      promptSections.push(buildCalculatedMetricsSection(analysisCols));
+    }
+    
+    // Build complete prompt
+    const customPrompt = `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+${promptSections.join('\n\n')}
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**OUTPUT FORMAT:**
+Please provide your analysis in a structured format with clear labels for each requested data point.
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+
+    return customPrompt;
+    
+  } catch (error) {
+    console.error('Error generating custom tabular prompt:', error);
+    return getTabularDataExtractionPrompt(); // Fallback
+  }
+}
+
+// Helper functions to build prompt sections
+function buildBasicPropertySection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'propertyAddress': 'Property Address: Extract the complete street address',
+      'askingPrice': 'Asking Price: Extract the exact asking price (include currency symbol)',
+      'propertyType': 'Property Type: Classify as House, Apartment, Condo, Townhouse, etc.',
+      'bedrooms': 'Bedrooms: Number of bedrooms (numeric only)',
+      'bathrooms': 'Bathrooms: Number of bathrooms (include half baths as .5)',
+      'squareFootage': 'Square Footage: Total square footage (numeric only)',
+      'yearBuilt': 'Year Built: Construction year (4-digit year)',
+      'lotSize': 'Lot Size: Lot size in square feet (if available)'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**BASIC PROPERTY INFORMATION:**\n${dataPoints.join('\n')}`;
+}
+
+function buildLocationSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'neighborhood': 'Neighborhood: Property neighborhood or area name',
+      'city': 'City: City name',
+      'state': 'State: State name',
+      'zipCode': 'ZIP Code: ZIP code (if available)',
+      'schoolQuality': 'School Quality Rating: Local school quality (1-10)'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**LOCATION & GEOGRAPHY:**\n${dataPoints.join('\n')}`;
+}
+
+function buildMarketDataSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'estimatedRent': 'Estimated Monthly Rent: Your professional estimate based on local market rates',
+      'locationScore': 'Location Score: Rate location quality 1-10 (consider schools, safety, amenities, transportation)',
+      'marketTrend': 'Market Trend: Current market direction (Rising, Stable, Declining)',
+      'daysOnMarket': 'Days on Market: Number of days listed (if available)',
+      'priceHistory': 'Price History: Any price changes (if available)',
+      'marketType': 'Market Type: Buyer\'s market, Seller\'s market, or Balanced',
+      'jobGrowth': 'Job Growth Rate: Local job growth percentage',
+      'populationGrowth': 'Population Growth Rate: Local population growth percentage'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**MARKET DATA:**\n${dataPoints.join('\n')}`;
+}
+
+function buildPropertyFeaturesSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'parkingSpaces': 'Parking Spaces: Number of parking spaces',
+      'garageType': 'Garage Type: Attached, Detached, None',
+      'heatingType': 'Heating Type: Type of heating system',
+      'coolingType': 'Cooling Type: Type of cooling system',
+      'appliances': 'Appliances Included: List of included appliances',
+      'amenities': 'Amenities: Property amenities and features'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**PROPERTY FEATURES:**\n${dataPoints.join('\n')}`;
+}
+
+function buildInvestmentAnalysisSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'keyAdvantages': 'Key Advantages: Top 3 property advantages for investment',
+      'keyConcerns': 'Key Concerns: Top 3 property limitations or concerns',
+      'redFlags': 'Red Flags: Any warning signs or risk indicators',
+      'investmentGrade': 'Investment Grade: Overall investment grade (A, B, C, D)',
+      'rentalPotential': 'Rental Potential: Rental market assessment',
+      'appreciationPotential': 'Appreciation Potential: Long-term appreciation outlook'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**INVESTMENT ANALYSIS:**\n${dataPoints.join('\n')}`;
+}
+
+function buildCalculatedMetricsSection(columns) {
+  const calculationInstructions = [];
+  
+  columns.forEach(col => {
+    if (col.isCalculated) {
+      const instructions = {
+        'pricePerSqFt': 'Price per Square Foot = Asking Price ÷ Square Footage',
+        'capRate': 'Cap Rate = (Estimated Monthly Rent × 12) ÷ Asking Price × 100',
+        'onePercentRule': '1% Rule Ratio = Estimated Monthly Rent ÷ Asking Price × 100',
+        'vacancyRisk': 'Vacancy Risk Score: 1-10 based on market demand and property appeal',
+        'maintenanceRisk': 'Maintenance Risk Score: 1-10 based on property age and condition',
+        'locationPremium': 'Location Premium = (Location Score - 5) × 2'
+      };
+      
+      if (instructions[col.id]) {
+        calculationInstructions.push(`- ${instructions[col.id]}`);
+      }
+    }
+  });
+  
+  if (calculationInstructions.length > 0) {
+    return `**CALCULATED METRICS:**\nFor the following metrics, provide the calculation steps:\n${calculationInstructions.join('\n')}`;
+  }
+  
+  return '';
+}
+
+// Helper function to generate columns section for prompt templates
+function generateColumnsSectionForPrompt(columns) {
+  // Group columns by category for organized output
+  const categorized = {};
+  columns.forEach(col => {
+    const category = col.category || 'other';
+    if (!categorized[category]) {
+      categorized[category] = [];
+    }
+    categorized[category].push(col);
+  });
+  
+  const sections = [];
+  const categoryNames = {
+    'core': 'BASIC PROPERTY INFORMATION',
+    'location': 'LOCATION & GEOGRAPHY', 
+    'financial': 'FINANCIAL DATA',
+    'features': 'PROPERTY FEATURES',
+    'analysis': 'INVESTMENT ANALYSIS',
+    'market': 'MARKET ANALYSIS',
+    'calculated': 'CALCULATED METRICS',
+    'risk': 'RISK ASSESSMENT',
+    'scoring': 'SCORING & RATINGS',
+    'custom': 'CUSTOM DATA POINTS'
+  };
+  
+  Object.entries(categorized).forEach(([category, cols]) => {
+    const sectionName = categoryNames[category] || category.toUpperCase();
+    const dataPoints = cols.map((col, index) => {
+      const description = col.description || `Extract ${col.name}`;
+      return `${index + 1}. ${col.name}: ${description}`;
+    });
+    
+    sections.push(`**${sectionName}:**\n${dataPoints.join('\n')}`);
+  });
+  
+  return sections.join('\n\n');
+}
+
+// Helper function to get custom columns statically (for use in non-UI contexts)
+async function getCustomColumnsStatic() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['customColumns']),
+      { customColumns: [] }
+    );
+    return result.customColumns || [];
+  } catch (error) {
+    console.error('Failed to get custom columns:', error);
+    return [];
+  }
+}
+
+// Function to get the selected prompt based on user preference
+async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
+  try {
+    switch (promptType) {
+      case 'tabular':
+        // Check if we have a custom template
+        const templateResult = await safeChromeFall(
+          () => chrome.storage.local.get(['tabularPromptTemplate', 'tabularColumnConfiguration', 'customColumns']),
+          { tabularPromptTemplate: null, tabularColumnConfiguration: null, customColumns: [] }
+        );
+        
+        // Use custom template if available
+        if (templateResult.tabularPromptTemplate) {
+          // Get enabled columns
+          let enabledColumns = [];
+          if (templateResult.tabularColumnConfiguration) {
+            enabledColumns = templateResult.tabularColumnConfiguration
+              .filter(col => col.enabled)
+              .map(col => col.id);
+          }
+          
+          // Get all columns (built-in + custom)
+          const defaultColumns = getTabularDataColumns();
+          const customColumns = templateResult.customColumns || [];
+          const allColumns = [...defaultColumns, ...customColumns];
+          
+          // Generate columns section if we have enabled columns
+          if (enabledColumns.length > 0) {
+            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+            const columnsSection = generateColumnsSectionForPrompt(selectedColumns);
+            
+            // Replace template placeholders
+            return templateResult.tabularPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+          } else {
+            // Return template without columns replacement
+            return templateResult.tabularPromptTemplate;
+          }
+        }
+        
+        // Check if we have saved column configuration for default prompt
+        if (templateResult.tabularColumnConfiguration) {
+          // Use columns selected by user with default prompt structure
+          const enabledColumns = templateResult.tabularColumnConfiguration
+            .filter(col => col.enabled)
+            .map(col => col.id);
+          
+          if (enabledColumns.length > 0) {
+            return await getTabularDataExtractionPromptWithColumns(enabledColumns);
+          }
+        }
+        
+        // Fallback to full tabular prompt
+        return getTabularDataExtractionPrompt();
+        
+      case 'dynamic':
+        // Check if user has custom dynamic template
+        const dynamicResult = await safeChromeFall(
+          () => chrome.storage.local.get(['dynamicPromptTemplate', 'dynamicPromptColumns']),
+          { dynamicPromptTemplate: null, dynamicPromptColumns: null }
+        );
+        
+        if (dynamicResult.dynamicPromptTemplate) {
+          // Get enabled columns
+          const enabledColumns = dynamicResult.dynamicPromptColumns || [];
+          
+          // Generate columns section
+          let columnsSection = '';
+          if (enabledColumns.length > 0) {
+            const allColumns = [...getTabularDataColumns(), ...await getCustomColumnsStatic()];
+            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
+            columnsSection = generateColumnsSectionForPrompt(selectedColumns);
+          }
+          
+          // Replace template placeholders
+          return dynamicResult.dynamicPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
+        }
+        
+        // Fallback to default dynamic generation
+        return await generateDynamicPrompt();
+        
+      case 'custom':
+        return customPrompt || getDefaultPromptTemplate();
+        
+      case 'default':
+      default:
+        // Check if user has custom default template
+        const defaultResult = await safeChromeFall(
+          () => chrome.storage.local.get(['defaultPromptTemplate']),
+          { defaultPromptTemplate: null }
+        );
+        
+        if (defaultResult.defaultPromptTemplate) {
+          return defaultResult.defaultPromptTemplate;
+        }
+        
+        // Check if user has custom prompt set, otherwise use built-in default
+        return customPrompt || getDefaultPromptTemplate();
+    }
+  } catch (error) {
+    console.error('Error selecting prompt:', error);
+    return getDefaultPromptTemplate();
+  }
+}
+
 // Dynamic prompt generation based on user's column selection
 async function generateDynamicPrompt() {
   try {
@@ -4002,6 +6804,83 @@ function getDefaultColumns() {
     { id: 'price', name: 'Property Price', category: 'core', enabled: true },
     { id: 'bedrooms', name: 'Number of Bedrooms', category: 'core', enabled: true },
     { id: 'propertyType', name: 'Type of Property', category: 'core', enabled: true }
+  ];
+}
+
+// Comprehensive column set for tabular data extraction
+function getTabularDataColumns() {
+  return [
+    // Basic Property Information
+    { id: 'propertyAddress', name: 'Property Address', description: 'Complete street address of the property', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'askingPrice', name: 'Asking Price', description: 'Listed price with currency symbol', type: 'currency', category: 'core', enabled: true, required: true },
+    { id: 'propertyType', name: 'Property Type', description: 'Classification (House, Condo, Apartment, etc.)', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms in the property', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms (include half baths as .5)', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'squareFootage', name: 'Square Footage', description: 'Total interior square footage', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was constructed', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'lotSize', name: 'Lot Size (sq ft)', description: 'Size of the lot in square feet', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'neighborhood', name: 'Neighborhood', description: 'Name of the neighborhood or area', type: 'text', category: 'location', enabled: true, required: false },
+    { id: 'city', name: 'City', description: 'City where the property is located', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'state', name: 'State', description: 'State where the property is located', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'zipCode', name: 'ZIP Code', description: 'Postal ZIP code of the property', type: 'text', category: 'location', enabled: true, required: false },
+    
+    // Market Data
+    { id: 'estimatedRent', name: 'Estimated Monthly Rent', description: 'Professional estimate of monthly rental income', type: 'currency', category: 'financial', enabled: true, required: false },
+    { id: 'locationScore', name: 'Location Score (1-10)', description: 'Rating of location quality (schools, safety, amenities)', type: 'number', category: 'scoring', enabled: true, required: false },
+    { id: 'marketTrend', name: 'Market Trend', description: 'Current market direction (Rising, Stable, Declining)', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'daysOnMarket', name: 'Days on Market', description: 'Number of days the property has been listed', type: 'number', category: 'market', enabled: true, required: false },
+    { id: 'priceHistory', name: 'Price History', description: 'Any recent price changes or reductions', type: 'text', category: 'market', enabled: true, required: false },
+    
+    // Property Features
+    { id: 'parkingSpaces', name: 'Parking Spaces', description: 'Number of available parking spaces', type: 'number', category: 'features', enabled: true, required: false },
+    { id: 'garageType', name: 'Garage Type', description: 'Type of garage (Attached, Detached, None)', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'heatingType', name: 'Heating Type', description: 'Type of heating system in the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'coolingType', name: 'Cooling Type', description: 'Type of cooling/AC system in the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'appliances', name: 'Appliances Included', description: 'List of appliances that come with the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'amenities', name: 'Amenities', description: 'Property amenities and special features', type: 'text', category: 'features', enabled: true, required: false },
+    
+    // Analysis Data
+    { id: 'keyAdvantages', name: 'Key Advantages', description: 'Top 3 advantages for investment purposes', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'keyConcerns', name: 'Key Concerns', description: 'Top 3 concerns or potential issues', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'redFlags', name: 'Red Flags', description: 'Warning signs or serious risk indicators', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'investmentGrade', name: 'Investment Grade', description: 'Overall investment quality grade (A, B, C, D)', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'rentalPotential', name: 'Rental Potential', description: 'Assessment of rental market viability', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'appreciationPotential', name: 'Appreciation Potential', description: 'Long-term property value growth outlook', type: 'text', category: 'analysis', enabled: true, required: false },
+    
+    // Market Analysis
+    { id: 'marketType', name: 'Market Type', description: 'Current market condition (Buyer\'s, Seller\'s, Balanced)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'marketCycle', name: 'Market Cycle', description: 'Current phase of the real estate market cycle', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'inventoryLevel', name: 'Inventory Level', description: 'Current housing inventory level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'demandLevel', name: 'Demand Level', description: 'Current buyer demand level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'jobGrowth', name: 'Job Growth Rate', description: 'Local employment growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'populationGrowth', name: 'Population Growth Rate', description: 'Local population growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'incomeGrowth', name: 'Income Growth Rate', description: 'Local median income growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'unemploymentRate', name: 'Unemployment Rate', description: 'Local unemployment rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'newConstruction', name: 'New Construction Level', description: 'Level of new construction activity in the area', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'infrastructureDev', name: 'Infrastructure Development', description: 'Status of infrastructure development projects', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'commercialDev', name: 'Commercial Development', description: 'Commercial development activity in the area', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'schoolQuality', name: 'School Quality Rating', description: 'Local school quality rating (1-10 scale)', type: 'number', category: 'location', enabled: true, required: false },
+    
+    // Calculated Metrics
+    { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Asking price divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', description: 'Estimated monthly rent divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'propertyAge', name: 'Property Age (Years)', description: 'Current year minus year built', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'bedroomRatio', name: 'Bedroom Ratio', description: 'Bedrooms divided by total rooms (bed+bath)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price divided by annual rent (investment metric)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'capRate', name: 'Cap Rate (%)', description: 'Annual rental income divided by property price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'onePercentRule', name: '1% Rule Ratio', description: 'Monthly rent as percentage of purchase price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', description: 'Purchase price divided by annual rent', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    
+    // Risk Metrics
+    { id: 'vacancyRisk', name: 'Vacancy Risk Score', description: 'Risk of vacancy based on demand and appeal (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', description: 'Risk of high maintenance costs based on age/condition (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'marketRisk', name: 'Market Risk Score', description: 'Risk from market instability and trends (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'overallRiskScore', name: 'Overall Risk Score', description: 'Average of all risk scores (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    
+    // Market Analysis Calculated
+    { id: 'locationPremium', name: 'Location Premium (%)', description: 'Premium/discount based on location score', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'daysOnMarketScore', name: 'Days on Market Score', description: 'Score based on days on market vs. average (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceTrendScore', name: 'Price Trend Score', description: 'Score based on price history and market direction (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
   ];
 }
 
@@ -4239,17 +7118,18 @@ function extractPropertyAnalysisData(responseText) {
     console.warn('⚠️ Large response detected:', responseText.length, 'characters - extraction may be slower');
   }
   
-  // Update analytics
-  extractionAnalytics.totalExtractions++;
-  
-  const analysis = {
-    fullResponse: responseText,
-    fullAnalysis: responseText, // Store full analysis for Excel export
-    extractedData: {},
-    timestamp: Date.now(),
-    errors: [], // Track any errors during extraction
-    warnings: [] // Track any warnings during extraction
-  };
+      // Update analytics
+    extractionAnalytics.totalExtractions++;
+    
+    const analysis = {
+      fullResponse: responseText,
+      fullAnalysis: responseText, // Store full analysis for Excel export
+      extractedData: {},
+      calculatedMetrics: {}, // Store calculated metrics
+      timestamp: Date.now(),
+      errors: [], // Track any errors during extraction
+      warnings: [] // Track any warnings during extraction
+    };
   
   try {
   
@@ -5238,6 +8118,11 @@ function extractPropertyAnalysisData(responseText) {
   console.log('✅ Successfully extracted meaningful property analysis data');
   console.log('✅ Meaningful property data found, analysis ready for save');
   
+  // Calculate comprehensive metrics
+  console.log('🧮 Calculating property metrics...');
+  analysis.calculatedMetrics = calculatePropertyMetrics(analysis.extractedData);
+  console.log(`✅ Calculated ${Object.keys(analysis.calculatedMetrics).length} metrics`);
+  
   // Update analytics for successful extraction
   extractionAnalytics.successfulExtractions++;
   extractionAnalytics.averageExtractionTime = (extractionAnalytics.averageExtractionTime + extractionTime) / 2;
@@ -5272,56 +8157,234 @@ function extractPropertyAnalysisData(responseText) {
   }
 }
 
-// Investment metrics calculation function
-function calculateInvestmentMetrics(data) {
+// Comprehensive calculation engine for property metrics
+function calculatePropertyMetrics(data) {
   const metrics = {};
   
   try {
-    const price = parseFloat((data.price || '').toString().replace(/[\$,]/g, ''));
-    const sqft = parseFloat((data.squareFeet || '').toString().replace(/[\$,]/g, ''));
-    const monthlyRent = parseFloat((data.estimatedRentalIncome || '').toString().replace(/[\$,]/g, ''));
+    // Parse core data fields with better handling
+    const price = parseFloat((data.askingPrice || data.price || '').toString().replace(/[\$,£€¥]/g, ''));
+    const sqft = parseFloat((data.squareFootage || data.squareFeet || '').toString().replace(/[,]/g, ''));
+    const monthlyRent = parseFloat((data.estimatedRent || data.estimatedRentalIncome || '').toString().replace(/[\$,£€¥]/g, ''));
     const yearBuilt = parseInt(data.yearBuilt || 0);
+    const bedrooms = parseInt(data.bedrooms || 0);
+    const bathrooms = parseFloat(data.bathrooms || 0);
+    const locationScore = parseFloat(data.locationScore || 0);
+    const daysOnMarket = parseInt(data.daysOnMarket || 0);
     
-    // Price per square foot
+    console.log('🔢 Calculating metrics from data:', {
+      price, sqft, monthlyRent, yearBuilt, bedrooms, bathrooms, locationScore, daysOnMarket
+    });
+    
+    // Basic Calculations
     if (price > 0 && sqft > 0) {
-      metrics.pricePerSqFt = (price / sqft).toFixed(2);
+      metrics.pricePerSqFt = parseFloat((price / sqft).toFixed(2));
     }
     
-    // Cap Rate (Annual return percentage)
-    if (price > 0 && monthlyRent > 0) {
-      metrics.capRate = (((monthlyRent * 12) / price) * 100).toFixed(2);
+    if (monthlyRent > 0 && sqft > 0) {
+      metrics.rentPerSqFt = parseFloat((monthlyRent / sqft).toFixed(2));
     }
     
-    // 1% Rule (Monthly rent to price ratio)
-    if (price > 0 && monthlyRent > 0) {
-      metrics.onePercentRule = ((monthlyRent / price) * 100).toFixed(2);
-    }
-    
-    // Gross Rent Multiplier
-    if (price > 0 && monthlyRent > 0) {
-      metrics.grossRentMultiplier = (price / (monthlyRent * 12)).toFixed(2);
-    }
-    
-    // Property Age
     if (yearBuilt > 0) {
       metrics.propertyAge = new Date().getFullYear() - yearBuilt;
     }
     
-    // Cash-on-Cash Return (assuming 20% down payment)
-    if (price > 0 && monthlyRent > 0) {
-      const downPayment = price * 0.20;
-      const annualCashFlow = monthlyRent * 12;
-      // Simplified calculation - actual would include mortgage payments, taxes, insurance, etc.
-      metrics.estimatedCashOnCashReturn = ((annualCashFlow / downPayment) * 100).toFixed(2);
+    if (bedrooms > 0 && bathrooms > 0) {
+      metrics.bedroomRatio = parseFloat((bedrooms / (bedrooms + bathrooms)).toFixed(3));
     }
     
-    console.log('📊 Calculated investment metrics:', metrics);
+    // Investment Metrics
+    if (price > 0 && monthlyRent > 0) {
+      metrics.grossRentMultiplier = parseFloat((price / (monthlyRent * 12)).toFixed(2));
+      metrics.capRate = parseFloat((((monthlyRent * 12) / price) * 100).toFixed(2));
+      metrics.onePercentRule = parseFloat(((monthlyRent / price) * 100).toFixed(3));
+      metrics.priceToRentRatio = parseFloat((price / (monthlyRent * 12)).toFixed(2));
+    }
+    
+    // Cash Flow Analysis (simplified assumptions)
+    if (price > 0 && monthlyRent > 0) {
+      const downPayment = price * 0.20; // 20% down
+      const loanAmount = price * 0.80;
+      const monthlyMortgage = calculateMortgagePayment(loanAmount, 0.07, 30); // 7% rate, 30 years
+      const monthlyExpenses = price * 0.001; // Estimated 0.1% of price for expenses
+      
+      metrics.monthlyCashFlow = parseFloat((monthlyRent - monthlyMortgage - monthlyExpenses).toFixed(2));
+      metrics.annualCashFlow = parseFloat((metrics.monthlyCashFlow * 12).toFixed(2));
+      
+      if (downPayment > 0) {
+        metrics.cashOnCashReturn = parseFloat(((metrics.annualCashFlow / downPayment) * 100).toFixed(2));
+      }
+    }
+    
+    // Risk Assessment Scores (1-10 scale)
+    metrics.vacancyRisk = calculateVacancyRisk(data);
+    metrics.maintenanceRisk = calculateMaintenanceRisk(data, yearBuilt);
+    metrics.marketRisk = calculateMarketRisk(data);
+    
+    if (metrics.vacancyRisk && metrics.maintenanceRisk && metrics.marketRisk) {
+      metrics.overallRiskScore = parseFloat(((metrics.vacancyRisk + metrics.maintenanceRisk + metrics.marketRisk) / 3).toFixed(2));
+    }
+    
+    // Market Analysis Calculated Metrics
+    if (locationScore > 0) {
+      metrics.locationPremium = parseFloat(((locationScore - 5) * 2).toFixed(2));
+    }
+    
+    if (daysOnMarket > 0) {
+      metrics.daysOnMarketScore = calculateDOMScore(daysOnMarket);
+    }
+    
+    metrics.priceTrendScore = calculatePriceTrendScore(data);
+    
+    console.log('📊 Calculated comprehensive metrics:', metrics);
     
   } catch (error) {
-    console.warn('Error calculating investment metrics:', error);
+    console.warn('Error calculating property metrics:', error);
   }
   
   return metrics;
+}
+
+// Helper function to calculate mortgage payment
+function calculateMortgagePayment(loanAmount, annualRate, years) {
+  const monthlyRate = annualRate / 12;
+  const numberOfPayments = years * 12;
+  
+  if (monthlyRate === 0) return loanAmount / numberOfPayments;
+  
+  const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
+                        (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
+  
+  return parseFloat(monthlyPayment.toFixed(2));
+}
+
+// Risk assessment functions
+function calculateVacancyRisk(data) {
+  let score = 5; // Default medium risk
+  
+  try {
+    const propertyType = (data.propertyType || '').toLowerCase();
+    const location = (data.neighborhood || data.city || '').toLowerCase();
+    
+    // Adjust based on property type
+    if (propertyType.includes('single family') || propertyType.includes('house')) {
+      score -= 1; // Lower vacancy risk for houses
+    } else if (propertyType.includes('studio') || propertyType.includes('efficiency')) {
+      score += 1; // Higher vacancy risk for studios
+    }
+    
+    // Adjust based on location indicators (simplified)
+    if (location.includes('downtown') || location.includes('university')) {
+      score -= 0.5; // Lower risk in high-demand areas
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating vacancy risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateMaintenanceRisk(data, yearBuilt) {
+  let score = 5; // Default medium risk
+  
+  try {
+    if (yearBuilt > 0) {
+      const age = new Date().getFullYear() - yearBuilt;
+      
+      if (age < 10) {
+        score = 2; // Low maintenance risk for new properties
+      } else if (age < 25) {
+        score = 4; // Moderate risk
+      } else if (age < 50) {
+        score = 6; // Higher risk
+      } else {
+        score = 8; // High risk for old properties
+      }
+    }
+    
+    // Adjust based on property type
+    const propertyType = (data.propertyType || '').toLowerCase();
+    if (propertyType.includes('condo') || propertyType.includes('apartment')) {
+      score -= 1; // Lower maintenance burden
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating maintenance risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateMarketRisk(data) {
+  let score = 5; // Default medium risk
+  
+  try {
+    const marketTrend = (data.marketTrend || '').toLowerCase();
+    
+    if (marketTrend.includes('rising') || marketTrend.includes('stable')) {
+      score -= 1; // Lower risk in stable/rising markets
+    } else if (marketTrend.includes('declining')) {
+      score += 2; // Higher risk in declining markets
+    }
+    
+    // Adjust based on location score if available
+    const locationScore = parseFloat(data.locationScore || 0);
+    if (locationScore > 7) {
+      score -= 1; // Lower risk in good locations
+    } else if (locationScore < 4) {
+      score += 1; // Higher risk in poor locations
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating market risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateDOMScore(daysOnMarket) {
+  // Score based on days on market (1-10, where 10 is best)
+  if (daysOnMarket <= 7) return 10;
+  if (daysOnMarket <= 14) return 9;
+  if (daysOnMarket <= 30) return 8;
+  if (daysOnMarket <= 60) return 6;
+  if (daysOnMarket <= 90) return 4;
+  if (daysOnMarket <= 180) return 2;
+  return 1;
+}
+
+function calculatePriceTrendScore(data) {
+  let score = 5; // Default neutral
+  
+  try {
+    const priceHistory = (data.priceHistory || '').toLowerCase();
+    
+    if (priceHistory.includes('reduced') || priceHistory.includes('lowered')) {
+      score = 3; // Price reductions indicate weaker market position
+    } else if (priceHistory.includes('increased') || priceHistory.includes('raised')) {
+      score = 7; // Price increases indicate strong market position
+    }
+    
+  } catch (error) {
+    console.warn('Error calculating price trend score:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+// Legacy function for backward compatibility
+function calculateInvestmentMetrics(data) {
+  return calculatePropertyMetrics(data);
 }
 
 // Data validation and cleaning function
@@ -7229,14 +10292,14 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Wait for input field to be available
     const inputField = await waitForInputField(5000);
     
-    // Get custom prompt from storage or generate dynamic prompt
+    // Get prompt selection and configuration
     const result = await safeChromeFall(
-      () => chrome.storage.local.get(['customPrompt']),
-      { customPrompt: null }
+      () => chrome.storage.local.get(['customPrompt', 'promptType', 'columnConfiguration']),
+      { customPrompt: null, promptType: 'default', columnConfiguration: null }
     );
     
-    // Use custom prompt if available, otherwise generate dynamic prompt based on column selection
-    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
+    // Use selected prompt type or custom prompt
+    const promptTemplate = await getSelectedPrompt(result.promptType, result.customPrompt, result.columnConfiguration);
 
     // Check if we should use prompt splitting
     const fullPrompt = promptTemplate
