@@ -523,7 +523,7 @@ async function handleTabSwitch(tabId) {
       // Refresh property history when switching to properties tab
       loadPropertyHistory();
       // Check for latest analysis to show at the top
-      checkForLatestAnalysis();
+      await checkForLatestAnalysis();
       // Update enhanced Properties tab
       await refreshPropertyData();
       updatePropertiesStats();
