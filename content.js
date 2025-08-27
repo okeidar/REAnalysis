@@ -459,27 +459,46 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
         
-        <!-- Custom Prompt Settings -->
+        <!-- Prompt Selection Settings -->
         <div class="re-section">
           <div class="re-section-header">
-            <div class="re-section-title">Custom Analysis Prompt</div>
-            <div class="re-section-subtitle">Customize the prompt sent to ChatGPT for property analysis</div>
+            <div class="re-section-title">Analysis Prompt Configuration</div>
+            <div class="re-section-subtitle">Choose and customize the prompt sent to ChatGPT for property analysis</div>
           </div>
           
           <div class="re-form-group">
+            <label class="re-form-label">Prompt Type</label>
+            <select class="re-form-input" id="re-prompt-type-select">
+              <option value="default">Default - Standard Analysis</option>
+              <option value="dynamic">Dynamic - Column-Based</option>
+              <option value="tabular">Tabular - Comprehensive Data Extraction</option>
+              <option value="custom">Custom - User-Defined Template</option>
+            </select>
+            <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
+              Select the type of analysis prompt to use
+            </div>
+          </div>
+
+          <div class="re-form-group" id="re-prompt-description">
+            <div id="re-prompt-desc-content" style="font-size: 12px; color: var(--chatgpt-text-secondary); padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+              Standard real estate investment analysis with basic property data extraction
+            </div>
+          </div>
+          
+          <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
             <label class="re-form-label">Custom Prompt Template</label>
             <textarea id="re-custom-prompt" class="re-form-input" rows="8" 
                       placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
                       style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
             <div style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-top: 4px;">
-              Leave empty to use the default AI-generated prompt. Variables: {PROPERTY_URL}, {DATE}
+              Variables: {PROPERTY_URL}, {DATE}
             </div>
           </div>
           
           <div style="display: flex; gap: 8px; margin-top: 12px;">
             <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt">
               <div>💾</div>
-              <span>Save Prompt</span>
+              <span>Save Settings</span>
             </button>
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-prompt">
               <div>🔄</div>
@@ -501,7 +520,11 @@ class REAnalyzerEmbeddedUI {
           <div style="display: flex; flex-direction: column; gap: 8px;">
             <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
               <div>📄</div>
-              <span>Export All Properties</span>
+              <span>Export All Properties (JSON)</span>
+            </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-csv">
+              <div>📊</div>
+              <span>Export to CSV (Comprehensive)</span>
             </button>
             <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
               <div>🧪</div>
@@ -944,11 +967,16 @@ class REAnalyzerEmbeddedUI {
 
     // Action buttons
     const exportBtn = this.panel.querySelector('#re-export-all');
+    const exportCsvBtn = this.panel.querySelector('#re-export-csv');
     const testBtn = this.panel.querySelector('#re-test-analysis');
     const clearBtn = this.panel.querySelector('#re-clear-data');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.exportAllProperties());
+    }
+
+    if (exportCsvBtn) {
+      exportCsvBtn.addEventListener('click', () => this.exportPropertiesToCSV());
     }
 
     if (testBtn) {
@@ -1705,19 +1733,22 @@ class REAnalyzerEmbeddedUI {
         return;
       }
       
-      // Create comprehensive export data
+      // Create comprehensive export data with calculated metrics
       const exportData = {
         exportDate: new Date().toISOString(),
         totalProperties: properties.length,
         analyzedCount: properties.filter(p => p.analysis && p.analysis.extractedData).length,
+        calculatedMetricsCount: properties.filter(p => p.analysis && p.analysis.calculatedMetrics).length,
         properties: properties.map(property => ({
           url: property.url,
           domain: property.domain,
           date: property.date,
           timestamp: property.timestamp,
           extractedData: property.analysis?.extractedData || {},
+          calculatedMetrics: property.analysis?.calculatedMetrics || {},
           fullAnalysis: property.analysis?.fullResponse || property.analysis?.fullAnalysis || 'No analysis available',
-          hasAnalysis: !!(property.analysis && property.analysis.extractedData)
+          hasAnalysis: !!(property.analysis && property.analysis.extractedData),
+          hasCalculatedMetrics: !!(property.analysis && property.analysis.calculatedMetrics)
         }))
       };
       
@@ -1733,11 +1764,101 @@ class REAnalyzerEmbeddedUI {
       link.click();
       document.body.removeChild(link);
       
-      this.showChatGPTMessage('success', `Exported ${properties.length} properties successfully!`);
+      const metricsCount = properties.filter(p => p.analysis && p.analysis.calculatedMetrics).length;
+      this.showChatGPTMessage('success', `Exported ${properties.length} properties with ${metricsCount} having calculated metrics!`);
       
     } catch (error) {
       console.error('❌ Failed to export all properties:', error);
       this.showChatGPTMessage('error', 'Failed to export properties');
+    }
+  }
+
+  async exportPropertiesToCSV() {
+    try {
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Get comprehensive column set for tabular data
+      const columns = getTabularDataColumns();
+      
+      // Create CSV headers
+      const headers = [
+        'URL',
+        'Domain', 
+        'Analysis Date',
+        ...columns.map(col => col.name)
+      ];
+      
+      // Create CSV rows
+      const rows = [headers];
+      
+      properties.forEach(property => {
+        if (property.analysis) {
+          const row = [
+            property.url || '',
+            property.domain || '',
+            property.date || ''
+          ];
+          
+          // Add extracted data columns
+          columns.forEach(col => {
+            let value = '';
+            
+            if (col.isCalculated) {
+              // Get from calculated metrics
+              value = property.analysis.calculatedMetrics?.[col.id] || '';
+            } else {
+              // Get from extracted data
+              value = property.analysis.extractedData?.[col.id] || '';
+            }
+            
+            // Format value for CSV
+            if (typeof value === 'number') {
+              value = value.toString();
+            } else if (typeof value === 'string') {
+              // Escape commas and quotes for CSV
+              if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                value = `"${value.replace(/"/g, '""')}"`;
+              }
+            }
+            
+            row.push(value);
+          });
+          
+          rows.push(row);
+        }
+      });
+      
+      // Convert to CSV string
+      const csvContent = rows.map(row => row.join(',')).join('\n');
+      
+      // Create and download file
+      const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `property-analysis-comprehensive-${Date.now()}.csv`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      this.showChatGPTMessage('success', `Exported ${analyzedCount} analyzed properties to CSV with ${columns.length} columns!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export properties to CSV:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties to CSV');
     }
   }
 
@@ -3157,103 +3278,188 @@ Or enter your own property URL:`);
     const savePromptBtn = this.panel.querySelector('#re-save-prompt');
     const resetPromptBtn = this.panel.querySelector('#re-reset-prompt');
     const previewPromptBtn = this.panel.querySelector('#re-preview-prompt');
+    const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+    const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
+    const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
     
-    // Load existing custom prompt
-    this.loadCustomPrompt();
+    // Load existing settings
+    this.loadPromptSettings();
+    
+    // Prompt type selection handler
+    if (promptTypeSelect) {
+      promptTypeSelect.addEventListener('change', (e) => {
+        this.handlePromptTypeChange(e.target.value);
+      });
+    }
     
     if (savePromptBtn) {
-      savePromptBtn.addEventListener('click', () => this.saveCustomPrompt());
+      savePromptBtn.addEventListener('click', () => this.savePromptSettings());
     }
     
     if (resetPromptBtn) {
-      resetPromptBtn.addEventListener('click', () => this.resetCustomPrompt());
+      resetPromptBtn.addEventListener('click', () => this.resetPromptSettings());
     }
     
     if (previewPromptBtn) {
-      previewPromptBtn.addEventListener('click', () => this.previewCustomPrompt());
+      previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
   }
   
-  async loadCustomPrompt() {
+  async loadPromptSettings() {
     try {
       const result = await safeChromeFall(
-        () => chrome.storage.local.get(['customPrompt']),
-        { customPrompt: null }
+        () => chrome.storage.local.get(['customPrompt', 'promptType']),
+        { customPrompt: null, promptType: 'default' }
       );
       
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
       const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      // Set prompt type
+      if (promptTypeSelect) {
+        promptTypeSelect.value = result.promptType || 'default';
+      }
+      
+      // Set custom prompt content
       if (customPromptTextarea && result.customPrompt) {
         customPromptTextarea.value = result.customPrompt;
       }
+      
+      // Update UI based on prompt type
+      this.handlePromptTypeChange(result.promptType || 'default');
+      
     } catch (error) {
-      console.error('Failed to load custom prompt:', error);
+      console.error('Failed to load prompt settings:', error);
     }
   }
+
+  handlePromptTypeChange(promptType) {
+    const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
+    const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
+    
+    // Show/hide custom prompt textarea
+    if (customPromptGroup) {
+      customPromptGroup.style.display = promptType === 'custom' ? 'block' : 'none';
+    }
+    
+    // Update description
+    if (promptDescContent) {
+      const descriptions = {
+        'default': 'Standard real estate investment analysis with basic property data extraction',
+        'dynamic': 'Adaptive prompt that generates based on your selected column configuration',
+        'tabular': 'Comprehensive data extraction with 50+ property metrics, calculations, and risk assessments for detailed spreadsheet analysis',
+        'custom': 'Use your own custom prompt template with full control over analysis structure'
+      };
+      
+      promptDescContent.textContent = descriptions[promptType] || descriptions.default;
+    }
+  }
+
+  async loadCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.loadPromptSettings();
+  }
   
-  async saveCustomPrompt() {
-    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-    if (!customPromptTextarea) return;
-    
-    const promptText = customPromptTextarea.value.trim();
-    
+  async savePromptSettings() {
     try {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
+      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
+      
       await safeChromeFall(
-        () => chrome.storage.local.set({ customPrompt: promptText || null }),
+        () => chrome.storage.local.set({ 
+          promptType: promptType,
+          customPrompt: customPrompt || null 
+        }),
         null
       );
       
-      this.showChatGPTMessage('success', 'Custom prompt saved successfully!');
-      console.log('💾 Custom prompt saved');
+      this.showChatGPTMessage('success', 'Prompt settings saved successfully!');
+      console.log('💾 Prompt settings saved:', { promptType, hasCustomPrompt: !!customPrompt });
     } catch (error) {
-      console.error('Failed to save custom prompt:', error);
-      this.showChatGPTMessage('error', 'Failed to save custom prompt');
+      console.error('Failed to save prompt settings:', error);
+      this.showChatGPTMessage('error', 'Failed to save prompt settings');
     }
   }
+
+  async saveCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.savePromptSettings();
+  }
   
-  async resetCustomPrompt() {
-    if (confirm('Are you sure you want to reset the custom prompt to default?')) {
+  async resetPromptSettings() {
+    if (confirm('Are you sure you want to reset all prompt settings to default?')) {
       try {
         await safeChromeFall(
-          () => chrome.storage.local.remove(['customPrompt']),
+          () => chrome.storage.local.remove(['customPrompt', 'promptType']),
           null
         );
         
+        const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
         const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+        
+        if (promptTypeSelect) {
+          promptTypeSelect.value = 'default';
+        }
+        
         if (customPromptTextarea) {
           customPromptTextarea.value = '';
         }
         
-        this.showChatGPTMessage('success', 'Custom prompt reset to default');
-        console.log('🔄 Custom prompt reset');
+        this.handlePromptTypeChange('default');
+        
+        this.showChatGPTMessage('success', 'Prompt settings reset to default');
+        console.log('🔄 Prompt settings reset');
       } catch (error) {
-        console.error('Failed to reset custom prompt:', error);
-        this.showChatGPTMessage('error', 'Failed to reset custom prompt');
+        console.error('Failed to reset prompt settings:', error);
+        this.showChatGPTMessage('error', 'Failed to reset prompt settings');
       }
     }
   }
-  
-  previewCustomPrompt() {
-    const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-    if (!customPromptTextarea) return;
-    
-    const promptText = customPromptTextarea.value.trim();
-    
-    if (!promptText) {
-      this.showChatGPTMessage('warning', 'No custom prompt to preview. The default AI-generated prompt will be used.');
-      return;
-    }
-    
-    // Show preview with example data
-    const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
-    const previewText = promptText
-      .replace('{PROPERTY_URL}', exampleUrl)
-      .replace('{DATE}', new Date().toLocaleDateString());
-    
-    // Create and show preview modal
-    this.showPromptPreviewModal(previewText);
+
+  async resetCustomPrompt() {
+    // This method is kept for backward compatibility
+    await this.resetPromptSettings();
   }
   
-  showPromptPreviewModal(previewText) {
+  async previewPrompt() {
+    try {
+      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
+      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
+      
+      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
+      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
+      
+      // Get the actual prompt that would be used
+      const promptTemplate = await getSelectedPrompt(promptType, customPrompt, null);
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'No prompt to preview');
+        return;
+      }
+      
+      // Show preview with example data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Create and show preview modal with prompt type info
+      this.showPromptPreviewModal(previewText, promptType);
+    } catch (error) {
+      console.error('Failed to preview prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to generate prompt preview');
+    }
+  }
+
+  previewCustomPrompt() {
+    // This method is kept for backward compatibility
+    this.previewPrompt();
+  }
+  
+  showPromptPreviewModal(previewText, promptType = 'custom') {
     // Remove existing modal if any
     const existingModal = document.querySelector('#re-prompt-preview-modal');
     if (existingModal) {
@@ -3270,7 +3476,11 @@ Or enter your own property URL:`);
           <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
         </div>
         <div class="re-modal-content">
-          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your custom prompt will appear when sent to ChatGPT:</p>
+          <div style="margin-bottom: 16px; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+            <strong>Prompt Type:</strong> ${promptType.toUpperCase()}<br>
+            <strong>Length:</strong> ${previewText.length} characters
+          </div>
+          <p style="margin-bottom: 16px; color: var(--chatgpt-text-secondary);">This is how your ${promptType} prompt will appear when sent to ChatGPT:</p>
           <div class="re-analysis-text" style="max-height: 400px;">
             ${previewText.replace(/\n/g, '<br>')}
           </div>
@@ -3827,11 +4037,13 @@ async function handleSplittingFallback() {
     }
     
     // Get the original prompt template  
+    // Get prompt selection and configuration
     const result = await safeChromeFall(
-      () => chrome.storage.local.get(['customPrompt']),
-      { customPrompt: null }
+      () => chrome.storage.local.get(['customPrompt', 'promptType', 'columnConfiguration']),
+      { customPrompt: null, promptType: 'default', columnConfiguration: null }
     );
-    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
+    
+    const promptTemplate = await getSelectedPrompt(result.promptType, result.customPrompt, result.columnConfiguration);
     
     // Create the full prompt with link
     const fullPrompt = promptTemplate
@@ -3939,6 +4151,142 @@ Focus on data accuracy and practical investment considerations that would be val
 Property Link: {PROPERTY_URL}`;
 }
 
+// Third prompt: Tabular Data Extraction Template
+function getTabularDataExtractionPrompt() {
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+**BASIC PROPERTY INFORMATION:**
+1. Property Address: Extract the complete street address
+2. Asking Price: Extract the exact asking price (include currency symbol)
+3. Property Type: Classify as House, Apartment, Condo, Townhouse, etc.
+4. Bedrooms: Number of bedrooms (numeric only)
+5. Bathrooms: Number of bathrooms (include half baths as .5)
+6. Square Footage: Total square footage (numeric only)
+7. Year Built: Construction year (4-digit year)
+8. Lot Size: Lot size in square feet (if available)
+9. Neighborhood: Property neighborhood or area name
+10. City: City name
+11. State: State name
+12. ZIP Code: ZIP code (if available)
+
+**MARKET DATA:**
+13. Estimated Monthly Rent: Your professional estimate based on local market rates
+14. Location Score: Rate location quality 1-10 (consider schools, safety, amenities, transportation)
+15. Market Trend: Current market direction (Rising, Stable, Declining)
+16. Days on Market: Number of days listed (if available)
+17. Price History: Any price changes (if available)
+
+**PROPERTY FEATURES:**
+18. Parking Spaces: Number of parking spaces
+19. Garage Type: Attached, Detached, None
+20. Heating Type: Type of heating system
+21. Cooling Type: Type of cooling system
+22. Appliances Included: List of included appliances
+23. Amenities: Property amenities and features
+
+**INVESTMENT ANALYSIS:**
+24. Key Advantages: Top 3 property advantages for investment
+25. Key Concerns: Top 3 property limitations or concerns
+26. Red Flags: Any warning signs or risk indicators
+27. Investment Grade: Overall investment grade (A, B, C, D)
+28. Rental Potential: Rental market assessment
+29. Appreciation Potential: Long-term appreciation outlook
+
+**MARKET ANALYSIS:**
+30. Market Type: Buyer's market, Seller's market, or Balanced
+31. Market Cycle: Current market cycle phase
+32. Inventory Level: Current inventory level (Low, Medium, High)
+33. Demand Level: Current demand level (Low, Medium, High)
+34. Job Growth Rate: Local job growth percentage
+35. Population Growth Rate: Local population growth percentage
+36. Income Growth Rate: Local income growth percentage
+37. Unemployment Rate: Local unemployment rate
+38. New Construction Level: Level of new construction activity
+39. Infrastructure Development: Infrastructure development status
+40. Commercial Development: Commercial development activity
+41. School Quality Rating: Local school quality (1-10)
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**CALCULATION INSTRUCTIONS:**
+For the following calculated metrics, provide the calculation steps:
+
+**Basic Calculations:**
+- Price per Square Foot = Asking Price ÷ Square Footage
+- Rent per Square Foot = Estimated Monthly Rent ÷ Square Footage
+- Property Age = Current Year - Year Built
+- Bedroom Ratio = Bedrooms ÷ (Bedrooms + Bathrooms)
+
+**Investment Metrics:**
+- Gross Rent Multiplier = Asking Price ÷ (Estimated Monthly Rent × 12)
+- Cap Rate = (Estimated Monthly Rent × 12) ÷ Asking Price × 100
+- 1% Rule Ratio = Estimated Monthly Rent ÷ Asking Price × 100
+- Price-to-Rent Ratio = Asking Price ÷ (Estimated Monthly Rent × 12)
+
+**Risk Assessment:**
+- Vacancy Risk Score: 1-10 based on market demand and property appeal
+- Maintenance Risk Score: 1-10 based on property age and condition
+- Market Risk Score: 1-10 based on market stability and trends
+- Overall Risk Score = (Vacancy Risk + Maintenance Risk + Market Risk) ÷ 3
+
+**Market Analysis:**
+- Location Premium = (Location Score - 5) × 2
+- Days on Market Score: 1-10 based on DOM relative to market average
+- Price Trend Score: 1-10 based on price history and market direction
+
+**OUTPUT FORMAT:**
+Please provide your analysis in the following structured format:
+
+**PROPERTY DATA SUMMARY:**
+[Extract all requested data points with clear labels]
+
+**CALCULATED METRICS:**
+[Provide all calculated metrics with formulas shown]
+
+**RISK ASSESSMENT:**
+[Provide risk scores with justification]
+
+**MARKET ANALYSIS:**
+[Provide market analysis data with supporting information]
+
+**INVESTMENT RECOMMENDATION:**
+[Overall investment assessment with key factors]
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+}
+
+// Function to get the selected prompt based on user preference
+async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
+  try {
+    switch (promptType) {
+      case 'tabular':
+        return getTabularDataExtractionPrompt();
+      case 'dynamic':
+        return await generateDynamicPrompt();
+      case 'custom':
+        return customPrompt || getDefaultPromptTemplate();
+      case 'default':
+      default:
+        // Check if user has custom prompt set, otherwise use dynamic
+        return customPrompt || await generateDynamicPrompt();
+    }
+  } catch (error) {
+    console.error('Error selecting prompt:', error);
+    return getDefaultPromptTemplate();
+  }
+}
+
 // Dynamic prompt generation based on user's column selection
 async function generateDynamicPrompt() {
   try {
@@ -4002,6 +4350,83 @@ function getDefaultColumns() {
     { id: 'price', name: 'Property Price', category: 'core', enabled: true },
     { id: 'bedrooms', name: 'Number of Bedrooms', category: 'core', enabled: true },
     { id: 'propertyType', name: 'Type of Property', category: 'core', enabled: true }
+  ];
+}
+
+// Comprehensive column set for tabular data extraction
+function getTabularDataColumns() {
+  return [
+    // Basic Property Information
+    { id: 'propertyAddress', name: 'Property Address', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'askingPrice', name: 'Asking Price', type: 'currency', category: 'core', enabled: true, required: true },
+    { id: 'propertyType', name: 'Property Type', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'bedrooms', name: 'Bedrooms', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'bathrooms', name: 'Bathrooms', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'squareFootage', name: 'Square Footage', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'yearBuilt', name: 'Year Built', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'lotSize', name: 'Lot Size (sq ft)', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'neighborhood', name: 'Neighborhood', type: 'text', category: 'location', enabled: true, required: false },
+    { id: 'city', name: 'City', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'state', name: 'State', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'zipCode', name: 'ZIP Code', type: 'text', category: 'location', enabled: true, required: false },
+    
+    // Market Data
+    { id: 'estimatedRent', name: 'Estimated Monthly Rent', type: 'currency', category: 'financial', enabled: true, required: false },
+    { id: 'locationScore', name: 'Location Score (1-10)', type: 'number', category: 'scoring', enabled: true, required: false },
+    { id: 'marketTrend', name: 'Market Trend', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'daysOnMarket', name: 'Days on Market', type: 'number', category: 'market', enabled: true, required: false },
+    { id: 'priceHistory', name: 'Price History', type: 'text', category: 'market', enabled: true, required: false },
+    
+    // Property Features
+    { id: 'parkingSpaces', name: 'Parking Spaces', type: 'number', category: 'features', enabled: true, required: false },
+    { id: 'garageType', name: 'Garage Type', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'heatingType', name: 'Heating Type', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'coolingType', name: 'Cooling Type', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'appliances', name: 'Appliances Included', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'amenities', name: 'Amenities', type: 'text', category: 'features', enabled: true, required: false },
+    
+    // Analysis Data
+    { id: 'keyAdvantages', name: 'Key Advantages', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'keyConcerns', name: 'Key Concerns', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'redFlags', name: 'Red Flags', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'investmentGrade', name: 'Investment Grade', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'rentalPotential', name: 'Rental Potential', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'appreciationPotential', name: 'Appreciation Potential', type: 'text', category: 'analysis', enabled: true, required: false },
+    
+    // Market Analysis
+    { id: 'marketType', name: 'Market Type', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'marketCycle', name: 'Market Cycle', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'inventoryLevel', name: 'Inventory Level', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'demandLevel', name: 'Demand Level', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'jobGrowth', name: 'Job Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'populationGrowth', name: 'Population Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'incomeGrowth', name: 'Income Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'unemploymentRate', name: 'Unemployment Rate', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'newConstruction', name: 'New Construction Level', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'infrastructureDev', name: 'Infrastructure Development', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'commercialDev', name: 'Commercial Development', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'schoolQuality', name: 'School Quality Rating', type: 'number', category: 'location', enabled: true, required: false },
+    
+    // Calculated Metrics
+    { id: 'pricePerSqFt', name: 'Price per Sq Ft', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'propertyAge', name: 'Property Age (Years)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'bedroomRatio', name: 'Bedroom Ratio', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'capRate', name: 'Cap Rate (%)', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'onePercentRule', name: '1% Rule Ratio', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    
+    // Risk Metrics
+    { id: 'vacancyRisk', name: 'Vacancy Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'marketRisk', name: 'Market Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'overallRiskScore', name: 'Overall Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    
+    // Market Analysis Calculated
+    { id: 'locationPremium', name: 'Location Premium (%)', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'daysOnMarketScore', name: 'Days on Market Score', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceTrendScore', name: 'Price Trend Score', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
   ];
 }
 
@@ -4239,17 +4664,18 @@ function extractPropertyAnalysisData(responseText) {
     console.warn('⚠️ Large response detected:', responseText.length, 'characters - extraction may be slower');
   }
   
-  // Update analytics
-  extractionAnalytics.totalExtractions++;
-  
-  const analysis = {
-    fullResponse: responseText,
-    fullAnalysis: responseText, // Store full analysis for Excel export
-    extractedData: {},
-    timestamp: Date.now(),
-    errors: [], // Track any errors during extraction
-    warnings: [] // Track any warnings during extraction
-  };
+      // Update analytics
+    extractionAnalytics.totalExtractions++;
+    
+    const analysis = {
+      fullResponse: responseText,
+      fullAnalysis: responseText, // Store full analysis for Excel export
+      extractedData: {},
+      calculatedMetrics: {}, // Store calculated metrics
+      timestamp: Date.now(),
+      errors: [], // Track any errors during extraction
+      warnings: [] // Track any warnings during extraction
+    };
   
   try {
   
@@ -5238,6 +5664,11 @@ function extractPropertyAnalysisData(responseText) {
   console.log('✅ Successfully extracted meaningful property analysis data');
   console.log('✅ Meaningful property data found, analysis ready for save');
   
+  // Calculate comprehensive metrics
+  console.log('🧮 Calculating property metrics...');
+  analysis.calculatedMetrics = calculatePropertyMetrics(analysis.extractedData);
+  console.log(`✅ Calculated ${Object.keys(analysis.calculatedMetrics).length} metrics`);
+  
   // Update analytics for successful extraction
   extractionAnalytics.successfulExtractions++;
   extractionAnalytics.averageExtractionTime = (extractionAnalytics.averageExtractionTime + extractionTime) / 2;
@@ -5272,56 +5703,234 @@ function extractPropertyAnalysisData(responseText) {
   }
 }
 
-// Investment metrics calculation function
-function calculateInvestmentMetrics(data) {
+// Comprehensive calculation engine for property metrics
+function calculatePropertyMetrics(data) {
   const metrics = {};
   
   try {
-    const price = parseFloat((data.price || '').toString().replace(/[\$,]/g, ''));
-    const sqft = parseFloat((data.squareFeet || '').toString().replace(/[\$,]/g, ''));
-    const monthlyRent = parseFloat((data.estimatedRentalIncome || '').toString().replace(/[\$,]/g, ''));
+    // Parse core data fields with better handling
+    const price = parseFloat((data.askingPrice || data.price || '').toString().replace(/[\$,£€¥]/g, ''));
+    const sqft = parseFloat((data.squareFootage || data.squareFeet || '').toString().replace(/[,]/g, ''));
+    const monthlyRent = parseFloat((data.estimatedRent || data.estimatedRentalIncome || '').toString().replace(/[\$,£€¥]/g, ''));
     const yearBuilt = parseInt(data.yearBuilt || 0);
+    const bedrooms = parseInt(data.bedrooms || 0);
+    const bathrooms = parseFloat(data.bathrooms || 0);
+    const locationScore = parseFloat(data.locationScore || 0);
+    const daysOnMarket = parseInt(data.daysOnMarket || 0);
     
-    // Price per square foot
+    console.log('🔢 Calculating metrics from data:', {
+      price, sqft, monthlyRent, yearBuilt, bedrooms, bathrooms, locationScore, daysOnMarket
+    });
+    
+    // Basic Calculations
     if (price > 0 && sqft > 0) {
-      metrics.pricePerSqFt = (price / sqft).toFixed(2);
+      metrics.pricePerSqFt = parseFloat((price / sqft).toFixed(2));
     }
     
-    // Cap Rate (Annual return percentage)
-    if (price > 0 && monthlyRent > 0) {
-      metrics.capRate = (((monthlyRent * 12) / price) * 100).toFixed(2);
+    if (monthlyRent > 0 && sqft > 0) {
+      metrics.rentPerSqFt = parseFloat((monthlyRent / sqft).toFixed(2));
     }
     
-    // 1% Rule (Monthly rent to price ratio)
-    if (price > 0 && monthlyRent > 0) {
-      metrics.onePercentRule = ((monthlyRent / price) * 100).toFixed(2);
-    }
-    
-    // Gross Rent Multiplier
-    if (price > 0 && monthlyRent > 0) {
-      metrics.grossRentMultiplier = (price / (monthlyRent * 12)).toFixed(2);
-    }
-    
-    // Property Age
     if (yearBuilt > 0) {
       metrics.propertyAge = new Date().getFullYear() - yearBuilt;
     }
     
-    // Cash-on-Cash Return (assuming 20% down payment)
-    if (price > 0 && monthlyRent > 0) {
-      const downPayment = price * 0.20;
-      const annualCashFlow = monthlyRent * 12;
-      // Simplified calculation - actual would include mortgage payments, taxes, insurance, etc.
-      metrics.estimatedCashOnCashReturn = ((annualCashFlow / downPayment) * 100).toFixed(2);
+    if (bedrooms > 0 && bathrooms > 0) {
+      metrics.bedroomRatio = parseFloat((bedrooms / (bedrooms + bathrooms)).toFixed(3));
     }
     
-    console.log('📊 Calculated investment metrics:', metrics);
+    // Investment Metrics
+    if (price > 0 && monthlyRent > 0) {
+      metrics.grossRentMultiplier = parseFloat((price / (monthlyRent * 12)).toFixed(2));
+      metrics.capRate = parseFloat((((monthlyRent * 12) / price) * 100).toFixed(2));
+      metrics.onePercentRule = parseFloat(((monthlyRent / price) * 100).toFixed(3));
+      metrics.priceToRentRatio = parseFloat((price / (monthlyRent * 12)).toFixed(2));
+    }
+    
+    // Cash Flow Analysis (simplified assumptions)
+    if (price > 0 && monthlyRent > 0) {
+      const downPayment = price * 0.20; // 20% down
+      const loanAmount = price * 0.80;
+      const monthlyMortgage = calculateMortgagePayment(loanAmount, 0.07, 30); // 7% rate, 30 years
+      const monthlyExpenses = price * 0.001; // Estimated 0.1% of price for expenses
+      
+      metrics.monthlyCashFlow = parseFloat((monthlyRent - monthlyMortgage - monthlyExpenses).toFixed(2));
+      metrics.annualCashFlow = parseFloat((metrics.monthlyCashFlow * 12).toFixed(2));
+      
+      if (downPayment > 0) {
+        metrics.cashOnCashReturn = parseFloat(((metrics.annualCashFlow / downPayment) * 100).toFixed(2));
+      }
+    }
+    
+    // Risk Assessment Scores (1-10 scale)
+    metrics.vacancyRisk = calculateVacancyRisk(data);
+    metrics.maintenanceRisk = calculateMaintenanceRisk(data, yearBuilt);
+    metrics.marketRisk = calculateMarketRisk(data);
+    
+    if (metrics.vacancyRisk && metrics.maintenanceRisk && metrics.marketRisk) {
+      metrics.overallRiskScore = parseFloat(((metrics.vacancyRisk + metrics.maintenanceRisk + metrics.marketRisk) / 3).toFixed(2));
+    }
+    
+    // Market Analysis Calculated Metrics
+    if (locationScore > 0) {
+      metrics.locationPremium = parseFloat(((locationScore - 5) * 2).toFixed(2));
+    }
+    
+    if (daysOnMarket > 0) {
+      metrics.daysOnMarketScore = calculateDOMScore(daysOnMarket);
+    }
+    
+    metrics.priceTrendScore = calculatePriceTrendScore(data);
+    
+    console.log('📊 Calculated comprehensive metrics:', metrics);
     
   } catch (error) {
-    console.warn('Error calculating investment metrics:', error);
+    console.warn('Error calculating property metrics:', error);
   }
   
   return metrics;
+}
+
+// Helper function to calculate mortgage payment
+function calculateMortgagePayment(loanAmount, annualRate, years) {
+  const monthlyRate = annualRate / 12;
+  const numberOfPayments = years * 12;
+  
+  if (monthlyRate === 0) return loanAmount / numberOfPayments;
+  
+  const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
+                        (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
+  
+  return parseFloat(monthlyPayment.toFixed(2));
+}
+
+// Risk assessment functions
+function calculateVacancyRisk(data) {
+  let score = 5; // Default medium risk
+  
+  try {
+    const propertyType = (data.propertyType || '').toLowerCase();
+    const location = (data.neighborhood || data.city || '').toLowerCase();
+    
+    // Adjust based on property type
+    if (propertyType.includes('single family') || propertyType.includes('house')) {
+      score -= 1; // Lower vacancy risk for houses
+    } else if (propertyType.includes('studio') || propertyType.includes('efficiency')) {
+      score += 1; // Higher vacancy risk for studios
+    }
+    
+    // Adjust based on location indicators (simplified)
+    if (location.includes('downtown') || location.includes('university')) {
+      score -= 0.5; // Lower risk in high-demand areas
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating vacancy risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateMaintenanceRisk(data, yearBuilt) {
+  let score = 5; // Default medium risk
+  
+  try {
+    if (yearBuilt > 0) {
+      const age = new Date().getFullYear() - yearBuilt;
+      
+      if (age < 10) {
+        score = 2; // Low maintenance risk for new properties
+      } else if (age < 25) {
+        score = 4; // Moderate risk
+      } else if (age < 50) {
+        score = 6; // Higher risk
+      } else {
+        score = 8; // High risk for old properties
+      }
+    }
+    
+    // Adjust based on property type
+    const propertyType = (data.propertyType || '').toLowerCase();
+    if (propertyType.includes('condo') || propertyType.includes('apartment')) {
+      score -= 1; // Lower maintenance burden
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating maintenance risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateMarketRisk(data) {
+  let score = 5; // Default medium risk
+  
+  try {
+    const marketTrend = (data.marketTrend || '').toLowerCase();
+    
+    if (marketTrend.includes('rising') || marketTrend.includes('stable')) {
+      score -= 1; // Lower risk in stable/rising markets
+    } else if (marketTrend.includes('declining')) {
+      score += 2; // Higher risk in declining markets
+    }
+    
+    // Adjust based on location score if available
+    const locationScore = parseFloat(data.locationScore || 0);
+    if (locationScore > 7) {
+      score -= 1; // Lower risk in good locations
+    } else if (locationScore < 4) {
+      score += 1; // Higher risk in poor locations
+    }
+    
+    // Ensure score stays within 1-10 range
+    score = Math.max(1, Math.min(10, score));
+    
+  } catch (error) {
+    console.warn('Error calculating market risk:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+function calculateDOMScore(daysOnMarket) {
+  // Score based on days on market (1-10, where 10 is best)
+  if (daysOnMarket <= 7) return 10;
+  if (daysOnMarket <= 14) return 9;
+  if (daysOnMarket <= 30) return 8;
+  if (daysOnMarket <= 60) return 6;
+  if (daysOnMarket <= 90) return 4;
+  if (daysOnMarket <= 180) return 2;
+  return 1;
+}
+
+function calculatePriceTrendScore(data) {
+  let score = 5; // Default neutral
+  
+  try {
+    const priceHistory = (data.priceHistory || '').toLowerCase();
+    
+    if (priceHistory.includes('reduced') || priceHistory.includes('lowered')) {
+      score = 3; // Price reductions indicate weaker market position
+    } else if (priceHistory.includes('increased') || priceHistory.includes('raised')) {
+      score = 7; // Price increases indicate strong market position
+    }
+    
+  } catch (error) {
+    console.warn('Error calculating price trend score:', error);
+  }
+  
+  return parseFloat(score.toFixed(1));
+}
+
+// Legacy function for backward compatibility
+function calculateInvestmentMetrics(data) {
+  return calculatePropertyMetrics(data);
 }
 
 // Data validation and cleaning function
@@ -7229,14 +7838,14 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     // Wait for input field to be available
     const inputField = await waitForInputField(5000);
     
-    // Get custom prompt from storage or generate dynamic prompt
+    // Get prompt selection and configuration
     const result = await safeChromeFall(
-      () => chrome.storage.local.get(['customPrompt']),
-      { customPrompt: null }
+      () => chrome.storage.local.get(['customPrompt', 'promptType', 'columnConfiguration']),
+      { customPrompt: null, promptType: 'default', columnConfiguration: null }
     );
     
-    // Use custom prompt if available, otherwise generate dynamic prompt based on column selection
-    const promptTemplate = result.customPrompt || await generateDynamicPrompt();
+    // Use selected prompt type or custom prompt
+    const promptTemplate = await getSelectedPrompt(result.promptType, result.customPrompt, result.columnConfiguration);
 
     // Check if we should use prompt splitting
     const fullPrompt = promptTemplate
