@@ -1782,6 +1782,15 @@ Or enter your own property URL:`);
         'mercadolibre.com', 'olx.com', 'trovit.com', 'mitula.com',
         'kyero.com', 'thinkspain.com', 'greekpropertyportal.com',
         
+        // Israeli platforms
+        'yad2.co.il', 'madlan.co.il',
+        
+        // Greek platforms
+        'spitogatos.gr', 'green-acres.gr',
+        
+        // Cyprus platforms
+        'zyprus.com', 'bazaraki.com',
+        
         // Regional/Local platforms
         'mls.com', 'mlslistings.com', 'paragonrels.com', 'northstarmlscom',
         'matrix.neren.com', 'flexmls.com', 'carets.com', 'listhub.com',
