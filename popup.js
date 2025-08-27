@@ -696,6 +696,16 @@ function displayPropertyHistory(history) {
     propertyCount.textContent = `${history.length}`;
   }
   
+  // Hide "Get Started" section after 3 properties analyzed
+  const workflowGuideSection = document.getElementById('workflowGuideSection');
+  if (workflowGuideSection) {
+    if (history.length >= 3) {
+      workflowGuideSection.style.display = 'none';
+    } else {
+      workflowGuideSection.style.display = 'block';
+    }
+  }
+  
   if (history.length === 0) {
     propertyHistoryList.innerHTML = `
       <div class="empty-state">
@@ -3710,6 +3720,12 @@ function initializeCategoryUI() {
     manageCategoriesBtn.addEventListener('click', openCategoryManagementModal);
   }
   
+  // Set up export all categories button
+  const exportAllCategoriesBtn = document.getElementById('exportAllCategoriesBtn');
+  if (exportAllCategoriesBtn) {
+    exportAllCategoriesBtn.addEventListener('click', exportAllCategoriesToWord);
+  }
+  
   // Set up category filter
   if (categoryFilter) {
     categoryFilter.addEventListener('change', (e) => {
@@ -4066,6 +4082,11 @@ async function renderCategoryGrid() {
         </div>
         <p class="category-description">${category.description}</p>
         <div class="category-actions">
+          ${propertyCount > 0 ? `
+            <button class="btn btn-ghost btn-sm" data-action="export-category" data-category-id="${category.id}" title="Export to Word">
+              📄
+            </button>
+          ` : ''}
           <button class="btn btn-ghost btn-sm" data-action="edit-category" data-category-id="${category.id}" title="Edit">
             ✏️
           </button>
@@ -4126,8 +4147,94 @@ function setupCategoryCardEventListeners() {
     } else if (action === 'delete-category') {
       event.stopPropagation();
       deleteCategory(categoryId);
+    } else if (action === 'export-category') {
+      event.stopPropagation();
+      exportCategoryToWord(categoryId);
     }
   });
+}
+
+// Export category to Word
+async function exportCategoryToWord(categoryId) {
+  try {
+    await categoryManager.initialize();
+    const category = categoryManager.getCategory(categoryId);
+    const properties = categoryManager.getPropertiesByCategory(categoryId);
+    
+    if (!category) {
+      showError('Category not found');
+      return;
+    }
+    
+    // Filter for properties with analysis
+    const analyzedProperties = properties.filter(property => property.analysis && property.analysis.fullResponse);
+    
+    if (analyzedProperties.length === 0) {
+      showError(`No analyzed properties found in category "${category.name}"`);
+      return;
+    }
+    
+    if (window.WordExportModule) {
+      // Add category context to the export
+      const exportData = {
+        categoryName: category.name,
+        categoryIcon: category.icon,
+        categoryDescription: category.description,
+        properties: analyzedProperties
+      };
+      window.WordExportModule.showExportOptionsModal(exportData);
+    } else {
+      showError('Word export module not loaded. Please refresh the extension.');
+    }
+  } catch (error) {
+    console.error('Failed to export category:', error);
+    showError('Failed to export category to Word');
+  }
+}
+
+// Export all categories to Word
+async function exportAllCategoriesToWord() {
+  try {
+    await categoryManager.initialize();
+    const allProperties = Array.from(categoryManager.properties.values());
+    const analyzedProperties = allProperties.filter(property => property.analysis && property.analysis.fullResponse);
+    
+    if (analyzedProperties.length === 0) {
+      showError('No analyzed properties available for export');
+      return;
+    }
+    
+    if (window.WordExportModule) {
+      // Group properties by category for organized export
+      const categorizedProperties = {};
+      const categories = categoryManager.getAllCategories();
+      
+      categories.forEach(category => {
+        const categoryProperties = analyzedProperties.filter(property => property.categoryId === category.id);
+        if (categoryProperties.length > 0) {
+          categorizedProperties[category.id] = {
+            name: category.name,
+            icon: category.icon,
+            description: category.description,
+            properties: categoryProperties
+          };
+        }
+      });
+      
+      const exportData = {
+        isMultiCategory: true,
+        categories: categorizedProperties,
+        totalProperties: analyzedProperties.length
+      };
+      
+      window.WordExportModule.showExportOptionsModal(exportData);
+    } else {
+      showError('Word export module not loaded. Please refresh the extension.');
+    }
+  } catch (error) {
+    console.error('Failed to export all categories:', error);
+    showError('Failed to export all categories to Word');
+  }
 }
 
 function openCategoryView(categoryId) {
@@ -5136,10 +5243,25 @@ function updateStatusWithProgress(title, subtitle, progress = 0) {
   const statusTitle = document.querySelector('.status-title');
   const statusSubtitle = document.querySelector('.status-subtitle');
   const progressFill = document.getElementById('statusProgress');
+  const statusIcon = document.querySelector('.status-icon');
 
   if (statusTitle) statusTitle.textContent = title;
   if (statusSubtitle) statusSubtitle.textContent = subtitle;
   if (progressFill) progressFill.style.width = `${progress}%`;
+  
+  // Update status icon based on connection state
+  if (statusIcon) {
+    if (progress === 100 && (title.includes('Connected') || title.includes('Ready'))) {
+      // Show checkmark when fully connected
+      statusIcon.innerHTML = '<span style="color: #16a34a; font-size: 20px;">✓</span>';
+    } else if (progress > 0 && progress < 100) {
+      // Show loading spinner for partial connection
+      statusIcon.innerHTML = '<div class="spinner"></div>';
+    } else {
+      // Show default icon for disconnected state
+      statusIcon.innerHTML = '<span style="color: #dc2626; font-size: 16px;">⚠️</span>';
+    }
+  }
 }
 
 // Initialize UX enhancements
