@@ -511,6 +511,54 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
 
+        <!-- Column Configuration -->
+        <div class="re-section" id="re-tabular-columns-section" style="display: none;">
+          <div class="re-section-header">
+            <div class="re-section-title">Tabular Data Columns</div>
+            <div class="re-section-subtitle">Configure which data points to request from ChatGPT</div>
+          </div>
+          
+          <div class="re-form-group">
+            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 12px;">
+              <div style="font-size: 12px; color: var(--chatgpt-text-secondary);">
+                Select the data points you want ChatGPT to extract when using the Tabular prompt
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all">
+                  <span>Select All</span>
+                </button>
+                <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all">
+                  <span>Clear All</span>
+                </button>
+              </div>
+            </div>
+            
+            <div id="re-columns-stats" style="font-size: 12px; color: var(--chatgpt-text-secondary); margin-bottom: 8px;">
+              Loading columns...
+            </div>
+          </div>
+          
+          <!-- Column Categories -->
+          <div id="re-columns-container">
+            <!-- Categories will be dynamically populated -->
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-columns">
+              <div>💾</div>
+              <span>Save Column Configuration</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-columns">
+              <div>🔄</div>
+              <span>Reset to Default</span>
+            </button>
+            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-prompt">
+              <div>👁️</div>
+              <span>Preview Prompt</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="re-section">
           <div class="re-section-header">
@@ -3303,6 +3351,9 @@ Or enter your own property URL:`);
     if (previewPromptBtn) {
       previewPromptBtn.addEventListener('click', () => this.previewPrompt());
     }
+    
+    // Column configuration event listeners
+    this.setupColumnConfigurationEvents();
   }
   
   async loadPromptSettings() {
@@ -3336,10 +3387,21 @@ Or enter your own property URL:`);
   handlePromptTypeChange(promptType) {
     const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
     const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
+    const tabularColumnsSection = this.panel.querySelector('#re-tabular-columns-section');
     
     // Show/hide custom prompt textarea
     if (customPromptGroup) {
       customPromptGroup.style.display = promptType === 'custom' ? 'block' : 'none';
+    }
+    
+    // Show/hide tabular columns configuration
+    if (tabularColumnsSection) {
+      tabularColumnsSection.style.display = promptType === 'tabular' ? 'block' : 'none';
+      
+      // Load columns when tabular is selected
+      if (promptType === 'tabular') {
+        this.loadTabularColumns();
+      }
     }
     
     // Update description
@@ -3347,7 +3409,7 @@ Or enter your own property URL:`);
       const descriptions = {
         'default': 'Standard real estate investment analysis with basic property data extraction',
         'dynamic': 'Adaptive prompt that generates based on your selected column configuration',
-        'tabular': 'Comprehensive data extraction with 50+ property metrics, calculations, and risk assessments for detailed spreadsheet analysis',
+        'tabular': 'Comprehensive data extraction with customizable data points for detailed spreadsheet analysis',
         'custom': 'Use your own custom prompt template with full control over analysis structure'
       };
       
@@ -3457,6 +3519,342 @@ Or enter your own property URL:`);
   previewCustomPrompt() {
     // This method is kept for backward compatibility
     this.previewPrompt();
+  }
+
+  // Column Configuration Methods
+  setupColumnConfigurationEvents() {
+    const selectAllBtn = this.panel.querySelector('#re-columns-select-all');
+    const clearAllBtn = this.panel.querySelector('#re-columns-clear-all');
+    const saveColumnsBtn = this.panel.querySelector('#re-save-columns');
+    const resetColumnsBtn = this.panel.querySelector('#re-reset-columns');
+    const previewTabularBtn = this.panel.querySelector('#re-preview-tabular-prompt');
+    
+    if (selectAllBtn) {
+      selectAllBtn.addEventListener('click', () => this.selectAllColumns());
+    }
+    
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', () => this.clearAllColumns());
+    }
+    
+    if (saveColumnsBtn) {
+      saveColumnsBtn.addEventListener('click', () => this.saveColumnConfiguration());
+    }
+    
+    if (resetColumnsBtn) {
+      resetColumnsBtn.addEventListener('click', () => this.resetColumnConfiguration());
+    }
+    
+    if (previewTabularBtn) {
+      previewTabularBtn.addEventListener('click', () => this.previewTabularPrompt());
+    }
+  }
+
+  async loadTabularColumns() {
+    try {
+      // Load saved column configuration
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularColumnConfiguration']),
+        { tabularColumnConfiguration: null }
+      );
+      
+      // Get default columns
+      const defaultColumns = getTabularDataColumns();
+      
+      // Merge with saved configuration
+      let columns = defaultColumns;
+      if (result.tabularColumnConfiguration) {
+        columns = this.mergeColumnConfigurations(defaultColumns, result.tabularColumnConfiguration);
+      }
+      
+      // Render columns UI
+      this.renderColumnsUI(columns);
+      this.updateColumnStats();
+      
+    } catch (error) {
+      console.error('Failed to load tabular columns:', error);
+    }
+  }
+
+  mergeColumnConfigurations(defaultColumns, savedConfig) {
+    return defaultColumns.map(defaultCol => {
+      const savedCol = savedConfig.find(saved => saved.id === defaultCol.id);
+      return savedCol ? { ...defaultCol, ...savedCol } : defaultCol;
+    });
+  }
+
+  renderColumnsUI(columns) {
+    const container = this.panel.querySelector('#re-columns-container');
+    if (!container) return;
+    
+    // Group columns by category
+    const categorizedColumns = this.groupColumnsByCategory(columns);
+    
+    container.innerHTML = '';
+    
+    // Render each category
+    Object.entries(categorizedColumns).forEach(([category, categoryColumns]) => {
+      const categorySection = this.createCategorySection(category, categoryColumns);
+      container.appendChild(categorySection);
+    });
+  }
+
+  groupColumnsByCategory(columns) {
+    const categories = {};
+    const categoryNames = {
+      'core': '🏠 Core Property Information',
+      'location': '📍 Location & Geography', 
+      'financial': '💰 Financial Data',
+      'features': '🔧 Property Features',
+      'analysis': '📊 Analysis Data',
+      'market': '📈 Market Analysis',
+      'calculated': '🧮 Calculated Metrics',
+      'risk': '⚠️ Risk Assessment',
+      'scoring': '⭐ Scoring & Ratings'
+    };
+    
+    columns.forEach(column => {
+      const category = column.category || 'other';
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(column);
+    });
+    
+    // Sort categories in logical order
+    const sortedCategories = {};
+    const categoryOrder = ['core', 'location', 'financial', 'features', 'analysis', 'market', 'calculated', 'risk', 'scoring'];
+    
+    categoryOrder.forEach(cat => {
+      if (categories[cat]) {
+        sortedCategories[categoryNames[cat] || cat] = categories[cat];
+      }
+    });
+    
+    // Add any remaining categories
+    Object.entries(categories).forEach(([cat, cols]) => {
+      if (!categoryOrder.includes(cat)) {
+        sortedCategories[categoryNames[cat] || cat] = cols;
+      }
+    });
+    
+    return sortedCategories;
+  }
+
+  createCategorySection(categoryName, columns) {
+    const section = document.createElement('div');
+    section.className = 're-column-category';
+    section.style.cssText = `
+      margin-bottom: 16px; 
+      border: 1px solid var(--chatgpt-border-light); 
+      border-radius: 8px; 
+      overflow: hidden;
+    `;
+    
+    // Category header
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: var(--chatgpt-surface-secondary); 
+      padding: 8px 12px; 
+      font-weight: 500; 
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    `;
+    
+    const enabledCount = columns.filter(col => col.enabled).length;
+    header.innerHTML = `
+      <span>${categoryName}</span>
+      <span style="font-size: 12px; color: var(--chatgpt-text-secondary);">${enabledCount}/${columns.length}</span>
+    `;
+    
+    // Category content
+    const content = document.createElement('div');
+    content.style.cssText = `
+      padding: 8px; 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+      gap: 4px;
+    `;
+    
+    columns.forEach(column => {
+      const columnItem = this.createColumnItem(column);
+      content.appendChild(columnItem);
+    });
+    
+    // Toggle category
+    let isExpanded = true;
+    header.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      content.style.display = isExpanded ? 'grid' : 'none';
+      header.style.opacity = isExpanded ? '1' : '0.7';
+    });
+    
+    section.appendChild(header);
+    section.appendChild(content);
+    
+    return section;
+  }
+
+  createColumnItem(column) {
+    const item = document.createElement('label');
+    item.className = 're-column-item';
+    item.style.cssText = `
+      display: flex; 
+      align-items: flex-start; 
+      gap: 8px; 
+      padding: 6px 8px; 
+      border-radius: 4px; 
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.2s;
+    `;
+    
+    item.addEventListener('mouseenter', () => {
+      item.style.backgroundColor = 'var(--chatgpt-surface-secondary)';
+    });
+    
+    item.addEventListener('mouseleave', () => {
+      item.style.backgroundColor = 'transparent';
+    });
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = column.enabled !== false;
+    checkbox.dataset.columnId = column.id;
+    checkbox.style.cssText = 'margin: 2px 0 0 0; flex-shrink: 0;';
+    
+    checkbox.addEventListener('change', () => {
+      column.enabled = checkbox.checked;
+      this.updateColumnStats();
+    });
+    
+    const label = document.createElement('div');
+    label.style.cssText = 'flex: 1; line-height: 1.3;';
+    
+    const badges = [];
+    if (column.required) badges.push('<span style="background: #ef4444; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">REQUIRED</span>');
+    if (column.isCalculated) badges.push('<span style="background: #3b82f6; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">CALCULATED</span>');
+    
+    label.innerHTML = `
+      <div style="font-weight: 500; color: var(--chatgpt-text-primary);">
+        ${column.name} ${badges.join(' ')}
+      </div>
+      ${column.description ? `<div style="font-size: 11px; color: var(--chatgpt-text-secondary); margin-top: 2px;">${column.description || ''}</div>` : ''}
+    `;
+    
+    item.appendChild(checkbox);
+    item.appendChild(label);
+    
+    return item;
+  }
+
+  updateColumnStats() {
+    const statsElement = this.panel.querySelector('#re-columns-stats');
+    if (!statsElement) return;
+    
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const totalCount = checkboxes.length;
+    
+    statsElement.textContent = `${enabledCount} of ${totalCount} columns selected`;
+  }
+
+  selectAllColumns() {
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  }
+
+  clearAllColumns() {
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  }
+
+  async saveColumnConfiguration() {
+    try {
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const columnConfig = Array.from(checkboxes).map(checkbox => ({
+        id: checkbox.dataset.columnId,
+        enabled: checkbox.checked
+      }));
+      
+      await safeChromeFall(
+        () => chrome.storage.local.set({ tabularColumnConfiguration: columnConfig }),
+        null
+      );
+      
+      this.showChatGPTMessage('success', 'Column configuration saved successfully!');
+      console.log('💾 Tabular column configuration saved:', columnConfig);
+      
+    } catch (error) {
+      console.error('Failed to save column configuration:', error);
+      this.showChatGPTMessage('error', 'Failed to save column configuration');
+    }
+  }
+
+  async resetColumnConfiguration() {
+    if (confirm('Are you sure you want to reset all columns to default settings?')) {
+      try {
+        await safeChromeFall(
+          () => chrome.storage.local.remove(['tabularColumnConfiguration']),
+          null
+        );
+        
+        // Reload columns with defaults
+        this.loadTabularColumns();
+        
+        this.showChatGPTMessage('success', 'Column configuration reset to default');
+        console.log('🔄 Tabular column configuration reset');
+        
+      } catch (error) {
+        console.error('Failed to reset column configuration:', error);
+        this.showChatGPTMessage('error', 'Failed to reset column configuration');
+      }
+    }
+  }
+
+  async previewTabularPrompt() {
+    try {
+      // Get current column configuration
+      const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+      const enabledColumns = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.dataset.columnId);
+      
+      if (enabledColumns.length === 0) {
+        this.showChatGPTMessage('warning', 'No columns selected. Please select at least one column to preview.');
+        return;
+      }
+      
+      // Generate tabular prompt with selected columns
+      const promptTemplate = await getTabularDataExtractionPromptWithColumns(enabledColumns);
+      
+      if (!promptTemplate) {
+        this.showChatGPTMessage('warning', 'Failed to generate prompt preview');
+        return;
+      }
+      
+      // Show preview with sample data
+      const exampleUrl = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+      const previewText = promptTemplate
+        .replace('{PROPERTY_URL}', exampleUrl)
+        .replace('{DATE}', new Date().toLocaleDateString());
+      
+      // Show preview modal with column info
+      this.showPromptPreviewModal(previewText, `tabular (${enabledColumns.length} columns)`);
+      
+    } catch (error) {
+      console.error('Failed to preview tabular prompt:', error);
+      this.showChatGPTMessage('error', 'Failed to generate prompt preview');
+    }
   }
   
   showPromptPreviewModal(previewText, promptType = 'custom') {
@@ -4266,12 +4664,236 @@ Analysis Date: {DATE}
 Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
 }
 
+// Function to generate tabular prompt with selected columns
+async function getTabularDataExtractionPromptWithColumns(enabledColumnIds) {
+  try {
+    // Get all available columns
+    const allColumns = getTabularDataColumns();
+    
+    // Filter to enabled columns
+    const enabledColumns = allColumns.filter(col => enabledColumnIds.includes(col.id));
+    
+    if (enabledColumns.length === 0) {
+      return getTabularDataExtractionPrompt(); // Fallback to full prompt
+    }
+    
+    // Group columns by category for organized prompt
+    const categorizedColumns = {};
+    enabledColumns.forEach(col => {
+      const category = col.category || 'other';
+      if (!categorizedColumns[category]) {
+        categorizedColumns[category] = [];
+      }
+      categorizedColumns[category].push(col);
+    });
+    
+    // Build prompt sections
+    let promptSections = [];
+    
+    // Build sections based on enabled columns
+    if (categorizedColumns.core) {
+      promptSections.push(buildBasicPropertySection(categorizedColumns.core));
+    }
+    
+    if (categorizedColumns.location) {
+      promptSections.push(buildLocationSection(categorizedColumns.location));
+    }
+    
+    if (categorizedColumns.financial || categorizedColumns.market) {
+      const marketCols = [...(categorizedColumns.financial || []), ...(categorizedColumns.market || [])];
+      promptSections.push(buildMarketDataSection(marketCols));
+    }
+    
+    if (categorizedColumns.features) {
+      promptSections.push(buildPropertyFeaturesSection(categorizedColumns.features));
+    }
+    
+    if (categorizedColumns.analysis) {
+      promptSections.push(buildInvestmentAnalysisSection(categorizedColumns.analysis));
+    }
+    
+    if (categorizedColumns.calculated || categorizedColumns.risk || categorizedColumns.scoring) {
+      const analysisCols = [...(categorizedColumns.calculated || []), ...(categorizedColumns.risk || []), ...(categorizedColumns.scoring || [])];
+      promptSections.push(buildCalculatedMetricsSection(analysisCols));
+    }
+    
+    // Build complete prompt
+    const customPrompt = `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+
+**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+
+${promptSections.join('\n\n')}
+
+**DATA FORMAT REQUIREMENTS:**
+- Use exact numbers and percentages where applicable
+- Include currency symbols for monetary values
+- Use consistent text formatting for categorical data
+- Mark unavailable data as "N/A" or leave blank
+- Ensure all numeric values are properly formatted
+- Use standardized abbreviations for consistency
+
+**OUTPUT FORMAT:**
+Please provide your analysis in a structured format with clear labels for each requested data point.
+
+Property Link: {PROPERTY_URL}
+Analysis Date: {DATE}
+
+Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+
+    return customPrompt;
+    
+  } catch (error) {
+    console.error('Error generating custom tabular prompt:', error);
+    return getTabularDataExtractionPrompt(); // Fallback
+  }
+}
+
+// Helper functions to build prompt sections
+function buildBasicPropertySection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'propertyAddress': 'Property Address: Extract the complete street address',
+      'askingPrice': 'Asking Price: Extract the exact asking price (include currency symbol)',
+      'propertyType': 'Property Type: Classify as House, Apartment, Condo, Townhouse, etc.',
+      'bedrooms': 'Bedrooms: Number of bedrooms (numeric only)',
+      'bathrooms': 'Bathrooms: Number of bathrooms (include half baths as .5)',
+      'squareFootage': 'Square Footage: Total square footage (numeric only)',
+      'yearBuilt': 'Year Built: Construction year (4-digit year)',
+      'lotSize': 'Lot Size: Lot size in square feet (if available)'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**BASIC PROPERTY INFORMATION:**\n${dataPoints.join('\n')}`;
+}
+
+function buildLocationSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'neighborhood': 'Neighborhood: Property neighborhood or area name',
+      'city': 'City: City name',
+      'state': 'State: State name',
+      'zipCode': 'ZIP Code: ZIP code (if available)',
+      'schoolQuality': 'School Quality Rating: Local school quality (1-10)'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**LOCATION & GEOGRAPHY:**\n${dataPoints.join('\n')}`;
+}
+
+function buildMarketDataSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'estimatedRent': 'Estimated Monthly Rent: Your professional estimate based on local market rates',
+      'locationScore': 'Location Score: Rate location quality 1-10 (consider schools, safety, amenities, transportation)',
+      'marketTrend': 'Market Trend: Current market direction (Rising, Stable, Declining)',
+      'daysOnMarket': 'Days on Market: Number of days listed (if available)',
+      'priceHistory': 'Price History: Any price changes (if available)',
+      'marketType': 'Market Type: Buyer\'s market, Seller\'s market, or Balanced',
+      'jobGrowth': 'Job Growth Rate: Local job growth percentage',
+      'populationGrowth': 'Population Growth Rate: Local population growth percentage'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**MARKET DATA:**\n${dataPoints.join('\n')}`;
+}
+
+function buildPropertyFeaturesSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'parkingSpaces': 'Parking Spaces: Number of parking spaces',
+      'garageType': 'Garage Type: Attached, Detached, None',
+      'heatingType': 'Heating Type: Type of heating system',
+      'coolingType': 'Cooling Type: Type of cooling system',
+      'appliances': 'Appliances Included: List of included appliances',
+      'amenities': 'Amenities: Property amenities and features'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**PROPERTY FEATURES:**\n${dataPoints.join('\n')}`;
+}
+
+function buildInvestmentAnalysisSection(columns) {
+  const dataPoints = columns.map((col, index) => {
+    const descriptions = {
+      'keyAdvantages': 'Key Advantages: Top 3 property advantages for investment',
+      'keyConcerns': 'Key Concerns: Top 3 property limitations or concerns',
+      'redFlags': 'Red Flags: Any warning signs or risk indicators',
+      'investmentGrade': 'Investment Grade: Overall investment grade (A, B, C, D)',
+      'rentalPotential': 'Rental Potential: Rental market assessment',
+      'appreciationPotential': 'Appreciation Potential: Long-term appreciation outlook'
+    };
+    
+    const description = descriptions[col.id] || `${col.name}: ${col.description || 'Extract this data point'}`;
+    return `${index + 1}. ${description}`;
+  });
+  
+  return `**INVESTMENT ANALYSIS:**\n${dataPoints.join('\n')}`;
+}
+
+function buildCalculatedMetricsSection(columns) {
+  const calculationInstructions = [];
+  
+  columns.forEach(col => {
+    if (col.isCalculated) {
+      const instructions = {
+        'pricePerSqFt': 'Price per Square Foot = Asking Price ÷ Square Footage',
+        'capRate': 'Cap Rate = (Estimated Monthly Rent × 12) ÷ Asking Price × 100',
+        'onePercentRule': '1% Rule Ratio = Estimated Monthly Rent ÷ Asking Price × 100',
+        'vacancyRisk': 'Vacancy Risk Score: 1-10 based on market demand and property appeal',
+        'maintenanceRisk': 'Maintenance Risk Score: 1-10 based on property age and condition',
+        'locationPremium': 'Location Premium = (Location Score - 5) × 2'
+      };
+      
+      if (instructions[col.id]) {
+        calculationInstructions.push(`- ${instructions[col.id]}`);
+      }
+    }
+  });
+  
+  if (calculationInstructions.length > 0) {
+    return `**CALCULATED METRICS:**\nFor the following metrics, provide the calculation steps:\n${calculationInstructions.join('\n')}`;
+  }
+  
+  return '';
+}
+
 // Function to get the selected prompt based on user preference
 async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
   try {
     switch (promptType) {
       case 'tabular':
+        // Check if we have saved column configuration
+        const columnResult = await safeChromeFall(
+          () => chrome.storage.local.get(['tabularColumnConfiguration']),
+          { tabularColumnConfiguration: null }
+        );
+        
+        if (columnResult.tabularColumnConfiguration) {
+          // Use columns selected by user
+          const enabledColumns = columnResult.tabularColumnConfiguration
+            .filter(col => col.enabled)
+            .map(col => col.id);
+          
+          if (enabledColumns.length > 0) {
+            return await getTabularDataExtractionPromptWithColumns(enabledColumns);
+          }
+        }
+        
+        // Fallback to full tabular prompt
         return getTabularDataExtractionPrompt();
+        
       case 'dynamic':
         return await generateDynamicPrompt();
       case 'custom':
@@ -4357,76 +4979,76 @@ function getDefaultColumns() {
 function getTabularDataColumns() {
   return [
     // Basic Property Information
-    { id: 'propertyAddress', name: 'Property Address', type: 'text', category: 'core', enabled: true, required: true },
-    { id: 'askingPrice', name: 'Asking Price', type: 'currency', category: 'core', enabled: true, required: true },
-    { id: 'propertyType', name: 'Property Type', type: 'text', category: 'core', enabled: true, required: true },
-    { id: 'bedrooms', name: 'Bedrooms', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'bathrooms', name: 'Bathrooms', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'squareFootage', name: 'Square Footage', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'yearBuilt', name: 'Year Built', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'lotSize', name: 'Lot Size (sq ft)', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'neighborhood', name: 'Neighborhood', type: 'text', category: 'location', enabled: true, required: false },
-    { id: 'city', name: 'City', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'state', name: 'State', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'zipCode', name: 'ZIP Code', type: 'text', category: 'location', enabled: true, required: false },
+    { id: 'propertyAddress', name: 'Property Address', description: 'Complete street address of the property', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'askingPrice', name: 'Asking Price', description: 'Listed price with currency symbol', type: 'currency', category: 'core', enabled: true, required: true },
+    { id: 'propertyType', name: 'Property Type', description: 'Classification (House, Condo, Apartment, etc.)', type: 'text', category: 'core', enabled: true, required: true },
+    { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms in the property', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms (include half baths as .5)', type: 'number', category: 'core', enabled: true, required: true },
+    { id: 'squareFootage', name: 'Square Footage', description: 'Total interior square footage', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was constructed', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'lotSize', name: 'Lot Size (sq ft)', description: 'Size of the lot in square feet', type: 'number', category: 'core', enabled: true, required: false },
+    { id: 'neighborhood', name: 'Neighborhood', description: 'Name of the neighborhood or area', type: 'text', category: 'location', enabled: true, required: false },
+    { id: 'city', name: 'City', description: 'City where the property is located', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'state', name: 'State', description: 'State where the property is located', type: 'text', category: 'location', enabled: true, required: true },
+    { id: 'zipCode', name: 'ZIP Code', description: 'Postal ZIP code of the property', type: 'text', category: 'location', enabled: true, required: false },
     
     // Market Data
-    { id: 'estimatedRent', name: 'Estimated Monthly Rent', type: 'currency', category: 'financial', enabled: true, required: false },
-    { id: 'locationScore', name: 'Location Score (1-10)', type: 'number', category: 'scoring', enabled: true, required: false },
-    { id: 'marketTrend', name: 'Market Trend', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'daysOnMarket', name: 'Days on Market', type: 'number', category: 'market', enabled: true, required: false },
-    { id: 'priceHistory', name: 'Price History', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'estimatedRent', name: 'Estimated Monthly Rent', description: 'Professional estimate of monthly rental income', type: 'currency', category: 'financial', enabled: true, required: false },
+    { id: 'locationScore', name: 'Location Score (1-10)', description: 'Rating of location quality (schools, safety, amenities)', type: 'number', category: 'scoring', enabled: true, required: false },
+    { id: 'marketTrend', name: 'Market Trend', description: 'Current market direction (Rising, Stable, Declining)', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'daysOnMarket', name: 'Days on Market', description: 'Number of days the property has been listed', type: 'number', category: 'market', enabled: true, required: false },
+    { id: 'priceHistory', name: 'Price History', description: 'Any recent price changes or reductions', type: 'text', category: 'market', enabled: true, required: false },
     
     // Property Features
-    { id: 'parkingSpaces', name: 'Parking Spaces', type: 'number', category: 'features', enabled: true, required: false },
-    { id: 'garageType', name: 'Garage Type', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'heatingType', name: 'Heating Type', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'coolingType', name: 'Cooling Type', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'appliances', name: 'Appliances Included', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'amenities', name: 'Amenities', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'parkingSpaces', name: 'Parking Spaces', description: 'Number of available parking spaces', type: 'number', category: 'features', enabled: true, required: false },
+    { id: 'garageType', name: 'Garage Type', description: 'Type of garage (Attached, Detached, None)', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'heatingType', name: 'Heating Type', description: 'Type of heating system in the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'coolingType', name: 'Cooling Type', description: 'Type of cooling/AC system in the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'appliances', name: 'Appliances Included', description: 'List of appliances that come with the property', type: 'text', category: 'features', enabled: true, required: false },
+    { id: 'amenities', name: 'Amenities', description: 'Property amenities and special features', type: 'text', category: 'features', enabled: true, required: false },
     
     // Analysis Data
-    { id: 'keyAdvantages', name: 'Key Advantages', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'keyConcerns', name: 'Key Concerns', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'redFlags', name: 'Red Flags', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'investmentGrade', name: 'Investment Grade', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'rentalPotential', name: 'Rental Potential', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'appreciationPotential', name: 'Appreciation Potential', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'keyAdvantages', name: 'Key Advantages', description: 'Top 3 advantages for investment purposes', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'keyConcerns', name: 'Key Concerns', description: 'Top 3 concerns or potential issues', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'redFlags', name: 'Red Flags', description: 'Warning signs or serious risk indicators', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'investmentGrade', name: 'Investment Grade', description: 'Overall investment quality grade (A, B, C, D)', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'rentalPotential', name: 'Rental Potential', description: 'Assessment of rental market viability', type: 'text', category: 'analysis', enabled: true, required: false },
+    { id: 'appreciationPotential', name: 'Appreciation Potential', description: 'Long-term property value growth outlook', type: 'text', category: 'analysis', enabled: true, required: false },
     
     // Market Analysis
-    { id: 'marketType', name: 'Market Type', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'marketCycle', name: 'Market Cycle', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'inventoryLevel', name: 'Inventory Level', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'demandLevel', name: 'Demand Level', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'jobGrowth', name: 'Job Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'populationGrowth', name: 'Population Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'incomeGrowth', name: 'Income Growth Rate', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'unemploymentRate', name: 'Unemployment Rate', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'newConstruction', name: 'New Construction Level', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'infrastructureDev', name: 'Infrastructure Development', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'commercialDev', name: 'Commercial Development', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'schoolQuality', name: 'School Quality Rating', type: 'number', category: 'location', enabled: true, required: false },
+    { id: 'marketType', name: 'Market Type', description: 'Current market condition (Buyer\'s, Seller\'s, Balanced)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'marketCycle', name: 'Market Cycle', description: 'Current phase of the real estate market cycle', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'inventoryLevel', name: 'Inventory Level', description: 'Current housing inventory level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'demandLevel', name: 'Demand Level', description: 'Current buyer demand level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'jobGrowth', name: 'Job Growth Rate', description: 'Local employment growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'populationGrowth', name: 'Population Growth Rate', description: 'Local population growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'incomeGrowth', name: 'Income Growth Rate', description: 'Local median income growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'unemploymentRate', name: 'Unemployment Rate', description: 'Local unemployment rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
+    { id: 'newConstruction', name: 'New Construction Level', description: 'Level of new construction activity in the area', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'infrastructureDev', name: 'Infrastructure Development', description: 'Status of infrastructure development projects', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'commercialDev', name: 'Commercial Development', description: 'Commercial development activity in the area', type: 'text', category: 'market', enabled: true, required: false },
+    { id: 'schoolQuality', name: 'School Quality Rating', description: 'Local school quality rating (1-10 scale)', type: 'number', category: 'location', enabled: true, required: false },
     
     // Calculated Metrics
-    { id: 'pricePerSqFt', name: 'Price per Sq Ft', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'propertyAge', name: 'Property Age (Years)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'bedroomRatio', name: 'Bedroom Ratio', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'capRate', name: 'Cap Rate (%)', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'onePercentRule', name: '1% Rule Ratio', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Asking price divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', description: 'Estimated monthly rent divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'propertyAge', name: 'Property Age (Years)', description: 'Current year minus year built', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'bedroomRatio', name: 'Bedroom Ratio', description: 'Bedrooms divided by total rooms (bed+bath)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price divided by annual rent (investment metric)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'capRate', name: 'Cap Rate (%)', description: 'Annual rental income divided by property price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'onePercentRule', name: '1% Rule Ratio', description: 'Monthly rent as percentage of purchase price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', description: 'Purchase price divided by annual rent', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
     
     // Risk Metrics
-    { id: 'vacancyRisk', name: 'Vacancy Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'marketRisk', name: 'Market Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'overallRiskScore', name: 'Overall Risk Score', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'vacancyRisk', name: 'Vacancy Risk Score', description: 'Risk of vacancy based on demand and appeal (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', description: 'Risk of high maintenance costs based on age/condition (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'marketRisk', name: 'Market Risk Score', description: 'Risk from market instability and trends (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    { id: 'overallRiskScore', name: 'Overall Risk Score', description: 'Average of all risk scores (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
     
     // Market Analysis Calculated
-    { id: 'locationPremium', name: 'Location Premium (%)', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'daysOnMarketScore', name: 'Days on Market Score', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceTrendScore', name: 'Price Trend Score', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
+    { id: 'locationPremium', name: 'Location Premium (%)', description: 'Premium/discount based on location score', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'daysOnMarketScore', name: 'Days on Market Score', description: 'Score based on days on market vs. average (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    { id: 'priceTrendScore', name: 'Price Trend Score', description: 'Score based on price history and market direction (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
   ];
 }
 
