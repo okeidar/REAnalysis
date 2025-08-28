@@ -2640,9 +2640,16 @@ Or enter your own property URL:`);
       
       // First, test if we can find the ChatGPT input field
       console.log('🔍 Testing ChatGPT input field detection...');
-      const testInput = findChatGPTInput();
+      let testInput = findChatGPTInput();
+      
+      // If not found immediately, wait for page to load
       if (!testInput) {
-        throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page and it has loaded completely.');
+        console.log('⏳ Input field not found immediately, waiting for page to load...');
+        testInput = await waitForInputField(15000); // Wait up to 15 seconds
+      }
+      
+      if (!testInput) {
+        throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page (https://chatgpt.com) and it has loaded completely. Try refreshing the page. For debugging, run debugChatGPTInput() in the console.');
       }
       console.log('✅ ChatGPT input field found:', testInput);
       
@@ -2653,7 +2660,13 @@ Or enter your own property URL:`);
       currentPropertyAnalysis = { url, startTime: Date.now() };
       
       // Call the existing insertPropertyAnalysisPrompt function
+      if (typeof insertPropertyAnalysisPrompt !== 'function') {
+        throw new Error('insertPropertyAnalysisPrompt function not available. Extension may not be properly loaded.');
+      }
+      
+      console.log('📤 Calling insertPropertyAnalysisPrompt with URL:', url);
       const result = await insertPropertyAnalysisPrompt(url);
+      console.log('📥 insertPropertyAnalysisPrompt result:', result);
       
       if (!result) {
         throw new Error('Failed to insert property analysis prompt into ChatGPT');
@@ -10166,33 +10179,45 @@ function findChatGPTInput() {
   
   // Try different selectors for ChatGPT input (updated for 2024)
   const selectors = [
-    // Latest ChatGPT interface selectors (2024)
-    'textarea[data-id="root"]',
-    'div[contenteditable="true"][data-id="root"]', 
+    // Most current ChatGPT interface selectors (December 2024)
+    '#prompt-textarea',                                    // Primary ID-based selector
+    'textarea[placeholder*="Message ChatGPT"]',            // Current placeholder text
+    'textarea[placeholder*="Send a message"]',             // Alternative placeholder
+    'textarea[data-id="root"]',                           // Data-id based
+    'div[contenteditable="true"][data-id="root"]',        // Contenteditable version
+    
+    // Role and aria-based selectors (more reliable)
+    'textarea[role="textbox"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'textarea[aria-label*="message"]',
+    'div[contenteditable="true"][aria-label*="message"]',
+    
+    // Modern input patterns
     'textarea[placeholder*="Message"]',
     'textarea[placeholder*="message"]',
-    'div[contenteditable="true"][role="textbox"]',
+    'div[contenteditable="true"][class*="ProseMirror"]',   // ProseMirror editor
     'textarea[data-testid="composer-text-input"]',
-    
-    // Common modern selectors
     'div[contenteditable="true"][data-testid*="composer"]',
+    
+    // Class-based patterns
     'textarea[class*="prose"]',
     'div[contenteditable="true"][class*="prose"]',
-    
-    // Fallback selectors
-    'div[contenteditable="true"]',
-    '#prompt-textarea',
-    'textarea',
-    
-    // Try by class patterns
     'textarea[class*="composer"]',
     'textarea[class*="input"]',
     'div[class*="composer"][contenteditable="true"]',
     'div[class*="input"][contenteditable="true"]',
     
+    // Fallback selectors (broad but necessary)
+    'div[contenteditable="true"]',
+    'textarea',
+    
     // Additional modern patterns
     'textarea[spellcheck="false"]',
-    'div[contenteditable="true"][spellcheck="false"]'
+    'div[contenteditable="true"][spellcheck="false"]',
+    
+    // Try by proximity to send button
+    'form textarea',
+    'form div[contenteditable="true"]'
   ];
   
   for (const selector of selectors) {
@@ -10216,21 +10241,38 @@ function findChatGPTInput() {
         
         console.log(`  📍 Element ${i + 1}:`, elementInfo);
         
-        // Check if element is visible and not disabled
-        if (element.offsetParent !== null && 
-            !element.disabled && 
-            !element.readOnly &&
-            element.style.display !== 'none') {
-          
+        // Enhanced visibility and suitability check
+        const isVisible = element.offsetParent !== null && 
+                         element.style.display !== 'none' &&
+                         element.style.visibility !== 'hidden' &&
+                         element.style.opacity !== '0';
+        
+        const isInteractable = !element.disabled && 
+                              !element.readOnly &&
+                              !element.hasAttribute('disabled') &&
+                              !element.hasAttribute('readonly');
+        
+        const hasValidDimensions = element.offsetWidth > 0 && element.offsetHeight > 0;
+        
+        const isInViewport = element.getBoundingClientRect().width > 0 && 
+                            element.getBoundingClientRect().height > 0;
+        
+        if (isVisible && isInteractable && hasValidDimensions && isInViewport) {
           console.log('✅ Found suitable input element:', element);
           console.log('📋 Element details:', elementInfo);
+          console.log('✅ Suitability checks passed:', {
+            visible: isVisible,
+            interactable: isInteractable,
+            validDimensions: hasValidDimensions,
+            inViewport: isInViewport
+          });
           return element;
         } else {
           console.log('❌ Element not suitable:', {
-            visible: element.offsetParent !== null,
-            notDisabled: !element.disabled,
-            notReadOnly: !element.readOnly,
-            notHidden: element.style.display !== 'none'
+            visible: isVisible,
+            interactable: isInteractable,
+            validDimensions: hasValidDimensions,
+            inViewport: isInViewport
           });
         }
       }
@@ -10239,24 +10281,78 @@ function findChatGPTInput() {
     }
   }
   
-  console.log('No suitable input field found');
+  console.log('❌ No suitable input field found with current selectors');
+  console.log('💡 This could mean:');
+  console.log('   - ChatGPT page is still loading');
+  console.log('   - ChatGPT interface has changed');
+  console.log('   - User is not on the correct ChatGPT page');
+  console.log('   - Page has errors or is blocked');
+  
+  // Log page state for debugging
+  console.log('📋 Page debug info:', {
+    url: window.location.href,
+    readyState: document.readyState,
+    title: document.title,
+    bodyClasses: document.body?.className || 'No body',
+    totalElements: document.querySelectorAll('*').length
+  });
+  
   return null;
 }
+
+// Debug helper function for users to run in console
+function debugChatGPTInput() {
+  console.log('🔧 CHATGPT INPUT DEBUG HELPER');
+  console.log('============================');
+  
+  const result = findChatGPTInput();
+  
+  if (result) {
+    console.log('✅ SUCCESS: Found ChatGPT input field');
+    console.log('📋 Element:', result);
+    console.log('📋 Tag:', result.tagName);
+    console.log('📋 ID:', result.id);
+    console.log('📋 Classes:', result.className);
+    console.log('📋 Placeholder:', result.placeholder);
+    console.log('📋 Data attributes:', Array.from(result.attributes).filter(attr => attr.name.startsWith('data-')));
+    return result;
+  } else {
+    console.log('❌ FAILED: Could not find ChatGPT input field');
+    console.log('💡 Try these manual checks:');
+    console.log('   1. Are you on https://chatgpt.com?');
+    console.log('   2. Is the page fully loaded?');
+    console.log('   3. Can you see the text input box?');
+    console.log('   4. Try refreshing the page');
+    return null;
+  }
+}
+
+// Make debug function globally available
+window.debugChatGPTInput = debugChatGPTInput;
 
 // Function to wait for input field to be available
 function waitForInputField(maxWait = 10000) {
   return new Promise((resolve, reject) => {
     const startTime = Date.now();
+    let attempts = 0;
+    
+    console.log(`⏳ Waiting for ChatGPT input field (max ${maxWait}ms)...`);
     
     function checkForInput() {
+      attempts++;
+      const elapsed = Date.now() - startTime;
+      console.log(`🔍 Attempt ${attempts} after ${elapsed}ms...`);
+      
       const input = findChatGPTInput();
       if (input) {
+        console.log(`✅ Input field found after ${elapsed}ms (${attempts} attempts)`);
         resolve(input);
         return;
       }
       
-      if (Date.now() - startTime > maxWait) {
-        reject(new Error('Timeout waiting for input field'));
+      if (elapsed > maxWait) {
+        console.log(`❌ Timeout after ${elapsed}ms (${attempts} attempts)`);
+        resolve(null); // Resolve with null instead of rejecting
         return;
       }
       
