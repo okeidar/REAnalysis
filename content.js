@@ -2750,7 +2750,7 @@ class REAnalyzerEmbeddedUI {
     
     try {
       // First test if we can find the input field
-      const inputField = findChatGPTInput();
+      const inputField = window.findChatGPTInput ? window.findChatGPTInput() : null;
       if (!inputField) {
         this.showChatGPTMessage('error', 'Could not find ChatGPT input field. Please make sure the page is fully loaded.');
         return;
@@ -3191,7 +3191,7 @@ Or enter your own property URL:`);
       
       // First, test if we can find the ChatGPT input field
       console.log('🔍 Testing ChatGPT input field detection...');
-      const testInput = findChatGPTInput();
+      const testInput = window.findChatGPTInput ? window.findChatGPTInput() : null;
       if (!testInput) {
         throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page and it has loaded completely.');
       }
@@ -3204,7 +3204,7 @@ Or enter your own property URL:`);
       currentPropertyAnalysis = { url, startTime: Date.now() };
       
       // Call the existing insertPropertyAnalysisPrompt function
-      const result = await insertPropertyAnalysisPrompt(url);
+      const result = window.insertPropertyAnalysisPrompt ? await window.insertPropertyAnalysisPrompt(url) : null;
       
       if (!result) {
         throw new Error('Failed to insert property analysis prompt into ChatGPT');
@@ -6865,7 +6865,7 @@ async function handleSplittingFallback() {
     resetPromptSplittingState();
     throw error;
   }
-}
+};
 
 // Helper function to get default prompt template
 function getDefaultPromptTemplate() {
@@ -10957,7 +10957,8 @@ async function insertTextInChatGPTInput(inputField, text, description = 'text') 
 }
 
 // Function to find ChatGPT input field with more comprehensive selectors
-function findChatGPTInput() {
+// Make function globally accessible
+window.findChatGPTInput = function findChatGPTInput() {
   console.log('🔍 Searching for ChatGPT input field...');
   console.log('📍 Current URL:', window.location.href);
   console.log('📱 Viewport:', window.innerWidth + 'x' + window.innerHeight);
@@ -11043,7 +11044,7 @@ function findChatGPTInput() {
   
   console.log('No suitable input field found');
   return null;
-}
+};
 
 // Function to wait for input field to be available
 function waitForInputField(maxWait = 10000) {
@@ -11071,7 +11072,8 @@ function waitForInputField(maxWait = 10000) {
 }
 
 // Function to insert text into ChatGPT input
-async function insertPropertyAnalysisPrompt(propertyLink) {
+// Make function globally accessible
+window.insertPropertyAnalysisPrompt = async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('Starting property analysis insertion for:', propertyLink);
   console.log('🔍 Property link type:', typeof propertyLink);
   console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
@@ -11250,7 +11252,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
     resetPromptSplittingState(); // Clean up state on error
     return false;
   }
-}
+};
 
 // Function to auto-submit the message (optional)
 function submitMessage() {
@@ -12315,8 +12317,8 @@ window.debugPromptSplittingState = function() {
 window.testPromptSplitting = function(propertyLink) {
   const testLink = propertyLink || 'https://example.com/test-property';
   console.log('🧪 Testing prompt splitting with link:', testLink);
-  if (typeof insertPropertyAnalysisPrompt === 'function') {
-    insertPropertyAnalysisPrompt(testLink);
+  if (typeof window.insertPropertyAnalysisPrompt === 'function') {
+    window.insertPropertyAnalysisPrompt(testLink);
   } else {
     console.log('❌ insertPropertyAnalysisPrompt function not available');
   }
@@ -12379,8 +12381,8 @@ window.testAnalyzeButtons = function() {
 window.testInputDetection = function() {
   console.log('🧪 Testing ChatGPT Input Field Detection...');
   
-  if (typeof findChatGPTInput === 'function') {
-    const input = findChatGPTInput();
+  if (typeof window.findChatGPTInput === 'function') {
+    const input = window.findChatGPTInput();
     if (input) {
       console.log('✅ ChatGPT input field found:', input);
       console.log('📋 Field type:', input.tagName);
