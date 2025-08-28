@@ -11287,17 +11287,6 @@ if (isChatGPTSite()) {
   try {
     console.log('✅ ChatGPT Helper Extension is active on ChatGPT');
     
-    // Add debug function for testing prompt splitting
-    window.debugPromptSplitting = function(testResponse) {
-      console.log('🧪 Testing prompt splitting with:', testResponse);
-      const result = detectConfirmation(testResponse || "Yes, I understand");
-      console.log('🧪 Test result:', result);
-      if (result && promptSplittingState.currentPhase === 'waiting_confirmation') {
-        console.log('🧪 Triggering handleConfirmationReceived');
-        handleConfirmationReceived();
-      }
-    };
-    
     // Load prompt splitting settings asynchronously
     loadPromptSplittingSettings().catch(error => {
       console.warn('Failed to load prompt splitting settings:', error);
@@ -11419,7 +11408,7 @@ if (isChatGPTSite()) {
     }
   });
   
-  // Listen for messages from background script (for saving analysis data)
+  // Listen for messages from background script (for saving analysis data)  
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'savePropertyAnalysis') {
       console.log('Received request to save analysis data:', request);
@@ -11427,6 +11416,54 @@ if (isChatGPTSite()) {
       return false;
     }
   });
+
+  // Setup response monitoring
+  setupResponseMonitor();
+  
+  // Listen for messages from popup or background script
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('Content script received message:', request);
+    
+    if (request.action === 'checkStatus') {
+      console.log('Responding to status check');
+      sendResponse({
+        active: true,
+        site: window.location.hostname,
+        url: window.location.href
+      });
+      
+    } else if (request.action === 'updatePromptSplittingSettings') {
+      console.log('Updating prompt splitting settings:', request.settings);
+      updatePromptSplittingSettings();
+      sendResponse({ success: true });
+      
+    } else if (request.action === 'analyzeProperty') {
+      console.log('Received property analysis request:', request.link);
+      
+      // Handle async operation properly
+      (async () => {
+        try {
+          const success = await insertPropertyAnalysisPrompt(request.link);
+          sendResponse({ success: success });
+        } catch (error) {
+          console.error('Error in property analysis:', error);
+          sendResponse({ success: false, error: error.message });
+        }
+      })();
+      
+      return true; // Keep channel open for async response
+    }
+  });
+
+  } catch (initError) {
+    console.error('ChatGPT Helper Extension initialization failed:', initError);
+    if (initError.message && initError.message.includes('Unexpected token')) {
+      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
+    }
+  }
+} else {
+  console.log('❌ ChatGPT Helper Extension is not active on this site');
+}
 
 // Global error handler for uncaught syntax errors
 window.addEventListener('error', function(event) {
@@ -11437,7 +11474,7 @@ window.addEventListener('error', function(event) {
   }
 });
 
-// Debug function to check current prompt splitting state
+// Debug function to check current prompt splitting state  
 window.debugPromptSplitting = function(testResponse) {
   console.log('🧪 Testing prompt splitting with:', testResponse);
   const result = detectConfirmation(testResponse || "Yes, I understand");
@@ -12248,54 +12285,6 @@ window.debugPromptSplittingState = function() {
   console.log('=== END DEBUG INFO ===');
 };
 
-    // Setup response monitoring
-    setupResponseMonitor();
-    
-    // Listen for messages from popup or background script
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-      console.log('Content script received message:', request);
-      
-      if (request.action === 'checkStatus') {
-        console.log('Responding to status check');
-        sendResponse({
-          active: true,
-          site: window.location.hostname,
-          url: window.location.href
-        });
-        
-      } else if (request.action === 'updatePromptSplittingSettings') {
-        console.log('Updating prompt splitting settings:', request.settings);
-        updatePromptSplittingSettings();
-        sendResponse({ success: true });
-        
-      } else if (request.action === 'analyzeProperty') {
-        console.log('Received property analysis request:', request.link);
-        
-        // Handle async operation properly
-        (async () => {
-          try {
-            const success = await insertPropertyAnalysisPrompt(request.link);
-            sendResponse({ success: success });
-          } catch (error) {
-            console.error('Error in property analysis:', error);
-            sendResponse({ success: false, error: error.message });
-          }
-        })();
-        
-        return true; // Keep channel open for async response
-      }
-    });
-
-  } catch (initError) {
-    console.error('ChatGPT Helper Extension initialization failed:', initError);
-    if (initError.message && initError.message.includes('Unexpected token')) {
-      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
-    }
-  }
-} else {
-  console.log('❌ ChatGPT Helper Extension is not active on this site');
-}
-
 // Global functions (available regardless of site)
 // Add function to manually test prompt splitting with a property link  
 window.testPromptSplitting = function(propertyLink) {
@@ -12307,3 +12296,6 @@ window.testPromptSplitting = function(propertyLink) {
     console.log('❌ insertPropertyAnalysisPrompt function not available');
   }
 };
+
+} // Close any remaining block
+} // Final close
