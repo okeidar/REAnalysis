@@ -8183,7 +8183,7 @@ function extractPropertyAnalysisData(responseText) {
         const streetHasIndicators = streetHasNumber || streetHasStreetWords;
         
         // More lenient validation - warn instead of reject for some cases
-        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
+        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotJustKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
         
         if (streetIsLikelyValid && !streetHasIndicators) {
           console.log(`⚠️ Street name "${streetCleaned}" passed basic validation but lacks typical street indicators (numbers or street words) - accepting anyway`);
@@ -8196,7 +8196,7 @@ function extractPropertyAnalysisData(responseText) {
             hasNumber: !!streetHasNumber,
             hasStreetWords: !!streetHasStreetWords,
             hasIndicators: streetHasIndicators,
-            isNotJustKeywords: streetNotKeywords,
+            isNotJustKeywords: streetNotJustKeywords,
             isNotPropertyFeature: streetNotFeature,
             isNotPrice: streetNotPrice,
             isNotJustNumber: streetNotJustNumber
