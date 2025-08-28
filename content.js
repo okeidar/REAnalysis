@@ -10070,6 +10070,48 @@ function setupResponseMonitor() {
         console.log('🔍 This might be a response from prompt splitting or a different analysis');
         console.log('🔍 Response preview:', messageText.substring(0, 500) + '...');
         
+        // ENHANCED FALLBACK: Try to detect if this is a property analysis even without currentPropertyAnalysis
+        const hasStrongPropertyIndicators = messageText.toLowerCase().includes('property details') ||
+                                           messageText.toLowerCase().includes('property analysis') ||
+                                           messageText.toLowerCase().includes('investment analysis') ||
+                                           messageText.toLowerCase().includes('location analysis') ||
+                                           messageText.toLowerCase().includes('rental income') ||
+                                           messageText.toLowerCase().includes('neighborhood analysis') ||
+                                           (messageText.includes('$') && messageText.toLowerCase().includes('bedroom'));
+        
+        if (hasStrongPropertyIndicators) {
+          console.log('🎯 STRONG PROPERTY INDICATORS DETECTED - Attempting to save analysis anyway!');
+          console.log('📊 Trying to extract and save analysis data...');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
+            console.log('✅ Successfully extracted analysis data from untracked response!');
+            console.log('🔍 Will attempt to find associated property URL...');
+            
+            // Try to find a recently analyzed property or create a fallback entry
+            const fallbackUrl = `fallback-analysis-${Date.now()}`;
+            
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: fallbackUrl,
+                sessionId: `fallback_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response && response.success) {
+                console.log('✅ Fallback analysis saved successfully!');
+                console.log('🔗 Saved under URL:', fallbackUrl);
+                console.log('💡 You can check this analysis in the extension popup');
+              }
+            }).catch(err => {
+              console.error('❌ Failed to save fallback analysis:', err);
+            });
+            
+            return; // Exit early since we handled it
+          }
+        }
+        
         // FALLBACK: If we're in prompt splitting mode, this could be the analysis response
         // NOTE: This should normally not be needed anymore since currentPropertyAnalysis 
         // is now set consistently when the property link is sent
@@ -11298,6 +11340,74 @@ window.debugSaveAnalysis = async function(propertyUrl) {
       }
     } else {
       console.log('❌ No analysis data extracted from message');
+    }
+  } else {
+    console.log('❌ No ChatGPT messages found on page');
+  }
+};
+
+// Force save any ChatGPT response as property analysis (even if not detected as one)
+window.forceSaveResponse = async function(propertyUrl, messageIndex = -1) {
+  if (!propertyUrl) {
+    propertyUrl = `manual-analysis-${Date.now()}`;
+    console.log('🔧 No URL provided, using:', propertyUrl);
+  }
+  
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length > 0) {
+    const targetMessage = messageIndex === -1 ? messages[messages.length - 1] : messages[messageIndex];
+    if (!targetMessage) {
+      console.log('❌ Message not found at index:', messageIndex);
+      return;
+    }
+    
+    const messageText = targetMessage.textContent || targetMessage.innerText || '';
+    
+    console.log('🚀 FORCE SAVING ChatGPT response as property analysis');
+    console.log('🔗 URL:', propertyUrl);
+    console.log('📝 Message length:', messageText.length);
+    console.log('📄 Preview:', messageText.substring(0, 200));
+    
+    // Create analysis object directly without validation
+    const analysisData = {
+      fullResponse: messageText,
+      fullAnalysis: messageText,
+      extractedData: {},
+      calculatedMetrics: {},
+      timestamp: Date.now(),
+      errors: [],
+      warnings: [{
+        type: 'manual_save',
+        message: 'This analysis was manually saved using forceSaveResponse',
+        severity: 'info'
+      }]
+    };
+    
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'savePropertyAnalysis',
+        propertyUrl: propertyUrl,
+        sessionId: `force_save_${Date.now()}`,
+        analysisData: analysisData
+      });
+      
+      console.log('✅ Force save response:', response);
+      
+      if (response && response.success) {
+        console.log('🎉 Successfully force saved analysis!');
+        console.log('💡 Check the extension popup to see the saved analysis');
+        console.log('📄 You can now export this analysis to Word/CSV');
+        
+        // Verify it was saved
+        setTimeout(async () => {
+          const saved = await debugSavedAnalysis(propertyUrl);
+          console.log('🔍 Verification check completed');
+        }, 1000);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Error force saving analysis:', error);
     }
   } else {
     console.log('❌ No ChatGPT messages found on page');
