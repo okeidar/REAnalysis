@@ -2257,7 +2257,7 @@ class REAnalyzerEmbeddedUI {
       );
       
       const properties = result.propertyHistory || [];
-      const analyzedProperties = properties.filter(p => p.analysis && p.analysis.fullResponse);
+      const analyzedProperties = properties.filter(p => p.analysis && (p.analysis.fullResponse || p.analysis.fullAnalysis));
       
       if (analyzedProperties.length === 0) {
         this.showChatGPTMessage('warning', 'No analyzed properties to export');
@@ -2423,7 +2423,8 @@ class REAnalyzerEmbeddedUI {
         );
         
         // Process the full response with formatting
-        const responseLines = property.analysis.fullResponse.split('\n');
+        const fullResponseText = property.analysis.fullResponse || property.analysis.fullAnalysis || '';
+        const responseLines = fullResponseText.split('\n');
         for (const line of responseLines) {
           if (line.trim() === '') {
             children.push(new Paragraph({ text: "" }));
@@ -11181,9 +11182,126 @@ window.getExtractionAnalytics = function() {
   return analytics;
 };
 
+// Debug function to check saved analysis data
+window.debugSavedAnalysis = async function(propertyUrl) {
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const history = result.propertyHistory || [];
+    
+    if (propertyUrl) {
+      const property = history.find(p => p.url === propertyUrl);
+      if (property) {
+        console.log('🔍 Found property in storage:', propertyUrl);
+        console.log('📊 Analysis data:', {
+          hasAnalysis: !!property.analysis,
+          hasFullResponse: !!property.analysis?.fullResponse,
+          fullResponseLength: property.analysis?.fullResponse?.length || 0,
+          hasFullAnalysis: !!property.analysis?.fullAnalysis,
+          fullAnalysisLength: property.analysis?.fullAnalysis?.length || 0,
+          extractedDataKeys: Object.keys(property.analysis?.extractedData || {}),
+          timestamp: property.analysisTimestamp,
+          sessionId: property.sessionId
+        });
+        console.log('📄 Full response preview:', property.analysis?.fullResponse?.substring(0, 300) || 'No fullResponse');
+        return property;
+      } else {
+        console.log('❌ Property not found in storage:', propertyUrl);
+      }
+    } else {
+      console.log('📚 All properties in storage:', history.length);
+      history.forEach((prop, index) => {
+        console.log(`${index + 1}. ${prop.url}`);
+        console.log(`   Has analysis: ${!!prop.analysis}`);
+        console.log(`   Has fullResponse: ${!!prop.analysis?.fullResponse}`);
+        console.log(`   FullResponse length: ${prop.analysis?.fullResponse?.length || 0}`);
+        console.log(`   Extracted data keys: ${Object.keys(prop.analysis?.extractedData || {}).length}`);
+      });
+      return history;
+    }
+  } catch (error) {
+    console.error('❌ Error checking saved analysis:', error);
+  }
+};
+
+// Debug function to test analysis extraction on current page
+window.debugCurrentAnalysis = function() {
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    console.log('🔍 Testing analysis extraction on last ChatGPT message:');
+    console.log('📝 Message length:', messageText.length);
+    console.log('📄 Message preview:', messageText.substring(0, 200));
+    
+    const analysisData = extractPropertyAnalysisData(messageText);
+    console.log('📊 Extraction result:', {
+      hasFullResponse: !!analysisData?.fullResponse,
+      fullResponseLength: analysisData?.fullResponse?.length || 0,
+      extractedDataKeys: Object.keys(analysisData?.extractedData || {}),
+      extractedDataCount: Object.keys(analysisData?.extractedData || {}).length
+    });
+    
+    return analysisData;
+  } else {
+    console.log('❌ No ChatGPT messages found on page');
+  }
+};
+
 window.clearExtractionCache = function() {
   extractionCache.clear();
   console.log('🗑️ Extraction cache cleared');
+};
+
+// Debug function to manually save analysis data
+window.debugSaveAnalysis = async function(propertyUrl) {
+  if (!propertyUrl) {
+    console.log('❌ Please provide a property URL');
+    return;
+  }
+  
+  const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+  if (messages.length > 0) {
+    const lastMessage = messages[messages.length - 1];
+    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    
+    console.log('🔍 Manually saving analysis for:', propertyUrl);
+    console.log('📝 Message length:', messageText.length);
+    
+    const analysisData = extractPropertyAnalysisData(messageText);
+    
+    if (analysisData) {
+      console.log('📊 Analysis data extracted:', {
+        hasFullResponse: !!analysisData.fullResponse,
+        fullResponseLength: analysisData.fullResponse?.length || 0,
+        extractedDataKeys: Object.keys(analysisData.extractedData || {})
+      });
+      
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'savePropertyAnalysis',
+          propertyUrl: propertyUrl,
+          sessionId: `manual_debug_${Date.now()}`,
+          analysisData: analysisData
+        });
+        
+        console.log('✅ Save response:', response);
+        
+        // Verify it was saved
+        setTimeout(async () => {
+          const saved = await debugSavedAnalysis(propertyUrl);
+          console.log('🔍 Verification check completed');
+        }, 1000);
+        
+        return response;
+      } catch (error) {
+        console.error('❌ Error saving analysis:', error);
+      }
+    } else {
+      console.log('❌ No analysis data extracted from message');
+    }
+  } else {
+    console.log('❌ No ChatGPT messages found on page');
+  }
 };
 
 window.getPatternPerformance = function() {
