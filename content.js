@@ -1319,18 +1319,25 @@ class REAnalyzerEmbeddedUI {
     
     if (pasteAnalyzeBtn) {
       pasteAnalyzeBtn.addEventListener('click', async () => {
+        console.log('🔍 Paste & Analyze button clicked');
         try {
           const text = await navigator.clipboard.readText();
+          console.log('📋 Clipboard text:', text);
           if (this.isValidPropertyLink(text)) {
+            console.log('✅ Valid property link detected, starting analysis...');
             await this.analyzeProperty(text);
           } else {
+            console.log('❌ Invalid property link:', text);
             this.showMessage('error', 'Clipboard does not contain a valid property link');
           }
         } catch (err) {
+          console.error('❌ Clipboard error:', err);
           this.showMessage('error', 'Unable to access clipboard. Please use manual input.');
           this.showManualInput();
         }
       });
+    } else {
+      console.log('❌ Paste & Analyze button not found');
     }
 
     if (manualInputBtn) {
@@ -1367,13 +1374,19 @@ class REAnalyzerEmbeddedUI {
 
     if (analyzeBtn) {
       analyzeBtn.addEventListener('click', () => {
+        console.log('🔍 Analyze Property button clicked');
         const url = propertyUrlInput ? propertyUrlInput.value.trim() : '';
+        console.log('📝 Input URL:', url);
         if (url && this.isValidPropertyLink(url)) {
+          console.log('✅ Valid property URL, starting analysis...');
           this.analyzeProperty(url);
         } else {
+          console.log('❌ Invalid or empty URL');
           this.showMessage('error', 'Please enter a valid property URL');
         }
       });
+    } else {
+      console.log('❌ Analyze Property button not found');
     }
 
     if (clearBtn) {
@@ -3117,9 +3130,16 @@ Or enter your own property URL:`);
   async analyzeProperty(url) {
     try {
       console.log('🔍 Starting property analysis:', url);
+      console.log('🔍 URL type:', typeof url);
+      console.log('🔍 URL length:', url ? url.length : 'null/undefined');
+      
+      if (!url) {
+        throw new Error('No URL provided for analysis');
+      }
       
       // Show progress
       this.showAnalysisProgress();
+      console.log('📊 Analysis progress shown');
       
       // Start timer
       this.analysisStartTime = Date.now();
@@ -3130,11 +3150,15 @@ Or enter your own property URL:`);
       // Update progress steps
       this.updateAnalysisStep('validate', 'completed');
       this.updateAnalysisStep('send', 'active');
+      console.log('📋 Progress steps updated');
       
       // Use existing analysis functionality from the original content script
+      console.log('🚀 Calling sendAnalysisToBackground...');
       const response = await this.sendAnalysisToBackground(url);
+      console.log('📤 Response from sendAnalysisToBackground:', response);
       
       if (response && response.success) {
+        console.log('✅ Analysis request successful');
         this.updateAnalysisStep('send', 'completed');
         this.updateAnalysisStep('analyze', 'active');
         
@@ -3147,6 +3171,7 @@ Or enter your own property URL:`);
         }, 2000);
         
       } else {
+        console.log('❌ Analysis request failed:', response);
         throw new Error(response?.error || 'Analysis failed');
       }
       
@@ -12294,6 +12319,81 @@ window.testPromptSplitting = function(propertyLink) {
     insertPropertyAnalysisPrompt(testLink);
   } else {
     console.log('❌ insertPropertyAnalysisPrompt function not available');
+  }
+};
+
+// Test function for the analyze buttons
+window.testAnalyzeButtons = function() {
+  console.log('🧪 Testing Analyze Buttons...');
+  
+  // Check if extension UI is loaded
+  if (!window.embeddedUI) {
+    console.log('❌ Extension UI not loaded. Try reloading the page.');
+    return false;
+  }
+  
+  // Check if buttons exist
+  const pasteBtn = document.querySelector('#re-paste-analyze-btn');
+  const analyzeBtn = document.querySelector('#re-analyze-btn');
+  const manualBtn = document.querySelector('#re-manual-input-btn');
+  
+  console.log('📋 Paste & Analyze button found:', !!pasteBtn);
+  console.log('🔍 Analyze Property button found:', !!analyzeBtn);
+  console.log('✏️ Manual Input button found:', !!manualBtn);
+  
+  // Test manual input button
+  if (manualBtn) {
+    console.log('🧪 Testing Manual Input button...');
+    manualBtn.click();
+    
+    setTimeout(() => {
+      const propertyInput = document.querySelector('#re-property-input');
+      console.log('📝 Property input section shown:', !propertyInput?.classList.contains('re-hidden'));
+      
+      // Test with sample URL
+      const urlInput = document.querySelector('#re-property-url');
+      if (urlInput) {
+        console.log('✅ URL input field found');
+        urlInput.value = 'https://www.zillow.com/homedetails/123-Main-St-Anytown-CA-12345/123456789_zpid/';
+        
+        // Trigger validation
+        if (window.embeddedUI.validatePropertyInput) {
+          window.embeddedUI.validatePropertyInput();
+        }
+        
+        // Test analyze button
+        if (analyzeBtn) {
+          console.log('🧪 Testing Analyze Property button with sample URL...');
+          analyzeBtn.click();
+        }
+      } else {
+        console.log('❌ URL input field not found');
+      }
+    }, 500);
+  }
+  
+  return true;
+};
+
+// Test function for input field detection
+window.testInputDetection = function() {
+  console.log('🧪 Testing ChatGPT Input Field Detection...');
+  
+  if (typeof findChatGPTInput === 'function') {
+    const input = findChatGPTInput();
+    if (input) {
+      console.log('✅ ChatGPT input field found:', input);
+      console.log('📋 Field type:', input.tagName);
+      console.log('📋 Field data-id:', input.getAttribute('data-id'));
+      console.log('📋 Field placeholder:', input.placeholder);
+      return true;
+    } else {
+      console.log('❌ ChatGPT input field not found');
+      return false;
+    }
+  } else {
+    console.log('❌ findChatGPTInput function not available');
+    return false;
   }
 };
 
