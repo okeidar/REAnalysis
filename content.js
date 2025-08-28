@@ -10414,10 +10414,63 @@ function setupResponseMonitor() {
         return; // Don't process as regular property analysis
       }
       
-      // Only process if we have an active property analysis session
-      if (currentPropertyAnalysis && messageText && messageText.length > 100) {
-        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
-        console.log('📊 Current response length:', messageText.length);
+      // ENHANCED: Process ALL ChatGPT responses for debugging and potential analysis
+      if (messageText && messageText.length > 100) {
+        console.log('📝 NEW CHATGPT RESPONSE DETECTED:');
+        console.log('📊 Response length:', messageText.length);
+        console.log('🔗 Active property analysis:', !!currentPropertyAnalysis);
+        console.log('📄 Response preview:', messageText.substring(0, 200));
+        
+        // Check if this looks like a property analysis even without active session
+        const looksLikePropertyAnalysis = messageText.toLowerCase().includes('property') ||
+                                        messageText.toLowerCase().includes('bedroom') ||
+                                        messageText.toLowerCase().includes('bathroom') ||
+                                        messageText.toLowerCase().includes('analysis') ||
+                                        messageText.toLowerCase().includes('investment') ||
+                                        messageText.toLowerCase().includes('location') ||
+                                        messageText.includes('$');
+        
+        console.log('🏠 Looks like property analysis:', looksLikePropertyAnalysis);
+        
+        // If it looks like property analysis but no active session, try to save it anyway
+        if (looksLikePropertyAnalysis && !currentPropertyAnalysis) {
+          console.log('🚨 POTENTIAL PROPERTY ANALYSIS WITHOUT ACTIVE SESSION - Attempting auto-save!');
+          
+          const analysisData = extractPropertyAnalysisData(messageText);
+          if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
+            console.log('✅ Successfully extracted analysis data from orphaned response!');
+            
+            const autoUrl = `auto-detected-analysis-${Date.now()}`;
+            
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: autoUrl,
+                sessionId: `auto_detected_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response && response.success) {
+                console.log('✅ Auto-saved orphaned property analysis!');
+                console.log('🔗 Saved under URL:', autoUrl);
+                console.log('💡 Check the extension popup to see this analysis');
+                
+                // Refresh the UI if it exists
+                if (window.embeddedUI && typeof window.embeddedUI.loadChatGPTPropertyData === 'function') {
+                  window.embeddedUI.loadChatGPTPropertyData();
+                }
+              }
+            }).catch(err => {
+              console.error('❌ Failed to auto-save orphaned analysis:', err);
+            });
+            
+            return; // Exit since we handled it
+          }
+        }
+        
+        // Original logic for active property analysis sessions
+        if (currentPropertyAnalysis) {
+          console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
         
         // Check if analysis session has timed out (10 minutes)
         const sessionAge = Date.now() - currentPropertyAnalysis.timestamp;
@@ -11387,6 +11440,99 @@ window.debugUIStatus = function() {
     propertiesTabExists: !!document.querySelector('#properties-tab'),
     propertiesListExists: !!document.querySelector('#re-properties-list')
   };
+};
+
+// Test the message detection system
+window.testMessageDetection = function() {
+  console.log('🧪 Testing ChatGPT message detection...');
+  
+  const messageSelectors = [
+    '[data-message-author-role="assistant"]',
+    '[data-message-id] [data-message-author-role="assistant"]',
+    '[data-author="assistant"]',
+    '.group.w-full.text-token-text-primary',
+    '.prose'
+  ];
+  
+  let foundMessages = 0;
+  for (const selector of messageSelectors) {
+    const elements = document.querySelectorAll(selector);
+    if (elements.length > 0) {
+      console.log(`✅ Found ${elements.length} messages with selector: ${selector}`);
+      foundMessages += elements.length;
+      
+      // Show preview of last message
+      const lastMessage = elements[elements.length - 1];
+      const text = lastMessage.textContent || lastMessage.innerText || '';
+      console.log(`📄 Last message preview (${text.length} chars):`, text.substring(0, 200));
+      
+      break; // Use first working selector
+    } else {
+      console.log(`❌ No messages found with selector: ${selector}`);
+    }
+  }
+  
+  if (foundMessages === 0) {
+    console.log('❌ No ChatGPT messages detected with any selector!');
+    console.log('💡 This suggests the page structure has changed.');
+    console.log('🔍 Try typing a message to ChatGPT and then run this test again.');
+  } else {
+    console.log(`✅ Total messages detected: ${foundMessages}`);
+  }
+  
+  return foundMessages;
+};
+
+// Manually trigger the message checking system
+window.triggerMessageCheck = function() {
+  console.log('🔄 Manually triggering message check...');
+  
+  // Find the checkForNewMessages function and call it
+  if (typeof checkForNewMessages === 'function') {
+    checkForNewMessages();
+    console.log('✅ Message check triggered');
+  } else {
+    console.log('❌ checkForNewMessages function not found');
+    console.log('💡 This suggests the extension monitoring system is not active');
+  }
+};
+
+// Comprehensive extraction test
+window.fullExtractionTest = function() {
+  console.log('🧪 COMPREHENSIVE EXTRACTION TEST');
+  console.log('='.repeat(50));
+  
+  // Step 1: Test message detection
+  console.log('1️⃣ Testing message detection...');
+  const messageCount = testMessageDetection();
+  
+  if (messageCount === 0) {
+    console.log('❌ No messages detected - cannot continue test');
+    return false;
+  }
+  
+  // Step 2: Test extraction on last message
+  console.log('\n2️⃣ Testing extraction on last message...');
+  const extractionResult = debugCurrentAnalysis();
+  
+  // Step 3: Test force save
+  console.log('\n3️⃣ Testing force save...');
+  const testUrl = `test-extraction-${Date.now()}`;
+  
+  forceSaveResponse(testUrl).then(saveResult => {
+    console.log('\n4️⃣ Testing data retrieval...');
+    setTimeout(() => {
+      debugSavedAnalysis(testUrl);
+      
+      console.log('\n5️⃣ Testing UI refresh...');
+      refreshPropertiesDisplay();
+      
+      console.log('\n✅ FULL EXTRACTION TEST COMPLETE');
+      console.log('Check the extension popup Properties tab for saved data');
+    }, 2000);
+  });
+  
+  return true;
 };
 
 // Force show the extension UI and switch to Properties tab
