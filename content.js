@@ -811,6 +811,10 @@ class REAnalyzerEmbeddedUI {
               <div>📊</div>
               <span>Export CSV</span>
             </button>
+            <button class="re-btn re-btn-secondary re-btn-full" id="re-export-word">
+              <div>📄</div>
+              <span>Export Word</span>
+            </button>
             <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
               <div>📤</div>
               <span>Export Settings</span>
@@ -1266,6 +1270,7 @@ class REAnalyzerEmbeddedUI {
     // Action buttons
     const exportBtn = this.panel.querySelector('#re-export-all');
     const exportCsvBtn = this.panel.querySelector('#re-export-csv');
+    const exportWordBtn = this.panel.querySelector('#re-export-word');
     const testBtn = this.panel.querySelector('#re-test-analysis');
     const clearBtn = this.panel.querySelector('#re-clear-data');
 
@@ -1275,6 +1280,10 @@ class REAnalyzerEmbeddedUI {
 
     if (exportCsvBtn) {
       exportCsvBtn.addEventListener('click', () => this.exportPropertiesToCSV());
+    }
+
+    if (exportWordBtn) {
+      exportWordBtn.addEventListener('click', () => this.exportPropertiesToWord());
     }
 
     if (testBtn) {
@@ -2197,6 +2206,343 @@ class REAnalyzerEmbeddedUI {
     } catch (error) {
       console.error('❌ Failed to export properties to CSV:', error);
       this.showChatGPTMessage('error', 'Failed to export properties to CSV');
+    }
+  }
+
+  async loadDocxLibrary() {
+    try {
+      // Check if docx is already loaded
+      if (typeof window.docx !== 'undefined') {
+        return window.docx;
+      }
+
+      // Create a script element to load docx.js
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL('docx.min.js');
+      
+      return new Promise((resolve, reject) => {
+        script.onload = () => {
+          if (typeof window.docx !== 'undefined') {
+            console.log('✅ docx.js library loaded successfully');
+            resolve(window.docx);
+          } else {
+            reject(new Error('docx library failed to load'));
+          }
+        };
+        
+        script.onerror = () => {
+          reject(new Error('Failed to load docx.js script'));
+        };
+        
+        document.head.appendChild(script);
+      });
+    } catch (error) {
+      console.error('❌ Error loading docx library:', error);
+      throw error;
+    }
+  }
+
+  async exportPropertiesToWord() {
+    try {
+      this.showChatGPTMessage('info', 'Preparing Word export...');
+      
+      // Load docx library
+      const docx = await this.loadDocxLibrary();
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+      
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const analyzedProperties = properties.filter(p => p.analysis && p.analysis.fullResponse);
+      
+      if (analyzedProperties.length === 0) {
+        this.showChatGPTMessage('warning', 'No analyzed properties to export');
+        return;
+      }
+      
+      this.showChatGPTMessage('info', `Generating Word document for ${analyzedProperties.length} properties...`);
+      
+      // Create document children array
+      const children = [];
+      
+      // Title page
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "ChatGPT Real Estate Property Analysis Report",
+              bold: true,
+              size: 32,
+            }),
+          ],
+          heading: HeadingLevel.TITLE,
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Generated on ${new Date().toLocaleDateString()}`,
+              italics: true,
+              size: 20,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Total Properties Analyzed: ${analyzedProperties.length}`,
+              size: 18,
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      
+      // Add page break
+      children.push(new Paragraph({ text: "" }));
+      children.push(new Paragraph({ text: "" }));
+      
+      // Process each property
+      for (let i = 0; i < analyzedProperties.length; i++) {
+        const property = analyzedProperties[i];
+        
+        // Property header
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Property ${i + 1}: ${property.domain || 'Unknown Source'}`,
+                bold: true,
+                size: 24,
+              }),
+            ],
+            heading: HeadingLevel.HEADING_1,
+          })
+        );
+        
+        // Property information
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Property URL: ",
+                bold: true,
+              }),
+              new TextRun({
+                text: property.url || 'N/A',
+                color: "0066CC",
+              }),
+            ],
+          })
+        );
+        
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Analysis Date: ",
+                bold: true,
+              }),
+              new TextRun({
+                text: property.date || 'N/A',
+              }),
+            ],
+          })
+        );
+        
+        // Add extracted data summary if available
+        if (property.analysis.extractedData) {
+          children.push(new Paragraph({ text: "" }));
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Key Property Data:",
+                  bold: true,
+                  size: 18,
+                }),
+              ],
+              heading: HeadingLevel.HEADING_3,
+            })
+          );
+          
+          const extractedData = property.analysis.extractedData;
+          const keyFields = [
+            { key: 'price', label: 'Price' },
+            { key: 'bedrooms', label: 'Bedrooms' },
+            { key: 'bathrooms', label: 'Bathrooms' },
+            { key: 'squareFeet', label: 'Square Feet' },
+            { key: 'propertyType', label: 'Property Type' },
+            { key: 'yearBuilt', label: 'Year Built' },
+            { key: 'estimatedRentalIncome', label: 'Estimated Rental Income' }
+          ];
+          
+          keyFields.forEach(field => {
+            if (extractedData[field.key]) {
+              children.push(
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: `• ${field.label}: `,
+                      bold: true,
+                    }),
+                    new TextRun({
+                      text: extractedData[field.key],
+                    }),
+                  ],
+                })
+              );
+            }
+          });
+        }
+        
+        // Add full analysis
+        children.push(new Paragraph({ text: "" }));
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "ChatGPT Analysis:",
+                bold: true,
+                size: 18,
+              }),
+            ],
+            heading: HeadingLevel.HEADING_3,
+          })
+        );
+        
+        // Process the full response with formatting
+        const responseLines = property.analysis.fullResponse.split('\n');
+        for (const line of responseLines) {
+          if (line.trim() === '') {
+            children.push(new Paragraph({ text: "" }));
+            continue;
+          }
+          
+          // Check for markdown headers
+          const headerMatch = line.match(/^\*\*(.+?)\*\*:?$/);
+          if (headerMatch) {
+            children.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: headerMatch[1],
+                    bold: true,
+                    size: 16,
+                  }),
+                ],
+                heading: HeadingLevel.HEADING_4,
+              })
+            );
+            continue;
+          }
+          
+          // Process line with bold text formatting
+          const textRuns = [];
+          let currentText = line;
+          
+          // Simple bold text processing
+          const boldPattern = /\*\*([^*]+)\*\*/g;
+          let lastIndex = 0;
+          let match;
+          
+          while ((match = boldPattern.exec(line)) !== null) {
+            // Add text before bold
+            if (match.index > lastIndex) {
+              textRuns.push(new TextRun({
+                text: line.substring(lastIndex, match.index),
+              }));
+            }
+            
+            // Add bold text
+            textRuns.push(new TextRun({
+              text: match[1],
+              bold: true,
+            }));
+            
+            lastIndex = match.index + match[0].length;
+          }
+          
+          // Add remaining text
+          if (lastIndex < line.length) {
+            textRuns.push(new TextRun({
+              text: line.substring(lastIndex),
+            }));
+          }
+          
+          // If no bold formatting was found, just add the whole line
+          if (textRuns.length === 0) {
+            textRuns.push(new TextRun({ text: line }));
+          }
+          
+          children.push(new Paragraph({
+            children: textRuns,
+          }));
+        }
+        
+        // Add space between properties
+        if (i < analyzedProperties.length - 1) {
+          children.push(new Paragraph({ text: "" }));
+          children.push(new Paragraph({ text: "" }));
+        }
+      }
+      
+      // Footer
+      children.push(new Paragraph({ text: "" }));
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Document generated by RE Analyzer Extension on ${new Date().toLocaleString()}`,
+              italics: true,
+              size: 16,
+              color: "666666",
+            }),
+          ],
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      
+      // Create document
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: children,
+          },
+        ],
+      });
+      
+      // Generate and download
+      this.showChatGPTMessage('info', 'Generating document...');
+      const buffer = await Packer.toBlob(doc);
+      
+      const url = URL.createObjectURL(buffer);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ChatGPT-Property-Analysis-${new Date().toISOString().split('T')[0]}.docx`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      this.showChatGPTMessage('success', `Word document exported successfully! ${analyzedProperties.length} properties included.`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export properties to Word:', error);
+      this.showChatGPTMessage('error', `Failed to export to Word: ${error.message}`);
     }
   }
 
@@ -5585,8 +5931,164 @@ Or enter your own property URL:`);
   }
 
   exportProperties() {
-    // Placeholder for export functionality
-    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+    // Show export options modal
+    this.showExportOptionsModal();
+  }
+
+  showExportOptionsModal() {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 're-modal-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.className = 're-export-modal';
+    modal.style.cssText = `
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h3 style="margin: 0 0 8px 0; color: #333; font-size: 20px;">Export Properties</h3>
+        <p style="margin: 0; color: #666; font-size: 14px;">Choose your preferred export format</p>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <button class="re-export-option" data-format="word" style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-size: 14px;
+        ">
+          <span style="font-size: 24px;">📄</span>
+          <div style="text-align: left;">
+            <div style="font-weight: 600; color: #333;">Word Document (.docx)</div>
+            <div style="color: #666; font-size: 12px;">Professional formatted document with analysis</div>
+          </div>
+        </button>
+        
+        <button class="re-export-option" data-format="csv" style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-size: 14px;
+        ">
+          <span style="font-size: 24px;">📊</span>
+          <div style="text-align: left;">
+            <div style="font-weight: 600; color: #333;">CSV Spreadsheet (.csv)</div>
+            <div style="color: #666; font-size: 12px;">Tabular data for analysis and comparison</div>
+          </div>
+        </button>
+        
+        <button class="re-export-option" data-format="json" style="
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+          border: 2px solid #e0e0e0;
+          border-radius: 8px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-size: 14px;
+        ">
+          <span style="font-size: 24px;">📄</span>
+          <div style="text-align: left;">
+            <div style="font-weight: 600; color: #333;">JSON Data (.json)</div>
+            <div style="color: #666; font-size: 12px;">Raw data with full analysis content</div>
+          </div>
+        </button>
+      </div>
+      
+      <div style="margin-top: 20px; text-align: center;">
+        <button id="re-export-cancel" style="
+          padding: 8px 16px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: white;
+          color: #666;
+          cursor: pointer;
+          font-size: 14px;
+        ">Cancel</button>
+      </div>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Add hover effects
+    const exportOptions = modal.querySelectorAll('.re-export-option');
+    exportOptions.forEach(option => {
+      option.addEventListener('mouseenter', () => {
+        option.style.borderColor = '#10a37f';
+        option.style.background = '#f7fcfa';
+      });
+      
+      option.addEventListener('mouseleave', () => {
+        option.style.borderColor = '#e0e0e0';
+        option.style.background = 'white';
+      });
+      
+      option.addEventListener('click', () => {
+        const format = option.getAttribute('data-format');
+        document.body.removeChild(overlay);
+        
+        switch (format) {
+          case 'word':
+            this.exportPropertiesToWord();
+            break;
+          case 'csv':
+            this.exportPropertiesToCSV();
+            break;
+          case 'json':
+            this.exportAllProperties();
+            break;
+        }
+      });
+    });
+
+    // Cancel button
+    const cancelBtn = modal.querySelector('#re-export-cancel');
+    cancelBtn.addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
   }
 
   manageCategories() {
