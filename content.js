@@ -2213,28 +2213,52 @@ class REAnalyzerEmbeddedUI {
     try {
       // Check if docx is already loaded
       if (typeof window.docx !== 'undefined') {
+        console.log('✅ docx.js library already loaded');
         return window.docx;
       }
 
+      console.log('🔄 Loading docx.js library...');
+      
       // Create a script element to load docx.js
       const script = document.createElement('script');
       script.src = chrome.runtime.getURL('docx.min.js');
+      script.type = 'text/javascript';
       
       return new Promise((resolve, reject) => {
+        // Set up timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          reject(new Error('docx library loading timed out after 10 seconds'));
+        }, 10000);
+
         script.onload = () => {
-          if (typeof window.docx !== 'undefined') {
-            console.log('✅ docx.js library loaded successfully');
-            resolve(window.docx);
-          } else {
-            reject(new Error('docx library failed to load'));
-          }
+          clearTimeout(timeout);
+          
+          // Wait a bit for the library to initialize
+          setTimeout(() => {
+            if (typeof window.docx !== 'undefined') {
+              console.log('✅ docx.js library loaded successfully');
+              console.log('📦 Available classes:', Object.keys(window.docx));
+              resolve(window.docx);
+            } else {
+              reject(new Error('docx library loaded but not available on window object'));
+            }
+          }, 100);
         };
         
-        script.onerror = () => {
-          reject(new Error('Failed to load docx.js script'));
+        script.onerror = (event) => {
+          clearTimeout(timeout);
+          console.error('❌ Script loading error:', event);
+          reject(new Error('Failed to load docx.js script - check if file exists'));
         };
         
-        document.head.appendChild(script);
+        // Try to load the script
+        try {
+          document.head.appendChild(script);
+          console.log('📥 Script tag added to document head');
+        } catch (appendError) {
+          clearTimeout(timeout);
+          reject(new Error(`Failed to append script to document: ${appendError.message}`));
+        }
       });
     } catch (error) {
       console.error('❌ Error loading docx library:', error);
@@ -2246,9 +2270,25 @@ class REAnalyzerEmbeddedUI {
     try {
       this.showChatGPTMessage('info', 'Preparing Word export...');
       
-      // Load docx library
-      const docx = await this.loadDocxLibrary();
+      // Load docx library with fallback
+      let docx;
+      try {
+        docx = await this.loadDocxLibrary();
+      } catch (docxError) {
+        console.error('❌ Failed to load docx library:', docxError);
+        this.showChatGPTMessage('error', 'Word export library failed to load. Trying fallback to rich text export...');
+        
+        // Fallback to rich text export
+        this.exportPropertiesToRichText();
+        return;
+      }
+      
+      // Validate required classes are available
       const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+      
+      if (!Document || !Packer || !Paragraph || !TextRun) {
+        throw new Error('Required docx classes not available');
+      }
       
       // Load all property data
       const result = await safeChromeFall(
@@ -2544,6 +2584,145 @@ class REAnalyzerEmbeddedUI {
     } catch (error) {
       console.error('❌ Failed to export properties to Word:', error);
       this.showChatGPTMessage('error', `Failed to export to Word: ${error.message}`);
+      
+      // Offer fallback export
+      if (error.message.includes('docx')) {
+        setTimeout(() => {
+          this.showChatGPTMessage('info', 'Trying fallback rich text export...');
+          this.exportPropertiesToRichText();
+        }, 2000);
+      }
+    }
+  }
+
+  async exportPropertiesToRichText() {
+    try {
+      this.showChatGPTMessage('info', 'Generating rich text document...');
+      
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      const analyzedProperties = properties.filter(p => p.analysis && (p.analysis.fullResponse || p.analysis.fullAnalysis));
+      
+      if (analyzedProperties.length === 0) {
+        this.showChatGPTMessage('warning', 'No analyzed properties to export');
+        return;
+      }
+      
+      // Create rich text content
+      let content = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Real Estate Property Analysis Report</title>
+  <style>
+    body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+    h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+    h2 { color: #34495e; margin-top: 30px; }
+    h3 { color: #7f8c8d; }
+    .property { margin-bottom: 40px; page-break-after: always; }
+    .metadata { background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0; }
+    .analysis { margin: 20px 0; }
+    .footer { text-align: center; color: #7f8c8d; font-style: italic; margin-top: 40px; }
+    strong { color: #2c3e50; }
+    .key-data { background: #e8f5e8; padding: 10px; margin: 10px 0; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>ChatGPT Real Estate Property Analysis Report</h1>
+  <div class="metadata">
+    <strong>Generated on:</strong> ${new Date().toLocaleDateString()}<br>
+    <strong>Total Properties Analyzed:</strong> ${analyzedProperties.length}<br>
+    <strong>Export Format:</strong> Rich Text (HTML)
+  </div>
+`;
+
+      // Process each property
+      analyzedProperties.forEach((property, index) => {
+        content += `
+  <div class="property">
+    <h2>Property ${index + 1}: ${property.domain || 'Unknown Source'}</h2>
+    
+    <div class="metadata">
+      <strong>Property URL:</strong> <a href="${property.url || '#'}">${property.url || 'N/A'}</a><br>
+      <strong>Analysis Date:</strong> ${property.date || 'N/A'}
+    </div>
+`;
+
+        // Add extracted data summary if available
+        if (property.analysis.extractedData) {
+          content += `
+    <div class="key-data">
+      <h3>Key Property Data</h3>
+`;
+          
+          const extractedData = property.analysis.extractedData;
+          const keyFields = [
+            { key: 'price', label: 'Price' },
+            { key: 'bedrooms', label: 'Bedrooms' },
+            { key: 'bathrooms', label: 'Bathrooms' },
+            { key: 'squareFeet', label: 'Square Feet' },
+            { key: 'propertyType', label: 'Property Type' },
+            { key: 'yearBuilt', label: 'Year Built' },
+            { key: 'estimatedRentalIncome', label: 'Estimated Rental Income' }
+          ];
+          
+          keyFields.forEach(field => {
+            if (extractedData[field.key]) {
+              content += `      <strong>${field.label}:</strong> ${extractedData[field.key]}<br>\n`;
+            }
+          });
+          
+          content += `    </div>\n`;
+        }
+        
+        // Add full analysis
+        content += `
+    <div class="analysis">
+      <h3>ChatGPT Analysis</h3>
+`;
+        
+        const fullResponseText = property.analysis.fullResponse || property.analysis.fullAnalysis || '';
+        const formattedText = fullResponseText
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') // Bold text
+          .replace(/\n/g, '<br>'); // Line breaks
+        
+        content += `      ${formattedText}
+    </div>
+  </div>
+`;
+      });
+      
+      // Footer
+      content += `
+  <div class="footer">
+    Document generated by RE Analyzer Extension on ${new Date().toLocaleString()}
+  </div>
+</body>
+</html>`;
+      
+      // Create and download file
+      const dataBlob = new Blob([content], { type: 'text/html' });
+      
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ChatGPT-Property-Analysis-${new Date().toISOString().split('T')[0]}.html`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      this.showChatGPTMessage('success', `Rich text document exported successfully! ${analyzedProperties.length} properties included. Open the HTML file in any word processor.`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export properties to rich text:', error);
+      this.showChatGPTMessage('error', `Failed to export to rich text: ${error.message}`);
     }
   }
 
@@ -11248,16 +11427,15 @@ if (isChatGPTSite()) {
       return false;
     }
   });
-  
-  } catch (initError) {
-    console.error('ChatGPT Helper Extension initialization failed:', initError);
-    if (initError.message && initError.message.includes('Unexpected token')) {
-      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
-    }
+
+// Global error handler for uncaught syntax errors
+window.addEventListener('error', function(event) {
+  if (event.error && event.error.message && event.error.message.includes('Unexpected token')) {
+    console.warn('ChatGPT Helper: Caught syntax error (likely extension context invalidation):', event.error.message);
+    event.preventDefault(); // Prevent the error from propagating
+    return true;
   }
-} else {
-  console.log('❌ ChatGPT Helper Extension is not active on this site');
-}
+});
 
 // Debug function to check current prompt splitting state
 window.debugPromptSplitting = function(testResponse) {
@@ -11588,6 +11766,53 @@ window.showExtensionUI = function() {
       console.log('❌ Extension not loaded. Please reload the page.');
       return false;
     }
+  }
+};
+
+// Test docx library loading
+window.testDocxLoading = async function() {
+  console.log('🧪 Testing docx library loading...');
+  
+  try {
+    // Check if it's already loaded
+    if (typeof window.docx !== 'undefined') {
+      console.log('✅ docx library already available');
+      console.log('📦 Available classes:', Object.keys(window.docx));
+      return true;
+    }
+    
+    // Test the URL
+    const docxUrl = chrome.runtime.getURL('docx.min.js');
+    console.log('🔗 Docx URL:', docxUrl);
+    
+    // Test if file exists
+    try {
+      const response = await fetch(docxUrl);
+      if (response.ok) {
+        console.log('✅ Docx file exists and is accessible');
+      } else {
+        console.log('❌ Docx file not found:', response.status);
+        return false;
+      }
+    } catch (fetchError) {
+      console.log('❌ Error fetching docx file:', fetchError);
+      return false;
+    }
+    
+    // Test loading
+    if (window.embeddedUI && typeof window.embeddedUI.loadDocxLibrary === 'function') {
+      const docx = await window.embeddedUI.loadDocxLibrary();
+      console.log('✅ Docx library loaded successfully');
+      console.log('📦 Available classes:', Object.keys(docx));
+      return true;
+    } else {
+      console.log('❌ loadDocxLibrary function not available');
+      return false;
+    }
+    
+  } catch (error) {
+    console.error('❌ Error testing docx loading:', error);
+    return false;
   }
 };
 
@@ -12023,11 +12248,62 @@ window.debugPromptSplittingState = function() {
   console.log('=== END DEBUG INFO ===');
 };
 
-// Add function to manually test prompt splitting with a property link
+    // Setup response monitoring
+    setupResponseMonitor();
+    
+    // Listen for messages from popup or background script
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      console.log('Content script received message:', request);
+      
+      if (request.action === 'checkStatus') {
+        console.log('Responding to status check');
+        sendResponse({
+          active: true,
+          site: window.location.hostname,
+          url: window.location.href
+        });
+        
+      } else if (request.action === 'updatePromptSplittingSettings') {
+        console.log('Updating prompt splitting settings:', request.settings);
+        updatePromptSplittingSettings();
+        sendResponse({ success: true });
+        
+      } else if (request.action === 'analyzeProperty') {
+        console.log('Received property analysis request:', request.link);
+        
+        // Handle async operation properly
+        (async () => {
+          try {
+            const success = await insertPropertyAnalysisPrompt(request.link);
+            sendResponse({ success: success });
+          } catch (error) {
+            console.error('Error in property analysis:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+        })();
+        
+        return true; // Keep channel open for async response
+      }
+    });
+
+  } catch (initError) {
+    console.error('ChatGPT Helper Extension initialization failed:', initError);
+    if (initError.message && initError.message.includes('Unexpected token')) {
+      console.warn('This error may be due to Chrome extension context invalidation. Try reloading the page.');
+    }
+  }
+} else {
+  console.log('❌ ChatGPT Helper Extension is not active on this site');
+}
+
+// Global functions (available regardless of site)
+// Add function to manually test prompt splitting with a property link  
 window.testPromptSplitting = function(propertyLink) {
   const testLink = propertyLink || 'https://example.com/test-property';
   console.log('🧪 Testing prompt splitting with link:', testLink);
-  insertPropertyAnalysisPrompt(testLink);
+  if (typeof insertPropertyAnalysisPrompt === 'function') {
+    insertPropertyAnalysisPrompt(testLink);
+  } else {
+    console.log('❌ insertPropertyAnalysisPrompt function not available');
+  }
 };
-
-} // End of multiple execution prevention block
