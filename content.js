@@ -11346,6 +11346,105 @@ window.debugSaveAnalysis = async function(propertyUrl) {
   }
 };
 
+// Debug function to manually refresh the Properties tab display
+window.refreshPropertiesDisplay = async function() {
+  console.log('🔄 Manually refreshing Properties tab display...');
+  
+  try {
+    if (window.embeddedUI) {
+      await window.embeddedUI.loadChatGPTPropertyData();
+      console.log('✅ Properties display refreshed successfully');
+    } else {
+      console.log('❌ Embedded UI not found. Extension may not be initialized.');
+      console.log('💡 Try reloading the page to initialize the extension.');
+    }
+  } catch (error) {
+    console.error('❌ Error refreshing properties display:', error);
+  }
+};
+
+// Debug function to check if the UI is properly embedded
+window.debugUIStatus = function() {
+  console.log('🔍 Checking UI Status:');
+  console.log('   embeddedUI exists:', !!window.embeddedUI);
+  console.log('   Extension panel exists:', !!document.querySelector('.re-panel'));
+  console.log('   Properties tab exists:', !!document.querySelector('#properties-tab'));
+  console.log('   Properties list exists:', !!document.querySelector('#re-properties-list'));
+  
+  if (window.embeddedUI) {
+    console.log('   Current tab:', window.embeddedUI.activeTab || 'unknown');
+  }
+  
+  // Check if Properties tab is active
+  const propertiesTab = document.querySelector('[data-tab="properties"]');
+  if (propertiesTab) {
+    console.log('   Properties tab is active:', propertiesTab.classList.contains('re-tab-active'));
+  }
+  
+  return {
+    uiInitialized: !!window.embeddedUI,
+    panelExists: !!document.querySelector('.re-panel'),
+    propertiesTabExists: !!document.querySelector('#properties-tab'),
+    propertiesListExists: !!document.querySelector('#re-properties-list')
+  };
+};
+
+// Force show the extension UI and switch to Properties tab
+window.showExtensionUI = function() {
+  console.log('🔧 Attempting to show extension UI...');
+  
+  // Check if UI exists
+  const panel = document.querySelector('.re-panel');
+  if (panel) {
+    console.log('✅ Extension panel found, making it visible');
+    panel.style.display = 'block';
+    panel.style.opacity = '1';
+    
+    // Switch to Properties tab
+    if (window.embeddedUI && typeof window.embeddedUI.switchTab === 'function') {
+      window.embeddedUI.switchTab('properties');
+      console.log('📊 Switched to Properties tab');
+    }
+    
+    // Refresh properties display
+    setTimeout(() => {
+      refreshPropertiesDisplay();
+    }, 500);
+    
+    return true;
+  } else {
+    console.log('❌ Extension panel not found. Trying to initialize...');
+    
+    // Try to initialize the UI if it doesn't exist
+    if (typeof initEmbeddedUI === 'function') {
+      initEmbeddedUI();
+      console.log('🔄 Attempted to initialize embedded UI');
+      
+      // Wait and try again
+      setTimeout(() => {
+        const newPanel = document.querySelector('.re-panel');
+        if (newPanel) {
+          console.log('✅ Extension panel created successfully');
+          newPanel.style.display = 'block';
+          newPanel.style.opacity = '1';
+          
+          if (window.embeddedUI) {
+            window.embeddedUI.switchTab('properties');
+            setTimeout(() => refreshPropertiesDisplay(), 500);
+          }
+        } else {
+          console.log('❌ Failed to create extension panel. Try reloading the page.');
+        }
+      }, 1000);
+      
+      return false;
+    } else {
+      console.log('❌ Extension not loaded. Please reload the page.');
+      return false;
+    }
+  }
+};
+
 // Force save any ChatGPT response as property analysis (even if not detected as one)
 window.forceSaveResponse = async function(propertyUrl, messageIndex = -1) {
   if (!propertyUrl) {
