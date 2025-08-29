@@ -73,6 +73,127 @@ function notifyContextInvalidation() {
   } catch (backupError) {
     console.warn('Failed to backup state to localStorage:', backupError);
   }
+  
+  // Show enhanced user notification with auto-refresh option
+  showContextInvalidationBanner();
+}
+
+// Enhanced context invalidation banner with auto-refresh
+function showContextInvalidationBanner() {
+  // Remove existing banner if any
+  const existingBanner = document.getElementById('re-context-banner');
+  if (existingBanner) {
+    existingBanner.remove();
+  }
+
+  // Create enhanced banner
+  const banner = document.createElement('div');
+  banner.id = 're-context-banner';
+  banner.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, #ff6b6b, #ffa726);
+    color: white;
+    padding: 12px 16px;
+    text-align: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10001;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    border-bottom: 2px solid rgba(255,255,255,0.3);
+    animation: slideDown 0.3s ease-out;
+  `;
+  
+  banner.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+      <span>⚠️ RE Analyzer: Extension context lost - some features may not work</span>
+      <button id="re-auto-refresh" style="
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+        🔄 Auto-Refresh in <span id="re-countdown">10</span>s
+      </button>
+      <button onclick="window.location.reload()" style="
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+        🔄 Refresh Now
+      </button>
+      <button onclick="document.getElementById('re-context-banner').remove()" style="
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+      " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+        ×
+      </button>
+    </div>
+  `;
+  
+  // Add CSS animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideDown {
+      from { transform: translateY(-100%); }
+      to { transform: translateY(0); }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  document.body.appendChild(banner);
+  
+  // Auto-refresh countdown
+  let countdown = 10;
+  const countdownElement = document.getElementById('re-countdown');
+  const autoRefreshBtn = document.getElementById('re-auto-refresh');
+  
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdownElement) {
+      countdownElement.textContent = countdown;
+    }
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      console.log('🔄 Auto-refreshing page to restore extension functionality...');
+      window.location.reload();
+    }
+  }, 1000);
+  
+  // Allow user to cancel auto-refresh
+  if (autoRefreshBtn) {
+    autoRefreshBtn.addEventListener('click', () => {
+      clearInterval(countdownInterval);
+      if (autoRefreshBtn) {
+        autoRefreshBtn.textContent = '❌ Auto-refresh cancelled';
+        autoRefreshBtn.disabled = true;
+        autoRefreshBtn.style.opacity = '0.6';
+      }
+    });
+  }
+  
+  console.log('📢 Context invalidation banner displayed with 10-second auto-refresh');
 }
 
 // Backup current state to localStorage as fallback
@@ -2225,12 +2346,13 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, or 5):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, or 6):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
 4. Monitor ChatGPT responses (for debugging)
 5. Debug saved analysis data
+6. Test View Analysis functionality
       
 Or enter your own property URL:`);
       
@@ -2249,6 +2371,16 @@ Or enter your own property URL:`);
       // Special debug option to inspect saved data
       if (testUrl === '5') {
         this.debugSavedAnalyses();
+        return;
+      }
+      
+      // Test View Analysis functionality
+      if (testUrl === '6') {
+        if (window.testViewAnalysis) {
+          window.testViewAnalysis();
+        } else {
+          console.log('❌ testViewAnalysis function not available');
+        }
         return;
       }
       if (testUrl === '1') {
@@ -3167,6 +3299,15 @@ Or enter your own property URL:`);
 
   showAnalysisModal(property) {
     console.log('🖼️ Showing analysis modal for:', property.url);
+    console.log('🔍 MODAL DEBUG: Full property object:', property);
+    console.log('🔍 MODAL DEBUG: Analysis data:', property.analysis);
+    console.log('🔍 MODAL DEBUG: Available analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
+    console.log('🔍 MODAL DEBUG: fullResponse exists:', !!(property.analysis?.fullResponse));
+    console.log('🔍 MODAL DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
+    console.log('🔍 MODAL DEBUG: fullAnalysis exists:', !!(property.analysis?.fullAnalysis));
+    console.log('🔍 MODAL DEBUG: fullAnalysis length:', property.analysis?.fullAnalysis?.length || 0);
+    console.log('🔍 MODAL DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 300) || 'No fullResponse');
+    console.log('🔍 MODAL DEBUG: fullAnalysis preview:', property.analysis?.fullAnalysis?.substring(0, 300) || 'No fullAnalysis');
     
     // Remove existing modal if any
     const existingModal = document.querySelector('#re-analysis-modal');
@@ -3185,6 +3326,9 @@ Or enter your own property URL:`);
     // Format the analysis data for display
     const propertyDetails = this.formatPropertyDetails(extractedData);
     const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
+    
+    console.log('🔍 MODAL DEBUG: Final analysisText to display:', analysisText.substring(0, 300) + '...');
+    console.log('🔍 MODAL DEBUG: Final analysisText length:', analysisText.length);
     
     modal.innerHTML = `
       <div class="re-modal">
@@ -3214,7 +3358,19 @@ Or enter your own property URL:`);
           <div class="re-analysis-section">
             <h4>🤖 Full ChatGPT Analysis</h4>
             <div class="re-analysis-text">
-              ${this.formatAnalysisText(analysisText)}
+              ${analysisText === 'No full analysis text available' ? `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                  <div style="font-size: 48px; margin-bottom: 16px;">🤔</div>
+                  <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No ChatGPT Analysis Found</div>
+                  <div style="font-size: 14px; line-height: 1.4; margin-bottom: 20px;">
+                    The full ChatGPT response wasn't saved for this property.<br>
+                    This can happen if the analysis was interrupted or if you're viewing an older property.
+                  </div>
+                  <div style="font-size: 13px; color: #888;">
+                    Try re-analyzing this property to get the full ChatGPT response.
+                  </div>
+                </div>
+              ` : this.formatAnalysisText(analysisText)}
             </div>
           </div>
           
@@ -3231,9 +3387,15 @@ Or enter your own property URL:`);
         </div>
         
         <div class="re-modal-footer">
-          <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
-            📋 Copy Analysis
-          </button>
+          ${analysisText === 'No full analysis text available' ? `
+            <button class="re-btn re-btn-primary" onclick="embeddedUI.reAnalyzeProperty('${property.url}'); this.closest('.re-modal-overlay').remove();">
+              🔍 Re-analyze Property
+            </button>
+          ` : `
+            <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+              📋 Copy Analysis
+            </button>
+          `}
           <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
             🔗 Open Original Listing
           </button>
@@ -3575,6 +3737,23 @@ Or enter your own property URL:`);
       this.showManualInput();
       this.validatePropertyInput();
     }
+  }
+
+  async reAnalyzeProperty(url) {
+    console.log('🔄 Re-analyzing property from modal:', url);
+    // Use the existing analyzeExistingProperty function and auto-start analysis
+    await this.analyzeExistingProperty(url);
+    
+    // Show message
+    this.showChatGPTMessage('info', 'Starting fresh analysis...');
+    
+    // Auto-start analysis after a short delay
+    setTimeout(() => {
+      const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+      if (analyzeBtn && this.isValidPropertyLink(url)) {
+        analyzeBtn.click();
+      }
+    }, 1000);
   }
 
   async exportProperty(url) {
@@ -9707,15 +9886,22 @@ function setupResponseMonitor() {
         return;
       }
       
-      console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
-      console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+      if (currentPropertyAnalysis) {
+        console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
+        console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+      } else {
+        console.log('✅ Detected completed property analysis response (no current analysis tracking)');
+      }
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
       const analysisData = extractPropertyAnalysisData(messageText);
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
-        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
+        const propertyUrl = currentPropertyAnalysis?.url || 'Unknown URL';
+        const sessionId = currentPropertyAnalysis?.sessionId || 'Unknown Session';
+        
+        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', propertyUrl);
         console.log('🔍 ANALYSIS DATA BEING SAVED:', {
-          url: currentPropertyAnalysis.url,
+          url: propertyUrl,
           hasFullResponse: !!analysisData.fullResponse,
           fullResponseLength: analysisData.fullResponse?.length || 0,
           hasFullAnalysis: !!analysisData.fullAnalysis,
@@ -9724,8 +9910,8 @@ function setupResponseMonitor() {
           fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
         });
         console.log('📊 Extracted data summary:', {
-          propertyUrl: currentPropertyAnalysis.url,
-          sessionId: currentPropertyAnalysis.sessionId,
+          propertyUrl: propertyUrl,
+          sessionId: sessionId,
           dataPoints: Object.keys(analysisData.extractedData).length,
           hasPrice: !!analysisData.extractedData.price,
           hasBedrooms: !!analysisData.extractedData.bedrooms,
@@ -9735,28 +9921,56 @@ function setupResponseMonitor() {
         });
         
         // Send the analysis data back to the background script
-        safeChromeFall(() => {
-          return chrome.runtime.sendMessage({
-            action: 'savePropertyAnalysis',
-            propertyUrl: currentPropertyAnalysis.url,
-            sessionId: currentPropertyAnalysis.sessionId,
-            analysisData: analysisData
-          });
-        }).then(response => {
-          if (response) {
-            console.log('✅ Analysis data sent successfully:', response);
-            if (response.success) {
-              console.log('🎉 Property analysis saved and should now show as analyzed!');
-              
-              // Notify embedded UI about completed analysis
-              if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
-                window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+        if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+          safeChromeFall(() => {
+            return chrome.runtime.sendMessage({
+              action: 'savePropertyAnalysis',
+              propertyUrl: currentPropertyAnalysis.url,
+              sessionId: currentPropertyAnalysis.sessionId,
+              analysisData: analysisData
+            });
+          }).then(response => {
+            if (response) {
+              console.log('✅ Analysis data sent successfully:', response);
+              if (response.success) {
+                console.log('🎉 Property analysis saved and should now show as analyzed!');
+                
+                // Notify embedded UI about completed analysis
+                if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                  if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+                    window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+                  }
+                }
               }
             }
+          }).catch(err => {
+            console.error('❌ Failed to send analysis data:', err);
+          });
+        } else {
+          console.warn('⚠️ Cannot save analysis: currentPropertyAnalysis is null or missing URL');
+          console.log('🔍 This might be a response from prompt splitting - checking fallback handling...');
+          
+          // Try to handle as split prompt response if we have pending property link
+          if (promptSplittingState.pendingPropertyLink && promptSplittingState.currentPhase) {
+            console.log('🔄 Attempting to save as split prompt response with pending link:', promptSplittingState.pendingPropertyLink);
+            
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `fallback_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response && response.success) {
+                console.log('✅ Fallback save successful for split prompt response');
+                resetPromptSplittingState();
+              }
+            }).catch(err => {
+              console.error('❌ Fallback save also failed:', err);
+            });
           }
-        }).catch(err => {
-          console.error('❌ Failed to send analysis data:', err);
-        });
+        }
         
         // Track this message as processed for this property
         if (currentUrl) {
@@ -9895,7 +10109,7 @@ function setupResponseMonitor() {
       
       // Only process if we have an active property analysis session
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
-        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
+        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis?.url || 'Unknown URL');
         console.log('📊 Current response length:', messageText.length);
         
         // Check if analysis session has timed out (10 minutes)
@@ -10645,7 +10859,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
-    console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis.url);
+    console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis?.url || 'Unknown URL');
   }
   
   // We'll set currentPropertyAnalysis later depending on the prompt approach
@@ -11422,6 +11636,58 @@ window.testPromptSplitting = function(propertyLink) {
   const testLink = propertyLink || 'https://example.com/test-property';
   console.log('🧪 Testing prompt splitting with link:', testLink);
   insertPropertyAnalysisPrompt(testLink);
+};
+
+// Test View Analysis functionality
+window.testViewAnalysis = async function() {
+  console.log('🧪 Testing View Analysis functionality...');
+  
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const properties = result.propertyHistory || [];
+    
+    console.log('📊 Found', properties.length, 'properties in storage');
+    
+    if (properties.length === 0) {
+      console.log('❌ No properties found. Analyze some properties first.');
+      return;
+    }
+    
+    properties.forEach((property, index) => {
+      console.log(`\n🏠 Property ${index + 1}:`);
+      console.log('   URL:', property.url);
+      console.log('   Has analysis:', !!property.analysis);
+      console.log('   Has fullResponse:', !!(property.analysis?.fullResponse));
+      console.log('   Has fullAnalysis:', !!(property.analysis?.fullAnalysis));
+      console.log('   fullResponse length:', property.analysis?.fullResponse?.length || 0);
+      console.log('   fullAnalysis length:', property.analysis?.fullAnalysis?.length || 0);
+      console.log('   extractedData keys:', Object.keys(property.analysis?.extractedData || {}));
+      
+      if (property.analysis?.fullResponse) {
+        console.log('   fullResponse preview:', property.analysis.fullResponse.substring(0, 200) + '...');
+      } else if (property.analysis?.fullAnalysis) {
+        console.log('   fullAnalysis preview:', property.analysis.fullAnalysis.substring(0, 200) + '...');
+      }
+    });
+    
+    // Test the first property with analysis
+    const propertyWithAnalysis = properties.find(p => p.analysis && (p.analysis.fullResponse || p.analysis.fullAnalysis));
+    
+    if (propertyWithAnalysis) {
+      console.log('\n🔍 Testing View Analysis modal with:', propertyWithAnalysis.url);
+      if (window.embeddedUI) {
+        window.embeddedUI.viewProperty(propertyWithAnalysis.url);
+      } else {
+        console.log('❌ embeddedUI not available');
+      }
+    } else {
+      console.log('\n❌ No properties found with saved analysis text');
+      console.log('💡 Try analyzing a property first, then test this function');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error testing View Analysis:', error);
+  }
 };
 
 } // End of multiple execution prevention block
