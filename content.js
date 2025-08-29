@@ -51,6 +51,74 @@ function safeChromeFall(apiCall, fallbackValue = null) {
   }
 }
 
+// Global fallback event handlers for buttons when embeddedUI is not immediately available
+// This ensures View Analysis buttons work even during extension initialization
+window.REAnalyzerButtonHandler = {
+  viewProperty: function(url) {
+    console.log('🔄 Fallback: View property called for:', url);
+    if (window.embeddedUI && window.embeddedUI.viewProperty) {
+      window.embeddedUI.viewProperty(url);
+    } else {
+      console.error('❌ embeddedUI not available, attempting to wait and retry...');
+      // Try waiting for embeddedUI to be available
+      let retries = 0;
+      const maxRetries = 10;
+      const checkInterval = setInterval(() => {
+        retries++;
+        if (window.embeddedUI && window.embeddedUI.viewProperty) {
+          clearInterval(checkInterval);
+          console.log('✅ embeddedUI found after', retries, 'retries, calling viewProperty');
+          window.embeddedUI.viewProperty(url);
+        } else if (retries >= maxRetries) {
+          clearInterval(checkInterval);
+          console.error('❌ embeddedUI still not available after', maxRetries, 'retries');
+          alert('RE Analyzer: Extension is still loading, please try again in a moment.');
+        }
+      }, 100);
+    }
+  },
+  
+  exportProperty: function(url) {
+    console.log('🔄 Fallback: Export property called for:', url);
+    if (window.embeddedUI && window.embeddedUI.exportProperty) {
+      window.embeddedUI.exportProperty(url);
+    } else {
+      console.error('❌ embeddedUI not available for export');
+      alert('RE Analyzer: Extension is still loading, please try again in a moment.');
+    }
+  },
+  
+  analyzeExistingProperty: function(url) {
+    console.log('🔄 Fallback: Analyze property called for:', url);
+    if (window.embeddedUI && window.embeddedUI.analyzeExistingProperty) {
+      window.embeddedUI.analyzeExistingProperty(url);
+    } else {
+      console.error('❌ embeddedUI not available for analysis');
+      alert('RE Analyzer: Extension is still loading, please try again in a moment.');
+    }
+  },
+  
+  copyAnalysisToClipboard: function(url) {
+    console.log('🔄 Fallback: Copy analysis called for:', url);
+    if (window.embeddedUI && window.embeddedUI.copyAnalysisToClipboard) {
+      window.embeddedUI.copyAnalysisToClipboard(url);
+    } else {
+      console.error('❌ embeddedUI not available for copy');
+      alert('RE Analyzer: Extension is still loading, please try again in a moment.');
+    }
+  },
+  
+  reAnalyzeProperty: function(url) {
+    console.log('🔄 Fallback: Re-analyze property called for:', url);
+    if (window.embeddedUI && window.embeddedUI.reAnalyzeProperty) {
+      window.embeddedUI.reAnalyzeProperty(url);
+    } else {
+      console.error('❌ embeddedUI not available for re-analysis');
+      alert('RE Analyzer: Extension is still loading, please try again in a moment.');
+    }
+  }
+};
+
 // Track if we've already notified about context invalidation to avoid spam
 let contextInvalidationNotified = false;
 
@@ -2117,15 +2185,15 @@ class REAnalyzerEmbeddedUI {
           <div>${property.date || 'Unknown date'}</div>
         </div>
         <div class="re-property-actions">
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="(window.embeddedUI?.viewProperty || window.REAnalyzerButtonHandler?.viewProperty)?.('${property.url}')">
             View Analysis
           </button>
           ${hasAnalysis ? `
-            <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+            <button class="re-btn re-btn-secondary re-btn-sm" onclick="(window.embeddedUI?.exportProperty || window.REAnalyzerButtonHandler?.exportProperty)?.('${property.url}')">
               Export
             </button>
           ` : `
-            <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+            <button class="re-btn re-btn-primary re-btn-sm" onclick="(window.embeddedUI?.analyzeExistingProperty || window.REAnalyzerButtonHandler?.analyzeExistingProperty)?.('${property.url}')">
               Analyze
             </button>
           `}
@@ -2346,13 +2414,14 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, or 6):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, 6, or 7):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
 4. Monitor ChatGPT responses (for debugging)
 5. Debug saved analysis data
 6. Test View Analysis functionality
+7. Test View Analysis Button Fix (NEW)
       
 Or enter your own property URL:`);
       
@@ -2380,6 +2449,16 @@ Or enter your own property URL:`);
           window.testViewAnalysis();
         } else {
           console.log('❌ testViewAnalysis function not available');
+        }
+        return;
+      }
+      
+      // Test View Analysis Button Fix
+      if (testUrl === '7') {
+        if (window.testViewAnalysisFix) {
+          window.testViewAnalysisFix();
+        } else {
+          console.log('❌ testViewAnalysisFix function not available');
         }
         return;
       }
@@ -3149,15 +3228,15 @@ Or enter your own property URL:`);
             ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
           </div>
           <div class="re-property-actions">
-            <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+            <button class="re-btn re-btn-ghost re-btn-sm" onclick="(window.embeddedUI?.viewProperty || window.REAnalyzerButtonHandler?.viewProperty)?.('${property.url}')">
               View
             </button>
             ${hasAnalysis ? `
-              <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+              <button class="re-btn re-btn-secondary re-btn-sm" onclick="(window.embeddedUI?.exportProperty || window.REAnalyzerButtonHandler?.exportProperty)?.('${property.url}')">
                 Export
               </button>
             ` : `
-              <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+              <button class="re-btn re-btn-primary re-btn-sm" onclick="(window.embeddedUI?.analyzeExistingProperty || window.REAnalyzerButtonHandler?.analyzeExistingProperty)?.('${property.url}')">
                 Analyze
               </button>
             `}
@@ -3289,7 +3368,14 @@ Or enter your own property URL:`);
       }
       
       // Show the saved ChatGPT analysis in a modal
-      this.showAnalysisModal(property);
+      console.log('🔍 DEBUG: About to call showAnalysisModal with property:', property.url);
+      try {
+        this.showAnalysisModal(property);
+        console.log('🔍 DEBUG: showAnalysisModal call completed successfully');
+      } catch (modalError) {
+        console.error('❌ Failed to show analysis modal:', modalError);
+        this.showChatGPTMessage('error', 'Failed to display analysis modal: ' + modalError.message);
+      }
       
     } catch (error) {
       console.error('❌ Failed to load property analysis:', error);
@@ -3388,11 +3474,11 @@ Or enter your own property URL:`);
         
         <div class="re-modal-footer">
           ${analysisText === 'No full analysis text available' ? `
-            <button class="re-btn re-btn-primary" onclick="embeddedUI.reAnalyzeProperty('${property.url}'); this.closest('.re-modal-overlay').remove();">
+            <button class="re-btn re-btn-primary" onclick="(window.embeddedUI?.reAnalyzeProperty || window.REAnalyzerButtonHandler?.reAnalyzeProperty)?.('${property.url}'); this.closest('.re-modal-overlay').remove();">
               🔍 Re-analyze Property
             </button>
           ` : `
-            <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+            <button class="re-btn re-btn-secondary" onclick="(window.embeddedUI?.copyAnalysisToClipboard || window.REAnalyzerButtonHandler?.copyAnalysisToClipboard)?.('${property.url}')">
               📋 Copy Analysis
             </button>
           `}
@@ -3412,12 +3498,27 @@ Or enter your own property URL:`);
     // Add modal to page
     document.body.appendChild(modal);
     
+    // Debug modal positioning
+    console.log('🔍 MODAL DEBUG: Modal element created:', modal);
+    console.log('🔍 MODAL DEBUG: Modal classNames:', modal.className);
+    console.log('🔍 MODAL DEBUG: Modal appended to body');
+    console.log('🔍 MODAL DEBUG: Modal computed style:', window.getComputedStyle(modal));
+    console.log('🔍 MODAL DEBUG: Body children count:', document.body.children.length);
+    
     // Close modal when clicking outside
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         modal.remove();
       }
     });
+    
+    // Force visibility if needed
+    setTimeout(() => {
+      modal.style.display = 'flex';
+      modal.style.visibility = 'visible';
+      modal.style.opacity = '1';
+      console.log('🔍 MODAL DEBUG: Force-set modal visibility styles');
+    }, 10);
     
     console.log('✅ Analysis modal displayed');
   }
@@ -3473,29 +3574,33 @@ Or enter your own property URL:`);
     styles.id = 're-modal-styles';
     styles.textContent = `
       .re-modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        padding: 20px;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 2147483647 !important;
+        padding: 20px !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
       
       .re-modal {
-        background: var(--chatgpt-bg-primary, white);
-        border-radius: 12px;
-        max-width: 800px;
-        max-height: 90vh;
-        width: 100%;
-        overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        display: flex;
-        flex-direction: column;
+        background: var(--chatgpt-bg-primary, white) !important;
+        border-radius: 12px !important;
+        max-width: 800px !important;
+        max-height: 90vh !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        z-index: 1 !important;
       }
       
       .re-modal-header {
@@ -11638,6 +11743,80 @@ window.testPromptSplitting = function(propertyLink) {
   insertPropertyAnalysisPrompt(testLink);
 };
 
+// Test View Analysis Button Fix functionality
+window.testViewAnalysisFix = async function() {
+  console.log('🧪 Testing View Analysis Button Fix...');
+  
+  try {
+    // Test 1: Check if fallback handler is available
+    console.log('\n1. 🔍 Testing fallback handler availability...');
+    console.log('   REAnalyzerButtonHandler exists:', !!window.REAnalyzerButtonHandler);
+    console.log('   REAnalyzerButtonHandler.viewProperty exists:', !!window.REAnalyzerButtonHandler?.viewProperty);
+    
+    // Test 2: Check if embeddedUI is available
+    console.log('\n2. 🔍 Testing embeddedUI availability...');
+    console.log('   window.embeddedUI exists:', !!window.embeddedUI);
+    console.log('   embeddedUI.viewProperty exists:', !!window.embeddedUI?.viewProperty);
+    console.log('   embeddedUI.showAnalysisModal exists:', !!window.embeddedUI?.showAnalysisModal);
+    
+    // Test 3: Test button onclick handlers
+    console.log('\n3. 🔍 Testing button onclick handler format...');
+    const testButtonClick = function(url) {
+      try {
+        const result = (window.embeddedUI?.viewProperty || window.REAnalyzerButtonHandler?.viewProperty)?.('TEST_URL');
+        console.log('   ✅ Button handler executed successfully');
+        return true;
+      } catch (err) {
+        console.log('   ❌ Button handler failed:', err);
+        return false;
+      }
+    };
+    testButtonClick('TEST_URL');
+    
+    // Test 4: Check for saved properties
+    console.log('\n4. 🔍 Testing saved properties...');
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const properties = result.propertyHistory || [];
+    console.log('   Total properties:', properties.length);
+    
+    // Find properties with analysis
+    const propertiesWithAnalysis = properties.filter(p => p.analysis && (p.analysis.fullResponse || p.analysis.fullAnalysis));
+    console.log('   Properties with analysis:', propertiesWithAnalysis.length);
+    
+    if (propertiesWithAnalysis.length > 0) {
+      console.log('\n5. 🔍 Testing actual View Analysis with property:', propertiesWithAnalysis[0].url);
+      if (window.embeddedUI && window.embeddedUI.viewProperty) {
+        try {
+          window.embeddedUI.viewProperty(propertiesWithAnalysis[0].url);
+          console.log('   ✅ View Analysis called successfully');
+        } catch (err) {
+          console.log('   ❌ View Analysis failed:', err);
+        }
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.viewProperty) {
+        try {
+          window.REAnalyzerButtonHandler.viewProperty(propertiesWithAnalysis[0].url);
+          console.log('   ✅ Fallback View Analysis called successfully');
+        } catch (err) {
+          console.log('   ❌ Fallback View Analysis failed:', err);
+        }
+      } else {
+        console.log('   ❌ No View Analysis method available');
+      }
+    } else {
+      console.log('\n5. ❌ No properties with analysis found - try analyzing a property first');
+    }
+    
+    console.log('\n🎯 View Analysis Button Fix Test Complete!');
+    console.log('💡 If you see errors, check that:');
+    console.log('   1. Extension is properly loaded');
+    console.log('   2. You have analyzed at least one property');
+    console.log('   3. Check console for detailed error messages');
+    
+  } catch (error) {
+    console.error('❌ Error testing View Analysis Fix:', error);
+  }
+};
+
 // Test View Analysis functionality
 window.testViewAnalysis = async function() {
   console.log('🧪 Testing View Analysis functionality...');
@@ -11689,5 +11868,7 @@ window.testViewAnalysis = async function() {
     console.error('❌ Error testing View Analysis:', error);
   }
 };
+
+
 
 } // End of multiple execution prevention block
