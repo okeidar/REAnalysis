@@ -73,6 +73,127 @@ function notifyContextInvalidation() {
   } catch (backupError) {
     console.warn('Failed to backup state to localStorage:', backupError);
   }
+  
+  // Show enhanced user notification with auto-refresh option
+  showContextInvalidationBanner();
+}
+
+// Enhanced context invalidation banner with auto-refresh
+function showContextInvalidationBanner() {
+  // Remove existing banner if any
+  const existingBanner = document.getElementById('re-context-banner');
+  if (existingBanner) {
+    existingBanner.remove();
+  }
+
+  // Create enhanced banner
+  const banner = document.createElement('div');
+  banner.id = 're-context-banner';
+  banner.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, #ff6b6b, #ffa726);
+    color: white;
+    padding: 12px 16px;
+    text-align: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10001;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    border-bottom: 2px solid rgba(255,255,255,0.3);
+    animation: slideDown 0.3s ease-out;
+  `;
+  
+  banner.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+      <span>⚠️ RE Analyzer: Extension context lost - some features may not work</span>
+      <button id="re-auto-refresh" style="
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+        🔄 Auto-Refresh in <span id="re-countdown">10</span>s
+      </button>
+      <button onclick="window.location.reload()" style="
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        transition: all 0.2s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+        🔄 Refresh Now
+      </button>
+      <button onclick="document.getElementById('re-context-banner').remove()" style="
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+      " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+        ×
+      </button>
+    </div>
+  `;
+  
+  // Add CSS animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideDown {
+      from { transform: translateY(-100%); }
+      to { transform: translateY(0); }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  document.body.appendChild(banner);
+  
+  // Auto-refresh countdown
+  let countdown = 10;
+  const countdownElement = document.getElementById('re-countdown');
+  const autoRefreshBtn = document.getElementById('re-auto-refresh');
+  
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdownElement) {
+      countdownElement.textContent = countdown;
+    }
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      console.log('🔄 Auto-refreshing page to restore extension functionality...');
+      window.location.reload();
+    }
+  }, 1000);
+  
+  // Allow user to cancel auto-refresh
+  if (autoRefreshBtn) {
+    autoRefreshBtn.addEventListener('click', () => {
+      clearInterval(countdownInterval);
+      if (autoRefreshBtn) {
+        autoRefreshBtn.textContent = '❌ Auto-refresh cancelled';
+        autoRefreshBtn.disabled = true;
+        autoRefreshBtn.style.opacity = '0.6';
+      }
+    });
+  }
+  
+  console.log('📢 Context invalidation banner displayed with 10-second auto-refresh');
 }
 
 // Backup current state to localStorage as fallback
