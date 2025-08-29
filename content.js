@@ -2649,7 +2649,18 @@ Or enter your own property URL:`);
       }
       
       if (!testInput) {
-        throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page (https://chatgpt.com) and it has loaded completely. Try refreshing the page. For debugging, run debugChatGPTInput() in the console.');
+        // Offer manual selection as last resort
+        console.log('🎯 Attempting manual input field selection...');
+        const userChoice = confirm('Automatic input field detection failed. Would you like to manually select the ChatGPT input field? (Click OK to select manually, or Cancel to abort)');
+        
+        if (userChoice) {
+          testInput = await manuallySelectChatGPTInput();
+          if (!testInput) {
+            throw new Error('Manual input field selection was cancelled or timed out. Please try again or refresh the page.');
+          }
+        } else {
+          throw new Error('Could not find ChatGPT input field. Make sure you are on the ChatGPT page (https://chatgpt.com) and it has loaded completely. Try refreshing the page. For debugging, run debugChatGPTInput() in the console.');
+        }
       }
       console.log('✅ ChatGPT input field found:', testInput);
       
@@ -10172,17 +10183,36 @@ function findChatGPTInput() {
   console.log('🔍 Searching for ChatGPT input field...');
   console.log('📍 Current URL:', window.location.href);
   console.log('📱 Viewport:', window.innerWidth + 'x' + window.innerHeight);
+  console.log('📋 Page title:', document.title);
+  console.log('📋 Document ready state:', document.readyState);
   
   // First, let's see what input elements exist on the page
   const allInputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
   console.log(`📋 Found ${allInputs.length} total input/editable elements on page`);
   
-  // Try different selectors for ChatGPT input (updated for 2024)
+  // Log all input elements for debugging
+  allInputs.forEach((input, index) => {
+    console.log(`📝 Input ${index + 1}:`, {
+      tag: input.tagName,
+      id: input.id,
+      classes: input.className,
+      placeholder: input.placeholder,
+      type: input.type,
+      contentEditable: input.contentEditable,
+      visible: input.offsetParent !== null,
+      disabled: input.disabled,
+      readOnly: input.readOnly
+    });
+  });
+  
+  // Try different selectors for ChatGPT input (comprehensive list for 2024)
   const selectors = [
     // Most current ChatGPT interface selectors (December 2024)
     '#prompt-textarea',                                    // Primary ID-based selector
+    'textarea[id*="prompt"]',                             // Any textarea with prompt in ID
     'textarea[placeholder*="Message ChatGPT"]',            // Current placeholder text
     'textarea[placeholder*="Send a message"]',             // Alternative placeholder
+    'textarea[placeholder*="Type a message"]',             // Another variant
     'textarea[data-id="root"]',                           // Data-id based
     'div[contenteditable="true"][data-id="root"]',        // Contenteditable version
     
@@ -10190,35 +10220,54 @@ function findChatGPTInput() {
     'textarea[role="textbox"]',
     'div[contenteditable="true"][role="textbox"]',
     'textarea[aria-label*="message"]',
+    'textarea[aria-label*="Message"]',
     'div[contenteditable="true"][aria-label*="message"]',
+    'div[contenteditable="true"][aria-label*="Message"]',
     
-    // Modern input patterns
+    // Modern input patterns with more variations
     'textarea[placeholder*="Message"]',
     'textarea[placeholder*="message"]',
+    'textarea[placeholder*="Ask"]',
+    'textarea[placeholder*="Type"]',
     'div[contenteditable="true"][class*="ProseMirror"]',   // ProseMirror editor
     'textarea[data-testid="composer-text-input"]',
+    'textarea[data-testid*="message"]',
+    'textarea[data-testid*="input"]',
     'div[contenteditable="true"][data-testid*="composer"]',
+    'div[contenteditable="true"][data-testid*="message"]',
+    'div[contenteditable="true"][data-testid*="input"]',
     
-    // Class-based patterns
+    // Class-based patterns (more comprehensive)
     'textarea[class*="prose"]',
     'div[contenteditable="true"][class*="prose"]',
     'textarea[class*="composer"]',
     'textarea[class*="input"]',
+    'textarea[class*="text"]',
+    'textarea[class*="message"]',
     'div[class*="composer"][contenteditable="true"]',
     'div[class*="input"][contenteditable="true"]',
+    'div[class*="text"][contenteditable="true"]',
+    'div[class*="message"][contenteditable="true"]',
     
-    // Fallback selectors (broad but necessary)
-    'div[contenteditable="true"]',
+    // Container-based searches (find input inside specific containers)
+    'main textarea',
+    'main div[contenteditable="true"]',
+    'form textarea:not([disabled]):not([readonly])',
+    'form div[contenteditable="true"]',
+    '[role="main"] textarea',
+    '[role="main"] div[contenteditable="true"]',
+    
+    // Broad fallback selectors with better filtering
+    'textarea:not([disabled]):not([readonly]):not([style*="display: none"])',
+    'div[contenteditable="true"]:not([style*="display: none"])',
+    
+    // Last resort - any visible input
     'textarea',
-    
-    // Additional modern patterns
-    'textarea[spellcheck="false"]',
-    'div[contenteditable="true"][spellcheck="false"]',
-    
-    // Try by proximity to send button
-    'form textarea',
-    'form div[contenteditable="true"]'
+    'div[contenteditable="true"]'
   ];
+  
+  // Collect all potential inputs with scoring
+  const candidates = [];
   
   for (const selector of selectors) {
     try {
@@ -10227,12 +10276,19 @@ function findChatGPTInput() {
       
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i];
+        
+        // Skip if we already have this element
+        if (candidates.some(c => c.element === element)) {
+          continue;
+        }
+        
         const elementInfo = {
           tag: element.tagName,
           id: element.id,
           classes: element.className,
           placeholder: element.placeholder,
           dataId: element.getAttribute('data-id'),
+          ariaLabel: element.getAttribute('aria-label'),
           visible: element.offsetParent !== null,
           disabled: element.disabled,
           readOnly: element.readOnly,
@@ -10257,28 +10313,83 @@ function findChatGPTInput() {
         const isInViewport = element.getBoundingClientRect().width > 0 && 
                             element.getBoundingClientRect().height > 0;
         
-        if (isVisible && isInteractable && hasValidDimensions && isInViewport) {
-          console.log('✅ Found suitable input element:', element);
-          console.log('📋 Element details:', elementInfo);
-          console.log('✅ Suitability checks passed:', {
+        // Calculate a score for this element
+        let score = 0;
+        
+        // High priority identifiers
+        if (element.id === 'prompt-textarea') score += 100;
+        if (element.id && element.id.includes('prompt')) score += 50;
+        if (element.placeholder && element.placeholder.includes('Message ChatGPT')) score += 80;
+        if (element.placeholder && element.placeholder.includes('message')) score += 30;
+        if (element.getAttribute('aria-label') && element.getAttribute('aria-label').includes('message')) score += 40;
+        
+        // Tag preferences
+        if (element.tagName === 'TEXTAREA') score += 20;
+        if (element.contentEditable === 'true') score += 15;
+        
+        // Container context
+        if (element.closest('main')) score += 10;
+        if (element.closest('form')) score += 10;
+        
+        // Visibility and interactability
+        if (isVisible) score += 30;
+        if (isInteractable) score += 30;
+        if (hasValidDimensions) score += 20;
+        if (isInViewport) score += 20;
+        
+        // Penalize hidden or problematic elements
+        if (!isVisible) score -= 50;
+        if (!isInteractable) score -= 50;
+        if (!hasValidDimensions) score -= 30;
+        
+        console.log(`  📊 Element score: ${score}`);
+        
+        candidates.push({
+          element,
+          score,
+          info: elementInfo,
+          checks: {
             visible: isVisible,
             interactable: isInteractable,
             validDimensions: hasValidDimensions,
             inViewport: isInViewport
-          });
-          return element;
-        } else {
-          console.log('❌ Element not suitable:', {
-            visible: isVisible,
-            interactable: isInteractable,
-            validDimensions: hasValidDimensions,
-            inViewport: isInViewport
-          });
-        }
+          }
+        });
       }
     } catch (e) {
       console.log(`❌ Error with selector ${selector}:`, e);
     }
+  }
+  
+  // Sort candidates by score
+  candidates.sort((a, b) => b.score - a.score);
+  
+  console.log('🏆 Top input field candidates:');
+  candidates.slice(0, 5).forEach((candidate, index) => {
+    console.log(`  ${index + 1}. Score: ${candidate.score}`, candidate.info);
+  });
+  
+  // Return the best candidate that meets basic requirements
+  for (const candidate of candidates) {
+    if (candidate.score >= 50 && 
+        candidate.checks.visible && 
+        candidate.checks.interactable && 
+        candidate.checks.validDimensions) {
+      console.log('✅ Selected best input element:', candidate.element);
+      console.log('📋 Element details:', candidate.info);
+      console.log('📊 Final score:', candidate.score);
+      return candidate.element;
+    }
+  }
+  
+  // If no good candidates, return the highest scoring one if it exists
+  if (candidates.length > 0) {
+    const bestCandidate = candidates[0];
+    console.log('⚠️ No ideal candidate found, using best available:', bestCandidate.element);
+    console.log('📋 Element details:', bestCandidate.info);
+    console.log('📊 Score:', bestCandidate.score);
+    console.log('⚠️ Checks:', bestCandidate.checks);
+    return bestCandidate.element;
   }
   
   console.log('❌ No suitable input field found with current selectors');
@@ -10300,11 +10411,120 @@ function findChatGPTInput() {
   return null;
 }
 
+// Manual input field selector for when automatic detection fails
+function manuallySelectChatGPTInput() {
+  console.log('🖱️ Starting manual input field selection...');
+  
+  return new Promise((resolve) => {
+    // Highlight all potential input fields
+    const allInputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+    const highlights = [];
+    
+    allInputs.forEach((input, index) => {
+      if (input.offsetParent !== null) { // Only highlight visible elements
+        const highlight = document.createElement('div');
+        highlight.style.cssText = `
+          position: absolute;
+          z-index: 10001;
+          border: 3px solid #ff4444;
+          background: rgba(255, 68, 68, 0.2);
+          pointer-events: none;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 12px;
+          color: #ff4444;
+          font-weight: bold;
+          padding: 2px 4px;
+        `;
+        
+        const rect = input.getBoundingClientRect();
+        highlight.style.left = (rect.left + window.scrollX) + 'px';
+        highlight.style.top = (rect.top + window.scrollY) + 'px';
+        highlight.style.width = rect.width + 'px';
+        highlight.style.height = rect.height + 'px';
+        highlight.textContent = `Input ${index + 1}`;
+        
+        document.body.appendChild(highlight);
+        highlights.push(highlight);
+        
+        // Add click handler to the input element
+        input.style.cursor = 'pointer';
+        input.style.border = '3px solid #ff4444';
+        
+        const clickHandler = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Clean up
+          highlights.forEach(h => h.remove());
+          allInputs.forEach(inp => {
+            inp.style.cursor = '';
+            inp.style.border = '';
+            inp.removeEventListener('click', clickHandler);
+          });
+          
+          console.log('✅ User selected input field:', input);
+          resolve(input);
+        };
+        
+        input.addEventListener('click', clickHandler);
+      }
+    });
+    
+    // Show instructions
+    const instructions = document.createElement('div');
+    instructions.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      z-index: 10002;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    instructions.innerHTML = `
+      <div style="margin-bottom: 8px;"><strong>🎯 Manual Input Selection</strong></div>
+      <div>Click on the ChatGPT text input field you want to use.</div>
+      <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Highlighted inputs are clickable</div>
+    `;
+    
+    document.body.appendChild(instructions);
+    
+    // Auto-cleanup after 30 seconds
+    setTimeout(() => {
+      if (document.body.contains(instructions)) {
+        instructions.remove();
+        highlights.forEach(h => h.remove());
+        allInputs.forEach(inp => {
+          inp.style.cursor = '';
+          inp.style.border = '';
+        });
+        console.log('⏰ Manual selection timed out');
+        resolve(null);
+      }
+    }, 30000);
+  });
+}
+
 // Debug helper function for users to run in console
 function debugChatGPTInput() {
   console.log('🔧 CHATGPT INPUT DEBUG HELPER');
   console.log('============================');
   
+  // Page info
+  console.log('📍 Current URL:', window.location.href);
+  console.log('📋 Page title:', document.title);
+  console.log('📋 Document ready state:', document.readyState);
+  console.log('📱 Viewport:', window.innerWidth + 'x' + window.innerHeight);
+  
+  // Try to find input
   const result = findChatGPTInput();
   
   if (result) {
@@ -10315,20 +10535,73 @@ function debugChatGPTInput() {
     console.log('📋 Classes:', result.className);
     console.log('📋 Placeholder:', result.placeholder);
     console.log('📋 Data attributes:', Array.from(result.attributes).filter(attr => attr.name.startsWith('data-')));
+    
+    // Test if we can focus and type in it
+    try {
+      result.focus();
+      const originalValue = result.value || result.textContent || '';
+      result.value = 'TEST';
+      result.textContent = 'TEST';
+      
+      setTimeout(() => {
+        result.value = originalValue;
+        result.textContent = originalValue;
+        console.log('✅ Input field is functional (focus and typing works)');
+      }, 1000);
+      
+    } catch (e) {
+      console.log('⚠️ Input field found but may not be functional:', e.message);
+    }
+    
     return result;
   } else {
     console.log('❌ FAILED: Could not find ChatGPT input field');
-    console.log('💡 Try these manual checks:');
+    console.log('💡 Try these solutions:');
     console.log('   1. Are you on https://chatgpt.com?');
     console.log('   2. Is the page fully loaded?');
     console.log('   3. Can you see the text input box?');
     console.log('   4. Try refreshing the page');
+    console.log('   5. Run manuallySelectChatGPTInput() to manually select the input field');
+    console.log('   6. Run listAllInputs() to see all available inputs');
     return null;
   }
 }
 
-// Make debug function globally available
+// Additional helper to list all inputs
+function listAllInputs() {
+  console.log('📝 ALL INPUT ELEMENTS ON PAGE');
+  console.log('=============================');
+  
+  const allInputs = document.querySelectorAll('input, textarea, [contenteditable="true"]');
+  console.log(`Found ${allInputs.length} total input/editable elements:`);
+  
+  allInputs.forEach((input, index) => {
+    const rect = input.getBoundingClientRect();
+    const info = {
+      index: index + 1,
+      tag: input.tagName,
+      id: input.id,
+      classes: input.className,
+      placeholder: input.placeholder,
+      type: input.type,
+      contentEditable: input.contentEditable,
+      visible: input.offsetParent !== null,
+      disabled: input.disabled,
+      readOnly: input.readOnly,
+      dimensions: `${Math.round(rect.width)}x${Math.round(rect.height)}`,
+      position: `${Math.round(rect.left)},${Math.round(rect.top)}`
+    };
+    
+    console.log(`${index + 1}.`, info);
+  });
+  
+  return allInputs;
+}
+
+// Make functions globally available
 window.debugChatGPTInput = debugChatGPTInput;
+window.manuallySelectChatGPTInput = manuallySelectChatGPTInput;
+window.listAllInputs = listAllInputs;
 
 // Function to wait for input field to be available
 function waitForInputField(maxWait = 10000) {
