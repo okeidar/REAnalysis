@@ -2225,12 +2225,13 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, or 5):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, or 6):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
 4. Monitor ChatGPT responses (for debugging)
 5. Debug saved analysis data
+6. Test View Analysis functionality
       
 Or enter your own property URL:`);
       
@@ -2249,6 +2250,16 @@ Or enter your own property URL:`);
       // Special debug option to inspect saved data
       if (testUrl === '5') {
         this.debugSavedAnalyses();
+        return;
+      }
+      
+      // Test View Analysis functionality
+      if (testUrl === '6') {
+        if (window.testViewAnalysis) {
+          window.testViewAnalysis();
+        } else {
+          console.log('❌ testViewAnalysis function not available');
+        }
         return;
       }
       if (testUrl === '1') {
@@ -3167,6 +3178,15 @@ Or enter your own property URL:`);
 
   showAnalysisModal(property) {
     console.log('🖼️ Showing analysis modal for:', property.url);
+    console.log('🔍 MODAL DEBUG: Full property object:', property);
+    console.log('🔍 MODAL DEBUG: Analysis data:', property.analysis);
+    console.log('🔍 MODAL DEBUG: Available analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
+    console.log('🔍 MODAL DEBUG: fullResponse exists:', !!(property.analysis?.fullResponse));
+    console.log('🔍 MODAL DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
+    console.log('🔍 MODAL DEBUG: fullAnalysis exists:', !!(property.analysis?.fullAnalysis));
+    console.log('🔍 MODAL DEBUG: fullAnalysis length:', property.analysis?.fullAnalysis?.length || 0);
+    console.log('🔍 MODAL DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 300) || 'No fullResponse');
+    console.log('🔍 MODAL DEBUG: fullAnalysis preview:', property.analysis?.fullAnalysis?.substring(0, 300) || 'No fullAnalysis');
     
     // Remove existing modal if any
     const existingModal = document.querySelector('#re-analysis-modal');
@@ -3185,6 +3205,9 @@ Or enter your own property URL:`);
     // Format the analysis data for display
     const propertyDetails = this.formatPropertyDetails(extractedData);
     const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
+    
+    console.log('🔍 MODAL DEBUG: Final analysisText to display:', analysisText.substring(0, 300) + '...');
+    console.log('🔍 MODAL DEBUG: Final analysisText length:', analysisText.length);
     
     modal.innerHTML = `
       <div class="re-modal">
@@ -3214,7 +3237,19 @@ Or enter your own property URL:`);
           <div class="re-analysis-section">
             <h4>🤖 Full ChatGPT Analysis</h4>
             <div class="re-analysis-text">
-              ${this.formatAnalysisText(analysisText)}
+              ${analysisText === 'No full analysis text available' ? `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                  <div style="font-size: 48px; margin-bottom: 16px;">🤔</div>
+                  <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No ChatGPT Analysis Found</div>
+                  <div style="font-size: 14px; line-height: 1.4; margin-bottom: 20px;">
+                    The full ChatGPT response wasn't saved for this property.<br>
+                    This can happen if the analysis was interrupted or if you're viewing an older property.
+                  </div>
+                  <div style="font-size: 13px; color: #888;">
+                    Try re-analyzing this property to get the full ChatGPT response.
+                  </div>
+                </div>
+              ` : this.formatAnalysisText(analysisText)}
             </div>
           </div>
           
@@ -3231,9 +3266,15 @@ Or enter your own property URL:`);
         </div>
         
         <div class="re-modal-footer">
-          <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
-            📋 Copy Analysis
-          </button>
+          ${analysisText === 'No full analysis text available' ? `
+            <button class="re-btn re-btn-primary" onclick="embeddedUI.reAnalyzeProperty('${property.url}'); this.closest('.re-modal-overlay').remove();">
+              🔍 Re-analyze Property
+            </button>
+          ` : `
+            <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+              📋 Copy Analysis
+            </button>
+          `}
           <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
             🔗 Open Original Listing
           </button>
@@ -3575,6 +3616,23 @@ Or enter your own property URL:`);
       this.showManualInput();
       this.validatePropertyInput();
     }
+  }
+
+  async reAnalyzeProperty(url) {
+    console.log('🔄 Re-analyzing property from modal:', url);
+    // Use the existing analyzeExistingProperty function and auto-start analysis
+    await this.analyzeExistingProperty(url);
+    
+    // Show message
+    this.showChatGPTMessage('info', 'Starting fresh analysis...');
+    
+    // Auto-start analysis after a short delay
+    setTimeout(() => {
+      const analyzeBtn = this.panel.querySelector('#re-analyze-btn');
+      if (analyzeBtn && this.isValidPropertyLink(url)) {
+        analyzeBtn.click();
+      }
+    }, 1000);
   }
 
   async exportProperty(url) {
@@ -11422,6 +11480,58 @@ window.testPromptSplitting = function(propertyLink) {
   const testLink = propertyLink || 'https://example.com/test-property';
   console.log('🧪 Testing prompt splitting with link:', testLink);
   insertPropertyAnalysisPrompt(testLink);
+};
+
+// Test View Analysis functionality
+window.testViewAnalysis = async function() {
+  console.log('🧪 Testing View Analysis functionality...');
+  
+  try {
+    const result = await chrome.storage.local.get(['propertyHistory']);
+    const properties = result.propertyHistory || [];
+    
+    console.log('📊 Found', properties.length, 'properties in storage');
+    
+    if (properties.length === 0) {
+      console.log('❌ No properties found. Analyze some properties first.');
+      return;
+    }
+    
+    properties.forEach((property, index) => {
+      console.log(`\n🏠 Property ${index + 1}:`);
+      console.log('   URL:', property.url);
+      console.log('   Has analysis:', !!property.analysis);
+      console.log('   Has fullResponse:', !!(property.analysis?.fullResponse));
+      console.log('   Has fullAnalysis:', !!(property.analysis?.fullAnalysis));
+      console.log('   fullResponse length:', property.analysis?.fullResponse?.length || 0);
+      console.log('   fullAnalysis length:', property.analysis?.fullAnalysis?.length || 0);
+      console.log('   extractedData keys:', Object.keys(property.analysis?.extractedData || {}));
+      
+      if (property.analysis?.fullResponse) {
+        console.log('   fullResponse preview:', property.analysis.fullResponse.substring(0, 200) + '...');
+      } else if (property.analysis?.fullAnalysis) {
+        console.log('   fullAnalysis preview:', property.analysis.fullAnalysis.substring(0, 200) + '...');
+      }
+    });
+    
+    // Test the first property with analysis
+    const propertyWithAnalysis = properties.find(p => p.analysis && (p.analysis.fullResponse || p.analysis.fullAnalysis));
+    
+    if (propertyWithAnalysis) {
+      console.log('\n🔍 Testing View Analysis modal with:', propertyWithAnalysis.url);
+      if (window.embeddedUI) {
+        window.embeddedUI.viewProperty(propertyWithAnalysis.url);
+      } else {
+        console.log('❌ embeddedUI not available');
+      }
+    } else {
+      console.log('\n❌ No properties found with saved analysis text');
+      console.log('💡 Try analyzing a property first, then test this function');
+    }
+    
+  } catch (error) {
+    console.error('❌ Error testing View Analysis:', error);
+  }
 };
 
 } // End of multiple execution prevention block
