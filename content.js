@@ -9886,15 +9886,22 @@ function setupResponseMonitor() {
         return;
       }
       
-      console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
-      console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+      if (currentPropertyAnalysis) {
+        console.log('✅ Detected completed property analysis response for:', currentPropertyAnalysis.url);
+        console.log('🔍 Session ID:', currentPropertyAnalysis.sessionId);
+      } else {
+        console.log('✅ Detected completed property analysis response (no current analysis tracking)');
+      }
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
       const analysisData = extractPropertyAnalysisData(messageText);
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
-        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', currentPropertyAnalysis.url);
+        const propertyUrl = currentPropertyAnalysis?.url || 'Unknown URL';
+        const sessionId = currentPropertyAnalysis?.sessionId || 'Unknown Session';
+        
+        console.log('✅ Successfully extracted analysis data (REGULAR PROPERTY ANALYSIS - SAVING!):', propertyUrl);
         console.log('🔍 ANALYSIS DATA BEING SAVED:', {
-          url: currentPropertyAnalysis.url,
+          url: propertyUrl,
           hasFullResponse: !!analysisData.fullResponse,
           fullResponseLength: analysisData.fullResponse?.length || 0,
           hasFullAnalysis: !!analysisData.fullAnalysis,
@@ -9903,8 +9910,8 @@ function setupResponseMonitor() {
           fullResponsePreview: analysisData.fullResponse?.substring(0, 200) || 'No fullResponse'
         });
         console.log('📊 Extracted data summary:', {
-          propertyUrl: currentPropertyAnalysis.url,
-          sessionId: currentPropertyAnalysis.sessionId,
+          propertyUrl: propertyUrl,
+          sessionId: sessionId,
           dataPoints: Object.keys(analysisData.extractedData).length,
           hasPrice: !!analysisData.extractedData.price,
           hasBedrooms: !!analysisData.extractedData.bedrooms,
@@ -9914,28 +9921,56 @@ function setupResponseMonitor() {
         });
         
         // Send the analysis data back to the background script
-        safeChromeFall(() => {
-          return chrome.runtime.sendMessage({
-            action: 'savePropertyAnalysis',
-            propertyUrl: currentPropertyAnalysis.url,
-            sessionId: currentPropertyAnalysis.sessionId,
-            analysisData: analysisData
-          });
-        }).then(response => {
-          if (response) {
-            console.log('✅ Analysis data sent successfully:', response);
-            if (response.success) {
-              console.log('🎉 Property analysis saved and should now show as analyzed!');
-              
-              // Notify embedded UI about completed analysis
-              if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
-                window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+        if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+          safeChromeFall(() => {
+            return chrome.runtime.sendMessage({
+              action: 'savePropertyAnalysis',
+              propertyUrl: currentPropertyAnalysis.url,
+              sessionId: currentPropertyAnalysis.sessionId,
+              analysisData: analysisData
+            });
+          }).then(response => {
+            if (response) {
+              console.log('✅ Analysis data sent successfully:', response);
+              if (response.success) {
+                console.log('🎉 Property analysis saved and should now show as analyzed!');
+                
+                // Notify embedded UI about completed analysis
+                if (window.embeddedUI && typeof window.embeddedUI.onAnalysisCompleted === 'function') {
+                  if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+                    window.embeddedUI.onAnalysisCompleted(currentPropertyAnalysis.url);
+                  }
+                }
               }
             }
+          }).catch(err => {
+            console.error('❌ Failed to send analysis data:', err);
+          });
+        } else {
+          console.warn('⚠️ Cannot save analysis: currentPropertyAnalysis is null or missing URL');
+          console.log('🔍 This might be a response from prompt splitting - checking fallback handling...');
+          
+          // Try to handle as split prompt response if we have pending property link
+          if (promptSplittingState.pendingPropertyLink && promptSplittingState.currentPhase) {
+            console.log('🔄 Attempting to save as split prompt response with pending link:', promptSplittingState.pendingPropertyLink);
+            
+            safeChromeFall(() => {
+              return chrome.runtime.sendMessage({
+                action: 'savePropertyAnalysis',
+                propertyUrl: promptSplittingState.pendingPropertyLink,
+                sessionId: `fallback_${Date.now()}`,
+                analysisData: analysisData
+              });
+            }).then(response => {
+              if (response && response.success) {
+                console.log('✅ Fallback save successful for split prompt response');
+                resetPromptSplittingState();
+              }
+            }).catch(err => {
+              console.error('❌ Fallback save also failed:', err);
+            });
           }
-        }).catch(err => {
-          console.error('❌ Failed to send analysis data:', err);
-        });
+        }
         
         // Track this message as processed for this property
         if (currentUrl) {
@@ -10074,7 +10109,7 @@ function setupResponseMonitor() {
       
       // Only process if we have an active property analysis session
       if (currentPropertyAnalysis && messageText && messageText.length > 100) {
-        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis.url);
+        console.log('📝 Monitoring response progress for:', currentPropertyAnalysis?.url || 'Unknown URL');
         console.log('📊 Current response length:', messageText.length);
         
         // Check if analysis session has timed out (10 minutes)
@@ -10824,7 +10859,7 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
-    console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis.url);
+    console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis?.url || 'Unknown URL');
   }
   
   // We'll set currentPropertyAnalysis later depending on the prompt approach
