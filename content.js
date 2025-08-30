@@ -2185,15 +2185,15 @@ class REAnalyzerEmbeddedUI {
           <div>${property.date || 'Unknown date'}</div>
         </div>
         <div class="re-property-actions">
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="(window.embeddedUI?.viewProperty || window.REAnalyzerButtonHandler?.viewProperty)?.('${property.url}')">
+          <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
             View Analysis
           </button>
           ${hasAnalysis ? `
-            <button class="re-btn re-btn-secondary re-btn-sm" onclick="(window.embeddedUI?.exportProperty || window.REAnalyzerButtonHandler?.exportProperty)?.('${property.url}')">
+            <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
               Export
             </button>
           ` : `
-            <button class="re-btn re-btn-primary re-btn-sm" onclick="(window.embeddedUI?.analyzeExistingProperty || window.REAnalyzerButtonHandler?.analyzeExistingProperty)?.('${property.url}')">
+            <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
               Analyze
             </button>
           `}
@@ -2202,6 +2202,8 @@ class REAnalyzerEmbeddedUI {
       
       propertiesList.appendChild(propertyCard);
     });
+
+    // Event listeners handled by global delegation
 
     // Add "View All" button if there are more properties
     if (properties.length > 10) {
@@ -3228,15 +3230,15 @@ Or enter your own property URL:`);
             ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
           </div>
           <div class="re-property-actions">
-            <button class="re-btn re-btn-ghost re-btn-sm" onclick="(window.embeddedUI?.viewProperty || window.REAnalyzerButtonHandler?.viewProperty)?.('${property.url}')">
+            <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
               View
             </button>
             ${hasAnalysis ? `
-              <button class="re-btn re-btn-secondary re-btn-sm" onclick="(window.embeddedUI?.exportProperty || window.REAnalyzerButtonHandler?.exportProperty)?.('${property.url}')">
+              <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
                 Export
               </button>
             ` : `
-              <button class="re-btn re-btn-primary re-btn-sm" onclick="(window.embeddedUI?.analyzeExistingProperty || window.REAnalyzerButtonHandler?.analyzeExistingProperty)?.('${property.url}')">
+              <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
                 Analyze
               </button>
             `}
@@ -3246,6 +3248,65 @@ Or enter your own property URL:`);
       
       propertiesList.appendChild(propertyItem);
     });
+
+    // Event listeners handled by global delegation
+  }
+
+  setupPropertyEventListeners(container) {
+    console.log('🔧 Setting up property event listeners');
+    
+    // View Analysis buttons
+    const viewButtons = container.querySelectorAll('.re-view-btn');
+    viewButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = button.getAttribute('data-property-url');
+        console.log('🔄 View Analysis button clicked for:', url);
+        if (window.embeddedUI && window.embeddedUI.viewProperty) {
+          window.embeddedUI.viewProperty(url);
+        } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.viewProperty) {
+          window.REAnalyzerButtonHandler.viewProperty(url);
+        } else {
+          console.error('❌ View Analysis function not available');
+        }
+      });
+    });
+    
+    // Export buttons
+    const exportButtons = container.querySelectorAll('.re-export-btn');
+    exportButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = button.getAttribute('data-property-url');
+        console.log('🔄 Export button clicked for:', url);
+        if (window.embeddedUI && window.embeddedUI.exportProperty) {
+          window.embeddedUI.exportProperty(url);
+        } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.exportProperty) {
+          window.REAnalyzerButtonHandler.exportProperty(url);
+        } else {
+          console.error('❌ Export function not available');
+        }
+      });
+    });
+    
+    // Analyze buttons
+    const analyzeButtons = container.querySelectorAll('.re-analyze-btn');
+    analyzeButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = button.getAttribute('data-property-url');
+        console.log('🔄 Analyze button clicked for:', url);
+        if (window.embeddedUI && window.embeddedUI.analyzeExistingProperty) {
+          window.embeddedUI.analyzeExistingProperty(url);
+        } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.analyzeExistingProperty) {
+          window.REAnalyzerButtonHandler.analyzeExistingProperty(url);
+        } else {
+          console.error('❌ Analyze function not available');
+        }
+      });
+    });
+    
+    console.log('✅ Property event listeners setup complete');
   }
 
   getDomainDisplayName(domain) {
@@ -3420,7 +3481,7 @@ Or enter your own property URL:`);
       <div class="re-modal">
         <div class="re-modal-header">
           <h3>Saved ChatGPT Analysis</h3>
-          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+          <button class="re-modal-close re-close-modal-btn">×</button>
         </div>
         
         <div class="re-modal-content">
@@ -3474,18 +3535,18 @@ Or enter your own property URL:`);
         
         <div class="re-modal-footer">
           ${analysisText === 'No full analysis text available' ? `
-            <button class="re-btn re-btn-primary" onclick="(window.embeddedUI?.reAnalyzeProperty || window.REAnalyzerButtonHandler?.reAnalyzeProperty)?.('${property.url}'); this.closest('.re-modal-overlay').remove();">
+            <button class="re-btn re-btn-primary re-reanalyze-btn" data-property-url="${property.url}">
               🔍 Re-analyze Property
             </button>
           ` : `
-            <button class="re-btn re-btn-secondary" onclick="(window.embeddedUI?.copyAnalysisToClipboard || window.REAnalyzerButtonHandler?.copyAnalysisToClipboard)?.('${property.url}')">
+            <button class="re-btn re-btn-secondary re-copy-btn" data-property-url="${property.url}">
               📋 Copy Analysis
             </button>
           `}
-          <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
+          <button class="re-btn re-btn-secondary re-open-listing-btn" data-property-url="${property.url}">
             🔗 Open Original Listing
           </button>
-          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+          <button class="re-btn re-btn-primary re-close-modal-btn">
             Close
           </button>
         </div>
@@ -3505,6 +3566,8 @@ Or enter your own property URL:`);
     console.log('🔍 MODAL DEBUG: Modal computed style:', window.getComputedStyle(modal));
     console.log('🔍 MODAL DEBUG: Body children count:', document.body.children.length);
     
+    // Event listeners handled by global delegation
+    
     // Close modal when clicking outside
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
@@ -3521,6 +3584,61 @@ Or enter your own property URL:`);
     }, 10);
     
     console.log('✅ Analysis modal displayed');
+  }
+
+  setupModalEventListeners(modal, property) {
+    console.log('🔧 Setting up modal event listeners for:', property.url);
+    
+    // Close button listeners
+    const closeButtons = modal.querySelectorAll('.re-close-modal-btn');
+    closeButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        console.log('🔄 Modal close button clicked');
+        modal.remove();
+      });
+    });
+    
+    // Copy analysis button
+    const copyBtn = modal.querySelector('.re-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        console.log('🔄 Copy analysis button clicked for:', property.url);
+        if (window.embeddedUI && window.embeddedUI.copyAnalysisToClipboard) {
+          window.embeddedUI.copyAnalysisToClipboard(property.url);
+        } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.copyAnalysisToClipboard) {
+          window.REAnalyzerButtonHandler.copyAnalysisToClipboard(property.url);
+        } else {
+          console.error('❌ Copy function not available');
+        }
+      });
+    }
+    
+    // Re-analyze button
+    const reanalyzeBtn = modal.querySelector('.re-reanalyze-btn');
+    if (reanalyzeBtn) {
+      reanalyzeBtn.addEventListener('click', () => {
+        console.log('🔄 Re-analyze button clicked for:', property.url);
+        if (window.embeddedUI && window.embeddedUI.reAnalyzeProperty) {
+          window.embeddedUI.reAnalyzeProperty(property.url);
+        } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.reAnalyzeProperty) {
+          window.REAnalyzerButtonHandler.reAnalyzeProperty(property.url);
+        } else {
+          console.error('❌ Re-analyze function not available');
+        }
+        modal.remove();
+      });
+    }
+    
+    // Open listing button
+    const openBtn = modal.querySelector('.re-open-listing-btn');
+    if (openBtn) {
+      openBtn.addEventListener('click', () => {
+        console.log('🔄 Open listing button clicked for:', property.url);
+        window.open(property.url, '_blank');
+      });
+    }
+    
+    console.log('✅ Modal event listeners setup complete');
   }
 
   formatPropertyDetails(extractedData) {
@@ -6042,6 +6160,9 @@ if (isChatGPTSite()) {
         embeddedUI = new REAnalyzerEmbeddedUI();
         window.embeddedUI = embeddedUI; // Make globally available
         window.reAnalyzer = embeddedUI; // Make accessible for custom column management
+        
+        // Setup global event delegation for CSP-compliant button handling
+        setupGlobalEventDelegation();
       }, 1000);
     });
   } else {
@@ -6050,6 +6171,9 @@ if (isChatGPTSite()) {
       embeddedUI = new REAnalyzerEmbeddedUI();
       window.embeddedUI = embeddedUI; // Make globally available
       window.reAnalyzer = embeddedUI; // Make accessible for custom column management
+      
+      // Setup global event delegation for CSP-compliant button handling
+      setupGlobalEventDelegation();
     }, 1000);
   }
 } else {
@@ -10309,7 +10433,13 @@ function setupResponseMonitor() {
   };
   
   // Check for new messages every 500ms for better completion detection
-  const intervalId = setInterval(checkForNewMessages, 500);
+  // Only run when we have an active analysis session or prompt splitting
+  const intervalId = setInterval(() => {
+    // Only check if we have an active session
+    if (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle') {
+      checkForNewMessages();
+    }
+  }, 500);
   
   // Also use MutationObserver for more immediate detection
   const observer = new MutationObserver((mutations) => {
@@ -10339,7 +10469,7 @@ function setupResponseMonitor() {
       }
     });
     
-    if (shouldCheck) {
+    if (shouldCheck && (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle')) {
       console.log('🔍 MutationObserver detected potential message change');
       setTimeout(checkForNewMessages, 500); // Small delay to let content load
     }
@@ -11262,7 +11392,114 @@ if (isChatGPTSite()) {
     addExtensionIndicator();
   }
 
-  // Setup response monitoring
+  // Setup global event delegation for CSP-compliant button handling
+function setupGlobalEventDelegation() {
+  console.log('🔧 Setting up global event delegation for CSP compliance');
+  
+  // Use event delegation on document body to handle all RE Analyzer buttons
+  document.body.addEventListener('click', function(e) {
+    const target = e.target;
+    const propertyUrl = target.getAttribute('data-property-url');
+    
+    // Handle close modal buttons first (don't need property URL)
+    if (target.classList.contains('re-close-modal-btn')) {
+      e.preventDefault();
+      console.log('🔄 Close modal button clicked (delegated)');
+      const modal = target.closest('.re-modal-overlay');
+      if (modal) modal.remove();
+      return;
+    }
+    
+    if (!propertyUrl) return; // Not one of our property buttons
+    
+    // View Analysis buttons
+    if (target.classList.contains('re-view-btn')) {
+      e.preventDefault();
+      console.log('🔄 View Analysis button clicked (delegated) for:', propertyUrl);
+      if (window.embeddedUI && window.embeddedUI.viewProperty) {
+        window.embeddedUI.viewProperty(propertyUrl);
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.viewProperty) {
+        window.REAnalyzerButtonHandler.viewProperty(propertyUrl);
+      } else {
+        console.error('❌ View Analysis function not available');
+      }
+      return;
+    }
+    
+    // Export buttons
+    if (target.classList.contains('re-export-btn')) {
+      e.preventDefault();
+      console.log('🔄 Export button clicked (delegated) for:', propertyUrl);
+      if (window.embeddedUI && window.embeddedUI.exportProperty) {
+        window.embeddedUI.exportProperty(propertyUrl);
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.exportProperty) {
+        window.REAnalyzerButtonHandler.exportProperty(propertyUrl);
+      } else {
+        console.error('❌ Export function not available');
+      }
+      return;
+    }
+    
+    // Analyze buttons
+    if (target.classList.contains('re-analyze-btn')) {
+      e.preventDefault();
+      console.log('🔄 Analyze button clicked (delegated) for:', propertyUrl);
+      if (window.embeddedUI && window.embeddedUI.analyzeExistingProperty) {
+        window.embeddedUI.analyzeExistingProperty(propertyUrl);
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.analyzeExistingProperty) {
+        window.REAnalyzerButtonHandler.analyzeExistingProperty(propertyUrl);
+      } else {
+        console.error('❌ Analyze function not available');
+      }
+      return;
+    }
+    
+    // Copy analysis buttons
+    if (target.classList.contains('re-copy-btn')) {
+      e.preventDefault();
+      console.log('🔄 Copy analysis button clicked (delegated) for:', propertyUrl);
+      if (window.embeddedUI && window.embeddedUI.copyAnalysisToClipboard) {
+        window.embeddedUI.copyAnalysisToClipboard(propertyUrl);
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.copyAnalysisToClipboard) {
+        window.REAnalyzerButtonHandler.copyAnalysisToClipboard(propertyUrl);
+      } else {
+        console.error('❌ Copy function not available');
+      }
+      return;
+    }
+    
+    // Re-analyze buttons
+    if (target.classList.contains('re-reanalyze-btn')) {
+      e.preventDefault();
+      console.log('🔄 Re-analyze button clicked (delegated) for:', propertyUrl);
+      if (window.embeddedUI && window.embeddedUI.reAnalyzeProperty) {
+        window.embeddedUI.reAnalyzeProperty(propertyUrl);
+      } else if (window.REAnalyzerButtonHandler && window.REAnalyzerButtonHandler.reAnalyzeProperty) {
+        window.REAnalyzerButtonHandler.reAnalyzeProperty(propertyUrl);
+      } else {
+        console.error('❌ Re-analyze function not available');
+      }
+      // Close the modal
+      const modal = target.closest('.re-modal-overlay');
+      if (modal) modal.remove();
+      return;
+    }
+    
+    // Open listing buttons
+    if (target.classList.contains('re-open-listing-btn')) {
+      e.preventDefault();
+      console.log('🔄 Open listing button clicked (delegated) for:', propertyUrl);
+      window.open(propertyUrl, '_blank');
+      return;
+    }
+    
+
+  });
+  
+  console.log('✅ Global event delegation setup complete');
+}
+
+// Setup response monitoring
   setupResponseMonitor();
   
   // Listen for messages from popup or background script
