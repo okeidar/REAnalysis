@@ -2166,9 +2166,10 @@ class REAnalyzerEmbeddedUI {
     const analyzedElement = this.panel.querySelector('#re-analyzed-count');
     const sourcesElement = this.panel.querySelector('#re-sources-count');
     
-    if (totalElement) totalElement.textContent = total.toString();
-    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
-    if (sourcesElement) sourcesElement.textContent = sources.toString();
+    // Add null checks before calling toString()
+    if (totalElement) totalElement.textContent = (total || 0).toString();
+    if (analyzedElement) analyzedElement.textContent = (analyzed || 0).toString();
+    if (sourcesElement) sourcesElement.textContent = (sources || 0).toString();
   }
 
   displayChatGPTProperties(properties) {
@@ -2257,7 +2258,7 @@ class REAnalyzerEmbeddedUI {
     const badge = this.panel.querySelector('#re-properties-badge');
     if (badge) {
       if (count > 0) {
-        badge.textContent = count.toString();
+        badge.textContent = (count || 0).toString();
         badge.classList.remove('re-hidden');
       } else {
         badge.classList.add('re-hidden');
@@ -2638,29 +2639,35 @@ Or enter your own property URL:`);
       () => chrome.storage.local.get(['propertyHistory']),
       { propertyHistory: [] }
     ).then(result => {
-      const properties = result.propertyHistory || [];
-      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
-      const pendingCount = properties.length - analyzedCount;
-      
-      // Update stats in properties tab
-      const totalElement = this.panel.querySelector('#re-total-properties');
-      const analyzedElement = this.panel.querySelector('#re-analyzed-count');
-      const pendingElement = this.panel.querySelector('#re-pending-count');
-      
-      if (totalElement) totalElement.textContent = properties.length;
-      if (analyzedElement) analyzedElement.textContent = analyzedCount;
-      if (pendingElement) pendingElement.textContent = pendingCount;
-      
-      // Update notification badge
-      const notification = this.panel.querySelector('#properties-notification');
-      if (notification) {
-        if (pendingCount > 0) {
-          notification.textContent = pendingCount;
-          notification.classList.add('re-show');
-        } else {
-          notification.classList.remove('re-show');
+      try {
+        const properties = result.propertyHistory || [];
+        const analyzedCount = properties.filter(p => p && p.analysis && p.analysis.extractedData).length;
+        const pendingCount = Math.max(0, properties.length - analyzedCount);
+        
+        // Update stats in properties tab
+        const totalElement = this.panel.querySelector('#re-total-properties');
+        const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+        const pendingElement = this.panel.querySelector('#re-pending-count');
+        
+        if (totalElement) totalElement.textContent = (properties.length || 0).toString();
+        if (analyzedElement) analyzedElement.textContent = (analyzedCount || 0).toString();
+        if (pendingElement) pendingElement.textContent = (pendingCount || 0).toString();
+        
+        // Update notification badge
+        const notification = this.panel.querySelector('#properties-notification');
+        if (notification) {
+          if (pendingCount > 0) {
+            notification.textContent = (pendingCount || 0).toString();
+            notification.classList.add('re-show');
+          } else {
+            notification.classList.remove('re-show');
+          }
         }
+      } catch (error) {
+        console.error('❌ Error updating properties stats:', error);
       }
+    }).catch(error => {
+      console.error('❌ Error loading property history for stats:', error);
     });
   }
 
@@ -3342,9 +3349,10 @@ Or enter your own property URL:`);
     const analyzedElement = this.panel.querySelector('#re-analyzed-count');
     const categoriesElement = this.panel.querySelector('#re-categories-count');
     
-    if (totalElement) totalElement.textContent = total.toString();
-    if (analyzedElement) analyzedElement.textContent = analyzed.toString();
-    if (categoriesElement) categoriesElement.textContent = categories.toString();
+    // Add null checks before calling toString()
+    if (totalElement) totalElement.textContent = (total || 0).toString();
+    if (analyzedElement) analyzedElement.textContent = (analyzed || 0).toString();
+    if (categoriesElement) categoriesElement.textContent = (categories || 0).toString();
   }
 
   showEmptyState() {
@@ -3606,7 +3614,7 @@ Or enter your own property URL:`);
     
     const notification = this.panel.querySelector('#properties-notification');
     if (notification && recentProperties.length > 0) {
-      notification.textContent = recentProperties.length.toString();
+      notification.textContent = (recentProperties.length || 0).toString();
       notification.style.display = 'flex';
     } else if (notification) {
       notification.style.display = 'none';
@@ -9106,9 +9114,9 @@ function calculatePropertyMetrics(data) {
   
   try {
     // Parse core data fields with better handling
-    const price = parseFloat((data.askingPrice || data.price || '').toString().replace(/[\$,£€¥]/g, ''));
-    const sqft = parseFloat((data.squareFootage || data.squareFeet || '').toString().replace(/[,]/g, ''));
-    const monthlyRent = parseFloat((data.estimatedRent || data.estimatedRentalIncome || '').toString().replace(/[\$,£€¥]/g, ''));
+    const price = parseFloat(String(data.askingPrice || data.price || '').replace(/[\$,£€¥]/g, ''));
+    const sqft = parseFloat(String(data.squareFootage || data.squareFeet || '').replace(/[,]/g, ''));
+    const monthlyRent = parseFloat(String(data.estimatedRent || data.estimatedRentalIncome || '').replace(/[\$,£€¥]/g, ''));
     const yearBuilt = parseInt(data.yearBuilt || 0);
     const bedrooms = parseInt(data.bedrooms || 0);
     const bathrooms = parseFloat(data.bathrooms || 0);
@@ -9337,7 +9345,7 @@ function validateAndCleanData(data) {
   try {
     // Clean and validate price
     if (cleanedData.price) {
-      let priceStr = cleanedData.price.toString().replace(/[\$,]/g, '');
+      let priceStr = String(cleanedData.price || '').replace(/[\$,]/g, '');
       
       // Handle K and M suffixes
       if (priceStr.match(/k$/i)) {
@@ -9379,7 +9387,7 @@ function validateAndCleanData(data) {
     
     // Clean and validate square feet
     if (cleanedData.squareFeet) {
-      const sqft = parseInt(cleanedData.squareFeet.toString().replace(/[,]/g, ''));
+      const sqft = parseInt(String(cleanedData.squareFeet || '').replace(/[,]/g, ''));
       if (sqft >= 100 && sqft <= 50000) {
         cleanedData.squareFeet = sqft.toString();
       } else {
@@ -9402,7 +9410,7 @@ function validateAndCleanData(data) {
     
     // Clean and validate estimated rental income
     if (cleanedData.estimatedRentalIncome) {
-      const rental = parseFloat(cleanedData.estimatedRentalIncome.toString().replace(/[\$,]/g, ''));
+      const rental = parseFloat(String(cleanedData.estimatedRentalIncome || '').replace(/[\$,]/g, ''));
       if (rental >= 100 && rental <= 50000) {
         cleanedData.estimatedRentalIncome = rental.toString();
       } else {
@@ -9511,8 +9519,8 @@ function validateDataConsistency(data) {
   try {
     // Price vs Property Type consistency
     if (data.price && data.propertyType) {
-      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
-      const propertyType = data.propertyType.toLowerCase();
+      const price = parseFloat(String(data.price || '').replace(/[,$]/g, ''));
+      const propertyType = String(data.propertyType || '').toLowerCase();
       
       // Luxury property type with low price
       if ((propertyType.includes('luxury') || propertyType.includes('premium') || 
@@ -9538,7 +9546,7 @@ function validateDataConsistency(data) {
     // Bedrooms vs Square Footage consistency
     if (data.bedrooms && data.squareFeet) {
       const bedrooms = parseInt(data.bedrooms);
-      const sqft = parseInt(data.squareFeet.toString().replace(/,/g, ''));
+      const sqft = parseInt(String(data.squareFeet || '').replace(/,/g, ''));
       
       // Very small space with many bedrooms
       if (sqft < 500 && bedrooms > 2) {
@@ -9561,8 +9569,8 @@ function validateDataConsistency(data) {
     
     // Price vs Square Footage consistency (price per sqft analysis)
     if (data.price && data.squareFeet) {
-      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
-      const sqft = parseInt(data.squareFeet.toString().replace(/,/g, ''));
+      const price = parseFloat(String(data.price || '').replace(/[,$]/g, ''));
+      const sqft = parseInt(String(data.squareFeet || '').replace(/,/g, ''));
       const pricePerSqft = price / sqft;
       
       // Extremely high price per sqft
@@ -9586,8 +9594,8 @@ function validateDataConsistency(data) {
     
     // Rental Income vs Price consistency (1% rule check)
     if (data.price && data.estimatedRentalIncome) {
-      const price = parseFloat(data.price.toString().replace(/[,$]/g, ''));
-      const monthlyRent = parseFloat(data.estimatedRentalIncome.toString().replace(/[,$]/g, ''));
+      const price = parseFloat(String(data.price || '').replace(/[,$]/g, ''));
+      const monthlyRent = parseFloat(String(data.estimatedRentalIncome || '').replace(/[,$]/g, ''));
       const rentToPrice = (monthlyRent * 12) / price;
       
       // Very low rental yield
@@ -10203,6 +10211,12 @@ function calculateDataQuality(data) {
     issues: []
   };
   
+  // Add null check for data parameter
+  if (!data || typeof data !== 'object') {
+    console.warn('calculateDataQuality: Invalid or null data provided');
+    return quality;
+  }
+  
   try {
     // Core fields for completeness assessment
     const coreFields = ['streetName', 'price', 'bedrooms', 'propertyType'];
@@ -10217,7 +10231,7 @@ function calculateDataQuality(data) {
     let foundAnalysisFields = 0;
     
     coreFields.forEach(field => {
-      if (data[field] && data[field].toString().trim()) {
+      if (data && data[field] && data[field] !== null && data[field] !== undefined && String(data[field]).trim()) {
         foundCoreFields++;
       } else {
         quality.missingFields.push(field);
@@ -10225,19 +10239,19 @@ function calculateDataQuality(data) {
     });
     
     financialFields.forEach(field => {
-      if (data[field] && data[field].toString().trim()) {
+      if (data && data[field] && data[field] !== null && data[field] !== undefined && String(data[field]).trim()) {
         foundFinancialFields++;
       }
     });
     
     detailFields.forEach(field => {
-      if (data[field] && data[field].toString().trim()) {
+      if (data && data[field] && data[field] !== null && data[field] !== undefined && String(data[field]).trim()) {
         foundDetailFields++;
       }
     });
     
     analysisFields.forEach(field => {
-      if (data[field] && data[field].toString().trim()) {
+      if (data && data[field] && data[field] !== null && data[field] !== undefined && String(data[field]).trim()) {
         foundAnalysisFields++;
       }
     });
@@ -10255,8 +10269,8 @@ function calculateDataQuality(data) {
     
     // Check for logical inconsistencies
     if (data.price && data.estimatedRentalIncome) {
-      const price = parseFloat(data.price.toString().replace(/[\$,]/g, ''));
-      const rent = parseFloat(data.estimatedRentalIncome.toString().replace(/[\$,]/g, ''));
+      const price = parseFloat(String(data.price || '').replace(/[\$,]/g, ''));
+      const rent = parseFloat(String(data.estimatedRentalIncome || '').replace(/[\$,]/g, ''));
       const priceToRentRatio = price / (rent * 12);
       
       if (priceToRentRatio < 5 || priceToRentRatio > 50) {
@@ -10279,8 +10293,8 @@ function calculateDataQuality(data) {
       const year = parseInt(data.yearBuilt);
       const currentYear = new Date().getFullYear();
       const age = currentYear - year;
-      const price = parseFloat(data.price.toString().replace(/[\$,]/g, ''));
-      const sqft = parseInt(data.squareFeet.toString().replace(/[,]/g, ''));
+      const price = parseFloat(String(data.price || '').replace(/[\$,]/g, ''));
+      const sqft = parseInt(String(data.squareFeet || '').replace(/[,]/g, ''));
       
       // Very basic sanity check for price per sqft based on age
       const pricePerSqft = price / sqft;
