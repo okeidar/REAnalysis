@@ -19,6 +19,10 @@
   --re-background-secondary: #f8f9fa;
   --re-text-primary: #1a202c;
   --re-text-secondary: #4a5568;
+  --re-text-muted: #6b7280;
+  --re-text-light: #9ca3af;
+  --re-text-on-dark: #f9fafb;
+  --re-text-on-primary: #ffffff;
   --re-border: #d1d5db;
   --re-border-light: #e5e7eb;
   --re-success: #059669;
@@ -561,6 +565,23 @@
   color: var(--re-text-secondary);
 }
 
+/* Ensure status indicators have proper contrast */
+.re-status-connected .re-status-title {
+  color: var(--re-text-primary);
+}
+
+.re-status-connected .re-status-subtitle {
+  color: var(--re-text-secondary);
+}
+
+.re-status-error .re-status-title {
+  color: var(--re-text-primary);
+}
+
+.re-status-error .re-status-subtitle {
+  color: var(--re-text-secondary);
+}
+
 .re-status-checking .re-status-icon {
   background: rgba(16, 163, 127, 0.1);
   color: var(--re-primary);
@@ -1083,16 +1104,7 @@
 }
 
 /* Dark mode support (optional - can be enabled based on ChatGPT's theme) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --re-background: #1a1a1a;
-    --re-background-secondary: #2d2d2d;
-    --re-text-primary: #ffffff;
-    --re-text-secondary: #a0a0a0;
-    --re-border: #404040;
-    --re-border-light: #2d2d2d;
-  }
-}
+
 
 /* Animation for panel entrance */
 @keyframes re-panel-enter {
@@ -1608,6 +1620,12 @@
   color: var(--re-text-primary);
 }
 
+/* Ensure modal content has proper contrast */
+.re-confirmation-modal {
+  background: var(--re-background);
+  color: var(--re-text-primary);
+}
+
 .re-modal-close-btn {
   background: none;
   border: none;
@@ -1939,6 +1957,43 @@
   outline-offset: 2px;
 }
 
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --re-background: #212121;
+    --re-background-secondary: #2f2f2f;
+    --re-text-primary: #ececec;
+    --re-text-secondary: #b4b4b4;
+    --re-text-muted: #8e8ea0;
+    --re-text-light: #a0a0a0;
+    --re-text-on-dark: #ececec;
+    --re-text-on-primary: #ffffff;
+    --re-border: #404040;
+    --re-border-light: #363636;
+    --re-primary: #10a37f;
+    --re-success: #16a34a;
+    --re-warning: #f59e0b;
+    --re-error: #ef4444;
+  }
+  
+  /* Ensure all text elements have proper contrast in dark mode */
+  .re-property-title {
+    color: var(--re-text-primary);
+  }
+  
+  .re-property-details {
+    color: var(--re-text-secondary);
+  }
+  
+  .re-setting-title {
+    color: var(--re-text-primary);
+  }
+  
+  .re-setting-description {
+    color: var(--re-text-secondary);
+  }
+}
+
 /* High contrast mode */
 .re-high-contrast-mode {
   --re-text-primary: #000000;
@@ -1951,6 +2006,18 @@
   --re-error: #cc0000;
 }
 
+/* Dark mode high contrast */
+@media (prefers-color-scheme: dark) {
+  .re-high-contrast-mode {
+    --re-text-primary: #ffffff;
+    --re-text-secondary: #cccccc;
+    --re-border: #888888;
+    --re-border-light: #666666;
+    --re-background: #000000;
+    --re-background-secondary: #1a1a1a;
+  }
+}
+
 .re-high-contrast-mode .re-btn {
   border-width: 2px;
   font-weight: var(--re-font-weight-semibold);
@@ -1958,6 +2025,239 @@
 
 .re-high-contrast-mode .re-property-card {
   border-width: 2px;
+}
+
+/* ============================================================================ */
+/* TEXT CONTRAST FIXES */
+/* ============================================================================ */
+
+/* Fix inline style overrides for better contrast */
+.re-text-description {
+  color: var(--re-text-secondary) !important;
+  font-size: var(--re-font-size-xs) !important;
+}
+
+.re-text-muted {
+  color: var(--re-text-muted) !important;
+}
+
+.re-text-light {
+  color: var(--re-text-light) !important;
+}
+
+.re-text-on-dark {
+  color: var(--re-text-on-dark) !important;
+}
+
+.re-text-on-primary {
+  color: var(--re-text-on-primary) !important;
+}
+
+/* Fix specific problematic areas */
+.re-section [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+.re-section [style*="color: #9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+.re-section [style*="color: #ffffff"] {
+  color: var(--re-text-primary) !important;
+}
+
+/* Fix tabular tab colors */
+.re-tabular-tab {
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  transition: var(--re-transition);
+}
+
+.re-tabular-tab:hover {
+  color: var(--re-text-primary);
+  background: var(--re-background-secondary);
+}
+
+.re-tabular-tab-active {
+  color: var(--re-text-primary);
+  border-bottom-color: var(--re-primary);
+  font-weight: var(--re-font-weight-medium);
+}
+
+/* Fix form descriptions */
+.re-form-group [style*="color: #d1d5db"],
+.re-form-group [style*="color: #9ca3af"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Fix version info */
+.re-version-info,
+[style*="color: #9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+/* Fix custom column form text */
+.re-section [style*="font-weight: 500; color: #ffffff"] {
+  color: var(--re-text-primary) !important;
+  font-weight: var(--re-font-weight-semibold) !important;
+}
+
+/* Fix button text in settings */
+.re-section .re-btn [style*="color: #d1d5db"] {
+  color: inherit !important;
+}
+
+/* Comprehensive inline style overrides for contrast */
+#re-analyzer-panel [style*="color: #d1d5db"],
+#re-analyzer-panel [style*="color:#d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analyzer-panel [style*="color: #9ca3af"],
+#re-analyzer-panel [style*="color:#9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+#re-analyzer-panel [style*="color: #ffffff"],
+#re-analyzer-panel [style*="color:#ffffff"]:not(.re-btn):not(button) {
+  color: var(--re-text-primary) !important;
+}
+
+#re-analyzer-panel [style*="color: #666666"],
+#re-analyzer-panel [style*="color:#666666"] {
+  color: var(--re-text-light) !important;
+}
+
+/* Fix any remaining hardcoded light colors on potentially dark backgrounds */
+.re-tabular-tabs [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+.re-form-group [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Ensure proper contrast for badges and small text */
+.re-category-btn,
+[style*="font-size: 10px"][style*="color: #d1d5db"],
+[style*="font-size: 11px"][style*="color: #d1d5db"],
+[style*="font-size: 12px"][style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Universal contrast fixes */
+#re-analyzer-panel * {
+  /* Ensure no text is invisible due to contrast issues */
+  min-contrast: 4.5;
+}
+
+/* Force readable text on all backgrounds */
+#re-analyzer-panel .re-section,
+#re-analyzer-panel .re-form-group,
+#re-analyzer-panel .re-setting-item {
+  color: var(--re-text-primary);
+}
+
+/* Ensure all small text is readable */
+#re-analyzer-panel [style*="font-size: 10px"],
+#re-analyzer-panel [style*="font-size: 11px"],
+#re-analyzer-panel [style*="font-size: 12px"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Fix any remaining light text on light backgrounds */
+@media (prefers-color-scheme: light) {
+  #re-analyzer-panel [style*="color: #ffffff"] {
+    color: var(--re-text-primary) !important;
+  }
+  
+  #re-analyzer-panel [style*="color: #f9fafb"] {
+    color: var(--re-text-primary) !important;
+  }
+}
+
+/* New helper classes for consistent text styling */
+.re-prompt-description {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  padding: var(--re-space-sm);
+  background: var(--re-background-secondary);
+  border-radius: var(--re-radius-sm);
+  border: 1px solid var(--re-border-light);
+}
+
+.re-form-header {
+  font-size: var(--re-font-size-sm);
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-text-primary);
+  margin-bottom: var(--re-space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-sm);
+}
+
+.re-input-help {
+  font-size: 10px;
+  color: var(--re-text-muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.re-section-subtitle {
+  font-size: var(--re-font-size-sm);
+  font-weight: var(--re-font-weight-medium);
+  color: var(--re-text-primary);
+}
+
+/* Column styling classes */
+.re-column-label {
+  font-weight: var(--re-font-weight-medium);
+  color: var(--re-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-xs);
+  flex-wrap: wrap;
+}
+
+.re-column-description {
+  font-size: 11px;
+  color: var(--re-text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.re-column-meta {
+  font-size: 11px;
+  color: var(--re-text-muted);
+  margin-top: 4px;
+}
+
+.re-category-btn {
+  background: none;
+  border: 1px solid var(--re-border);
+  color: var(--re-text-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: var(--re-transition);
+}
+
+.re-category-btn:hover {
+  border-color: var(--re-primary);
+  color: var(--re-primary);
+  background: rgba(13, 138, 105, 0.1);
+}
+
+.re-category-count {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  font-weight: var(--re-font-weight-medium);
 }
 
 /* ============================================================================ */
@@ -2092,10 +2392,11 @@ select.re-form-input {
   gap: var(--re-space-sm);
   cursor: pointer;
   font-size: var(--re-font-size-xs);
-  color: #ffffff;
+  color: var(--re-text-primary);
   padding: var(--re-space-sm);
   background: var(--re-background-secondary);
   border-radius: var(--re-radius-sm);
+  border: 1px solid var(--re-border-light);
 }
 
 .re-custom-column-inputs {

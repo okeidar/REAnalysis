@@ -645,7 +645,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-compact-toggle" style="margin: 0;">
               <span class="re-form-label" style="margin: 0;">Compact Mode</span>
             </label>
-            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+            <div class="re-text-description">
               Use smaller interface elements to save space
             </div>
           </div>
@@ -663,7 +663,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-auto-show-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Auto-show Results</span>
             </label>
-            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+            <div class="re-text-description">
               Automatically switch to Properties tab after analysis
             </div>
           </div>
@@ -673,7 +673,7 @@ class REAnalyzerEmbeddedUI {
               <input type="checkbox" id="re-notifications-toggle" style="margin: 0;" checked>
               <span class="re-form-label" style="margin: 0;">Show Notifications</span>
             </label>
-            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+            <div class="re-text-description">
               Display notifications when analysis completes
             </div>
           </div>
@@ -694,13 +694,13 @@ class REAnalyzerEmbeddedUI {
               <option value="tabular">Tabular - Data Extraction</option>
               <option value="custom">Custom - User-Defined</option>
             </select>
-            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+            <div class="re-text-description">
               Select the type of analysis prompt to use
             </div>
           </div>
 
           <div class="re-form-group" id="re-prompt-description">
-            <div id="re-prompt-desc-content" style="font-size: 12px; color: #d1d5db; padding: 8px; background: var(--chatgpt-surface-secondary); border-radius: 6px;">
+            <div id="re-prompt-desc-content" class="re-prompt-description">
               Standard real estate investment analysis with basic property data extraction
             </div>
           </div>
@@ -710,7 +710,7 @@ class REAnalyzerEmbeddedUI {
             <textarea id="re-custom-prompt" class="re-form-input" rows="6" 
                       placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
                       style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-            <div style="font-size: 12px; color: #d1d5db; margin-top: 4px;">
+            <div class="re-text-description">
               Variables: {PROPERTY_URL}, {DATE}
             </div>
           </div>
@@ -799,13 +799,13 @@ class REAnalyzerEmbeddedUI {
           
           <!-- Tabular Configuration Tabs -->
           <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 12px;">
-            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid var(--chatgpt-accent); font-weight: 500; font-size: 12px; color: #ffffff;">
+            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns">
               📊 Columns
             </button>
-            <button class="re-tabular-tab" data-tab="prompt" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
+            <button class="re-tabular-tab" data-tab="prompt">
               📝 Template
             </button>
-            <button class="re-tabular-tab" data-tab="custom-columns" style="padding: 6px 12px; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; font-size: 12px; color: #d1d5db;">
+            <button class="re-tabular-tab" data-tab="custom-columns">
               ➕ Custom
             </button>
           </div>
@@ -814,7 +814,7 @@ class REAnalyzerEmbeddedUI {
           <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
             <div class="re-form-group">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 11px; color: #d1d5db;">
+                <div class="re-text-muted">
                   Select data points to extract
                 </div>
                 <div class="re-column-selection-buttons">
@@ -830,7 +830,7 @@ class REAnalyzerEmbeddedUI {
                 </div>
               </div>
               
-              <div id="re-columns-stats" style="font-size: 11px; color: #d1d5db; margin-bottom: 6px;">
+              <div id="re-columns-stats" class="re-text-muted">
                 Loading columns...
               </div>
             </div>
@@ -848,7 +848,7 @@ class REAnalyzerEmbeddedUI {
               <textarea id="re-tabular-prompt-template" class="re-form-input" rows="8" 
                         placeholder="Enter tabular prompt template..."
                         style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
-              <div style="font-size: 11px; color: #d1d5db; margin-top: 4px;">
+              <div class="re-text-description">
                 Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
               </div>
             </div>
@@ -864,7 +864,7 @@ class REAnalyzerEmbeddedUI {
           <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
             <div class="re-form-group">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 12px; font-weight: 500; color: #ffffff;">Custom Data Columns</div>
+                <div class="re-section-subtitle">Custom Data Columns</div>
                 <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column" style="font-size: 11px; padding: 4px 8px;">
                   ➕ Add
                 </button>
@@ -878,7 +878,7 @@ class REAnalyzerEmbeddedUI {
             
             <!-- Add Custom Column Form -->
             <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 12px; margin-top: 8px; background: var(--chatgpt-surface-primary);">
-              <div style="font-size: 12px; font-weight: 500; color: #ffffff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <div class="re-form-header">
                 <span>➕</span>
                 <span id="re-form-title">Add Custom Column</span>
               </div>
@@ -887,7 +887,7 @@ class REAnalyzerEmbeddedUI {
                 <div>
                   <label class="re-form-label" style="font-size: 11px;">Column Name *</label>
                   <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees, Pet Policy" style="font-size: 11px;" maxlength="50">
-                  <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Letters, numbers, spaces, hyphens, underscores only</div>
+                  <div class="re-input-help">Letters, numbers, spaces, hyphens, underscores only</div>
                 </div>
                 <div>
                   <label class="re-form-label" style="font-size: 11px;">Category</label>
@@ -908,7 +908,7 @@ class REAnalyzerEmbeddedUI {
                 <textarea id="re-new-column-description" class="re-form-input" rows="2" 
                           placeholder="Describe what ChatGPT should extract for this data point..."
                           style="font-size: 11px;" maxlength="200"></textarea>
-                <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Help ChatGPT understand what to look for</div>
+                <div class="re-input-help">Help ChatGPT understand what to look for</div>
               </div>
               
               <div class="re-custom-column-actions">
@@ -980,7 +980,7 @@ class REAnalyzerEmbeddedUI {
         </div>
 
         <!-- Version Info -->
-        <div style="text-align: center; padding: 12px; color: #9ca3af; font-size: 11px;">
+        <div class="re-version-info">
           RE Analyzer v2.0.0
         </div>
       </div>
@@ -1483,6 +1483,9 @@ class REAnalyzerEmbeddedUI {
       // Apply on initialization
       this.applyHighContrastMode(highContrastCheckbox.checked);
     }
+    
+    // Fix any remaining contrast issues
+    this.fixTextContrast();
     
     // Custom prompt events
     this.setupCustomPromptEvents();
@@ -1989,6 +1992,9 @@ class REAnalyzerEmbeddedUI {
       this.loadChatGPTPropertyData();
     } else if (tabId === 'analyzer') {
       this.updateChatGPTConnectionStatus();
+    } else if (tabId === 'settings') {
+      // Fix contrast issues when settings tab is loaded
+      setTimeout(() => this.fixTextContrast(), 100);
     }
     
     console.log(`📑 Switched to ChatGPT-style ${tabId} section`);
@@ -2632,6 +2638,32 @@ Or enter your own property URL:`);
         panel.classList.remove('re-high-contrast-mode');
       }
     }
+  }
+
+  fixTextContrast() {
+    // Fix any remaining inline styles that cause contrast issues
+    const panel = this.panel;
+    if (!panel) return;
+    
+    // Find all elements with problematic inline colors
+    const problematicElements = panel.querySelectorAll('[style*="color: #d1d5db"], [style*="color: #9ca3af"], [style*="color: #ffffff"]');
+    
+    problematicElements.forEach(element => {
+      const style = element.getAttribute('style') || '';
+      
+      // Replace problematic colors with CSS variables
+      let newStyle = style
+        .replace(/color:\s*#d1d5db/gi, 'color: var(--re-text-secondary)')
+        .replace(/color:\s*#9ca3af/gi, 'color: var(--re-text-muted)')
+        .replace(/color:\s*#ffffff/gi, 'color: var(--re-text-primary)');
+      
+      // Only update if we made changes and it's not a button
+      if (newStyle !== style && !element.classList.contains('re-btn')) {
+        element.setAttribute('style', newStyle);
+      }
+    });
+    
+    console.log('🎨 Fixed text contrast for', problematicElements.length, 'elements');
   }
 
   updatePropertiesStats() {
@@ -5278,13 +5310,12 @@ Or enter your own property URL:`);
           t.classList.remove('re-tabular-tab-active');
           t.style.borderBottomColor = 'transparent';
           t.style.fontWeight = 'normal';
-          t.style.color = '#d1d5db';
+          t.classList.add('re-tabular-tab');
         });
         
         tab.classList.add('re-tabular-tab-active');
         tab.style.borderBottomColor = 'var(--chatgpt-accent)';
         tab.style.fontWeight = '500';
-        tab.style.color = '#ffffff';
         
         // Show/hide content
         tabContents.forEach(content => {
@@ -5434,9 +5465,9 @@ Or enter your own property URL:`);
     headerContent.innerHTML = `
       <span style="flex: 1;">${categoryName}</span>
       <div style="display: flex; gap: 4px; align-items: center;">
-        <button class="re-category-select-all" data-category="${categoryName}" style="background: none; border: 1px solid #d1d5db; color: #d1d5db; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;" title="Select all in category">All</button>
-        <button class="re-category-clear-all" data-category="${categoryName}" style="background: none; border: 1px solid #d1d5db; color: #d1d5db; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;" title="Clear all in category">None</button>
-        <span style="font-size: 12px; color: #d1d5db;">${enabledCount}/${columns.length}</span>
+        <button class="re-category-select-all re-category-btn" data-category="${categoryName}" title="Select all in category">All</button>
+        <button class="re-category-clear-all re-category-btn" data-category="${categoryName}" title="Clear all in category">None</button>
+        <span class="re-category-count">${enabledCount}/${columns.length}</span>
       </div>
     `;
     
@@ -5560,11 +5591,11 @@ Or enter your own property URL:`);
     }
     
     label.innerHTML = `
-      <div style="font-weight: 500; color: #ffffff; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+      <div class="re-column-label">
         <span>${column.name}</span>
         ${badges.join(' ')}
       </div>
-      ${column.description ? `<div style="font-size: 11px; color: #d1d5db; margin-top: 2px;">${column.description || ''}</div>` : ''}
+      ${column.description ? `<div class="re-column-description">${column.description || ''}</div>` : ''}
     `;
     
     item.appendChild(checkbox);
@@ -5932,10 +5963,10 @@ Or enter your own property URL:`);
             </span>
             <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 1px 4px; border-radius: 2px;">CUSTOM</span>
           </div>
-          <div style="font-size: 12px; color: #d1d5db; line-height: 1.4;">
+          <div class="re-column-description">
             ${column.description || 'No description provided'}
           </div>
-          <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
+          <div class="re-column-meta">
             Type: ${column.type || 'text'} • ID: ${column.id}
           </div>
         </div>
