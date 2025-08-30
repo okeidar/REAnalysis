@@ -3312,6 +3312,9 @@ Or enter your own property URL:`);
     const propertyDetails = this.formatPropertyDetails(extractedData);
     const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
     
+    // Log analysis text length for verification
+    console.log(`📏 Analysis text length: ${analysisText.length} characters`);
+    
     modal.innerHTML = `
       <div class="re-modal">
         <div class="re-modal-header">
@@ -3521,6 +3524,7 @@ Or enter your own property URL:`);
         padding: 20px;
         overflow-y: auto;
         flex: 1;
+        max-height: 70vh;
       }
       
       .re-analysis-section {
@@ -3580,8 +3584,6 @@ Or enter your own property URL:`);
         font-size: 14px;
         line-height: 1.6;
         color: var(--chatgpt-text-primary, #333);
-        max-height: 400px;
-        overflow-y: auto;
         white-space: pre-wrap;
       }
       
