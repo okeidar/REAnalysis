@@ -2569,10 +2569,10 @@ class REAnalyzerEmbeddedUI {
 
   async exportPropertiesToCSV() {
     try {
-      // Load all property data
+      // Load all property data and column configuration
       const result = await safeChromeFall(
-        () => chrome.storage.local.get(['propertyHistory']),
-        { propertyHistory: [] }
+        () => chrome.storage.local.get(['propertyHistory', 'tabularColumnConfiguration', 'customColumns']),
+        { propertyHistory: [], tabularColumnConfiguration: null, customColumns: [] }
       );
       
       const properties = result.propertyHistory || [];
@@ -2582,21 +2582,49 @@ class REAnalyzerEmbeddedUI {
         return;
       }
       
-      // Get comprehensive column set for tabular data
-      const columns = getTabularDataColumns();
+      // Get all available columns (default + custom)
+      const defaultColumns = getTabularDataColumns();
+      const customColumns = result.customColumns || [];
+      const allColumns = [...defaultColumns, ...customColumns];
       
-      // Create CSV headers
+      // Apply user's saved column configuration to get enabled columns only
+      let columns = allColumns;
+      if (result.tabularColumnConfiguration) {
+        columns = this.mergeColumnConfigurations(allColumns, result.tabularColumnConfiguration);
+      }
+      
+      // Filter to only enabled columns
+      const enabledColumns = columns.filter(col => col.enabled);
+      
+      console.log('📊 CSV Export Debug Info:');
+      console.log(`   Total columns available: ${allColumns.length}`);
+      console.log(`   Enabled columns: ${enabledColumns.length}`);
+      console.log(`   Enabled column IDs: ${enabledColumns.map(c => c.id).join(', ')}`);
+      
+      // Fallback: If no columns are enabled, use the 4 core default columns
+      if (enabledColumns.length === 0) {
+        console.log('⚠️ No enabled columns found, using default core columns for CSV export');
+        const coreColumns = columns.filter(col => 
+          ['propertyAddress', 'askingPrice', 'bedrooms', 'propertyType'].includes(col.id) ||
+          ['streetName', 'price'].includes(col.id)
+        );
+        coreColumns.forEach(col => col.enabled = true);
+        enabledColumns.push(...coreColumns);
+        console.log(`   Using core columns: ${coreColumns.map(c => c.id).join(', ')}`);
+      }
+      
+      // Create CSV headers using only enabled columns
       const headers = [
         'URL',
         'Domain', 
         'Analysis Date',
-        ...columns.map(col => col.name)
+        ...enabledColumns.map(col => col.name)
       ];
       
       // Create CSV rows
       const rows = [headers];
       
-      properties.forEach(property => {
+      properties.forEach((property, index) => {
         if (property.analysis) {
           const row = [
             property.url || '',
@@ -2604,26 +2632,63 @@ class REAnalyzerEmbeddedUI {
             property.date || ''
           ];
           
-          // Add extracted data columns
-          columns.forEach(col => {
+          console.log(`📋 Processing property ${index + 1} for CSV:`, property.url);
+          console.log(`   Available data keys:`, Object.keys(property.analysis.extractedData || {}));
+          console.log(`   Available calculated metrics:`, Object.keys(property.analysis.calculatedMetrics || {}));
+          
+          // Add extracted data columns (only enabled ones)
+          enabledColumns.forEach(col => {
             let value = '';
             
             if (col.isCalculated) {
               // Get from calculated metrics
               value = property.analysis.calculatedMetrics?.[col.id] || '';
+            } else if (col.category === 'custom') {
+              // Handle custom columns - check both extractedData and customData
+              value = property.analysis.extractedData?.[col.id] || 
+                      property.analysis.customData?.[col.id] || 
+                      property.analysis.customColumns?.[col.id] || '';
             } else {
-              // Get from extracted data
+              // Get from extracted data with fallback mapping for column ID mismatches
               value = property.analysis.extractedData?.[col.id] || '';
+              
+              // Handle column ID mapping between different systems
+              if (!value) {
+                const idMappings = {
+                  'propertyAddress': ['streetName', 'address', 'Street Name', 'Property Address'],
+                  'askingPrice': ['price', 'Property Price', 'Asking Price'],
+                  'bedrooms': ['Number of Bedrooms', 'Bedrooms'],
+                  'bathrooms': ['Bathrooms'],
+                  'squareFootage': ['squareFeet', 'Square Footage', 'Square Feet'],
+                  'estimatedRent': ['estimatedRentalIncome', 'Estimated Monthly Rental Income']
+                };
+                
+                const alternativeKeys = idMappings[col.id] || [];
+                for (const altKey of alternativeKeys) {
+                  value = property.analysis.extractedData?.[altKey];
+                  if (value) {
+                    console.log(`🔄 Mapped ${col.id} from ${altKey}:`, value);
+                    break;
+                  }
+                }
+              }
             }
             
             // Format value for CSV
-            if (typeof value === 'number') {
+            if (value === null || value === undefined) {
+              value = '';
+            } else if (typeof value === 'number') {
               value = value.toString();
             } else if (typeof value === 'string') {
+              // Clean up the value
+              value = value.trim();
               // Escape commas and quotes for CSV
               if (value.includes(',') || value.includes('"') || value.includes('\n')) {
                 value = `"${value.replace(/"/g, '""')}"`;
               }
+            } else {
+              // Convert other types to string
+              value = String(value);
             }
             
             row.push(value);
@@ -2648,7 +2713,13 @@ class REAnalyzerEmbeddedUI {
       document.body.removeChild(link);
       
       const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
-      this.showChatGPTMessage('success', `Exported ${analyzedCount} analyzed properties to CSV with ${columns.length} columns!`);
+      console.log('✅ CSV Export completed:');
+      console.log(`   Total properties: ${properties.length}`);
+      console.log(`   Analyzed properties: ${analyzedCount}`);
+      console.log(`   Columns exported: ${enabledColumns.length}`);
+      console.log(`   Column names: ${enabledColumns.map(c => c.name).join(', ')}`);
+      
+      this.showChatGPTMessage('success', `Exported ${analyzedCount} analyzed properties to CSV with ${enabledColumns.length} enabled columns!`);
       
     } catch (error) {
       console.error('❌ Failed to export properties to CSV:', error);
@@ -8219,77 +8290,77 @@ function getDefaultColumns() {
 // Comprehensive column set for tabular data extraction
 function getTabularDataColumns() {
   return [
-    // Basic Property Information
+    // Basic Property Information - Core export fields enabled by default
     { id: 'propertyAddress', name: 'Property Address', description: 'Complete street address of the property', type: 'text', category: 'core', enabled: true, required: true },
     { id: 'askingPrice', name: 'Asking Price', description: 'Listed price with currency symbol', type: 'currency', category: 'core', enabled: true, required: true },
     { id: 'propertyType', name: 'Property Type', description: 'Classification (House, Condo, Apartment, etc.)', type: 'text', category: 'core', enabled: true, required: true },
     { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms in the property', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms (include half baths as .5)', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'squareFootage', name: 'Square Footage', description: 'Total interior square footage', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was constructed', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'lotSize', name: 'Lot Size (sq ft)', description: 'Size of the lot in square feet', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'neighborhood', name: 'Neighborhood', description: 'Name of the neighborhood or area', type: 'text', category: 'location', enabled: true, required: false },
-    { id: 'city', name: 'City', description: 'City where the property is located', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'state', name: 'State', description: 'State where the property is located', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'zipCode', name: 'ZIP Code', description: 'Postal ZIP code of the property', type: 'text', category: 'location', enabled: true, required: false },
+    { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms (include half baths as .5)', type: 'number', category: 'core', enabled: false, required: false },
+    { id: 'squareFootage', name: 'Square Footage', description: 'Total interior square footage', type: 'number', category: 'core', enabled: false, required: false },
+    { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was constructed', type: 'number', category: 'core', enabled: false, required: false },
+    { id: 'lotSize', name: 'Lot Size (sq ft)', description: 'Size of the lot in square feet', type: 'number', category: 'core', enabled: false, required: false },
+    { id: 'neighborhood', name: 'Neighborhood', description: 'Name of the neighborhood or area', type: 'text', category: 'location', enabled: false, required: false },
+    { id: 'city', name: 'City', description: 'City where the property is located', type: 'text', category: 'location', enabled: false, required: false },
+    { id: 'state', name: 'State', description: 'State where the property is located', type: 'text', category: 'location', enabled: false, required: false },
+    { id: 'zipCode', name: 'ZIP Code', description: 'Postal ZIP code of the property', type: 'text', category: 'location', enabled: false, required: false },
     
-    // Market Data
-    { id: 'estimatedRent', name: 'Estimated Monthly Rent', description: 'Professional estimate of monthly rental income', type: 'currency', category: 'financial', enabled: true, required: false },
-    { id: 'locationScore', name: 'Location Score (1-10)', description: 'Rating of location quality (schools, safety, amenities)', type: 'number', category: 'scoring', enabled: true, required: false },
-    { id: 'marketTrend', name: 'Market Trend', description: 'Current market direction (Rising, Stable, Declining)', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'daysOnMarket', name: 'Days on Market', description: 'Number of days the property has been listed', type: 'number', category: 'market', enabled: true, required: false },
-    { id: 'priceHistory', name: 'Price History', description: 'Any recent price changes or reductions', type: 'text', category: 'market', enabled: true, required: false },
+    // Market Data - Disabled by default
+    { id: 'estimatedRent', name: 'Estimated Monthly Rent', description: 'Professional estimate of monthly rental income', type: 'currency', category: 'financial', enabled: false, required: false },
+    { id: 'locationScore', name: 'Location Score (1-10)', description: 'Rating of location quality (schools, safety, amenities)', type: 'number', category: 'scoring', enabled: false, required: false },
+    { id: 'marketTrend', name: 'Market Trend', description: 'Current market direction (Rising, Stable, Declining)', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'daysOnMarket', name: 'Days on Market', description: 'Number of days the property has been listed', type: 'number', category: 'market', enabled: false, required: false },
+    { id: 'priceHistory', name: 'Price History', description: 'Any recent price changes or reductions', type: 'text', category: 'market', enabled: false, required: false },
     
-    // Property Features
-    { id: 'parkingSpaces', name: 'Parking Spaces', description: 'Number of available parking spaces', type: 'number', category: 'features', enabled: true, required: false },
-    { id: 'garageType', name: 'Garage Type', description: 'Type of garage (Attached, Detached, None)', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'heatingType', name: 'Heating Type', description: 'Type of heating system in the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'coolingType', name: 'Cooling Type', description: 'Type of cooling/AC system in the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'appliances', name: 'Appliances Included', description: 'List of appliances that come with the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'amenities', name: 'Amenities', description: 'Property amenities and special features', type: 'text', category: 'features', enabled: true, required: false },
+    // Property Features - Disabled by default
+    { id: 'parkingSpaces', name: 'Parking Spaces', description: 'Number of available parking spaces', type: 'number', category: 'features', enabled: false, required: false },
+    { id: 'garageType', name: 'Garage Type', description: 'Type of garage (Attached, Detached, None)', type: 'text', category: 'features', enabled: false, required: false },
+    { id: 'heatingType', name: 'Heating Type', description: 'Type of heating system in the property', type: 'text', category: 'features', enabled: false, required: false },
+    { id: 'coolingType', name: 'Cooling Type', description: 'Type of cooling/AC system in the property', type: 'text', category: 'features', enabled: false, required: false },
+    { id: 'appliances', name: 'Appliances Included', description: 'List of appliances that come with the property', type: 'text', category: 'features', enabled: false, required: false },
+    { id: 'amenities', name: 'Amenities', description: 'Property amenities and special features', type: 'text', category: 'features', enabled: false, required: false },
     
-    // Analysis Data
-    { id: 'keyAdvantages', name: 'Key Advantages', description: 'Top 3 advantages for investment purposes', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'keyConcerns', name: 'Key Concerns', description: 'Top 3 concerns or potential issues', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'redFlags', name: 'Red Flags', description: 'Warning signs or serious risk indicators', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'investmentGrade', name: 'Investment Grade', description: 'Overall investment quality grade (A, B, C, D)', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'rentalPotential', name: 'Rental Potential', description: 'Assessment of rental market viability', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'appreciationPotential', name: 'Appreciation Potential', description: 'Long-term property value growth outlook', type: 'text', category: 'analysis', enabled: true, required: false },
+    // Analysis Data - Disabled by default
+    { id: 'keyAdvantages', name: 'Key Advantages', description: 'Top 3 advantages for investment purposes', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'keyConcerns', name: 'Key Concerns', description: 'Top 3 concerns or potential issues', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'redFlags', name: 'Red Flags', description: 'Warning signs or serious risk indicators', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'investmentGrade', name: 'Investment Grade', description: 'Overall investment quality grade (A, B, C, D)', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'rentalPotential', name: 'Rental Potential', description: 'Assessment of rental market viability', type: 'text', category: 'analysis', enabled: false, required: false },
+    { id: 'appreciationPotential', name: 'Appreciation Potential', description: 'Long-term property value growth outlook', type: 'text', category: 'analysis', enabled: false, required: false },
     
-    // Market Analysis
-    { id: 'marketType', name: 'Market Type', description: 'Current market condition (Buyer\'s, Seller\'s, Balanced)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'marketCycle', name: 'Market Cycle', description: 'Current phase of the real estate market cycle', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'inventoryLevel', name: 'Inventory Level', description: 'Current housing inventory level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'demandLevel', name: 'Demand Level', description: 'Current buyer demand level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'jobGrowth', name: 'Job Growth Rate', description: 'Local employment growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'populationGrowth', name: 'Population Growth Rate', description: 'Local population growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'incomeGrowth', name: 'Income Growth Rate', description: 'Local median income growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'unemploymentRate', name: 'Unemployment Rate', description: 'Local unemployment rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'newConstruction', name: 'New Construction Level', description: 'Level of new construction activity in the area', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'infrastructureDev', name: 'Infrastructure Development', description: 'Status of infrastructure development projects', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'commercialDev', name: 'Commercial Development', description: 'Commercial development activity in the area', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'schoolQuality', name: 'School Quality Rating', description: 'Local school quality rating (1-10 scale)', type: 'number', category: 'location', enabled: true, required: false },
+    // Market Analysis - Disabled by default
+    { id: 'marketType', name: 'Market Type', description: 'Current market condition (Buyer\'s, Seller\'s, Balanced)', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'marketCycle', name: 'Market Cycle', description: 'Current phase of the real estate market cycle', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'inventoryLevel', name: 'Inventory Level', description: 'Current housing inventory level (Low, Medium, High)', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'demandLevel', name: 'Demand Level', description: 'Current buyer demand level (Low, Medium, High)', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'jobGrowth', name: 'Job Growth Rate', description: 'Local employment growth rate percentage', type: 'percentage', category: 'market', enabled: false, required: false },
+    { id: 'populationGrowth', name: 'Population Growth Rate', description: 'Local population growth rate percentage', type: 'percentage', category: 'market', enabled: false, required: false },
+    { id: 'incomeGrowth', name: 'Income Growth Rate', description: 'Local median income growth rate percentage', type: 'percentage', category: 'market', enabled: false, required: false },
+    { id: 'unemploymentRate', name: 'Unemployment Rate', description: 'Local unemployment rate percentage', type: 'percentage', category: 'market', enabled: false, required: false },
+    { id: 'newConstruction', name: 'New Construction Level', description: 'Level of new construction activity in the area', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'infrastructureDev', name: 'Infrastructure Development', description: 'Status of infrastructure development projects', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'commercialDev', name: 'Commercial Development', description: 'Commercial development activity in the area', type: 'text', category: 'market', enabled: false, required: false },
+    { id: 'schoolQuality', name: 'School Quality Rating', description: 'Local school quality rating (1-10 scale)', type: 'number', category: 'location', enabled: false, required: false },
     
-    // Calculated Metrics
-    { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Asking price divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', description: 'Estimated monthly rent divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'propertyAge', name: 'Property Age (Years)', description: 'Current year minus year built', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'bedroomRatio', name: 'Bedroom Ratio', description: 'Bedrooms divided by total rooms (bed+bath)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price divided by annual rent (investment metric)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'capRate', name: 'Cap Rate (%)', description: 'Annual rental income divided by property price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'onePercentRule', name: '1% Rule Ratio', description: 'Monthly rent as percentage of purchase price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', description: 'Purchase price divided by annual rent', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    // Calculated Metrics - Disabled by default
+    { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Asking price divided by square footage', type: 'currency', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', description: 'Estimated monthly rent divided by square footage', type: 'currency', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'propertyAge', name: 'Property Age (Years)', description: 'Current year minus year built', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'bedroomRatio', name: 'Bedroom Ratio', description: 'Bedrooms divided by total rooms (bed+bath)', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price divided by annual rent (investment metric)', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'capRate', name: 'Cap Rate (%)', description: 'Annual rental income divided by property price', type: 'percentage', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'onePercentRule', name: '1% Rule Ratio', description: 'Monthly rent as percentage of purchase price', type: 'percentage', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', description: 'Purchase price divided by annual rent', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true },
     
-    // Risk Metrics
-    { id: 'vacancyRisk', name: 'Vacancy Risk Score', description: 'Risk of vacancy based on demand and appeal (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', description: 'Risk of high maintenance costs based on age/condition (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'marketRisk', name: 'Market Risk Score', description: 'Risk from market instability and trends (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'overallRiskScore', name: 'Overall Risk Score', description: 'Average of all risk scores (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    // Risk Metrics - Disabled by default
+    { id: 'vacancyRisk', name: 'Vacancy Risk Score', description: 'Risk of vacancy based on demand and appeal (1-10)', type: 'number', category: 'risk', enabled: false, required: false, isCalculated: true },
+    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', description: 'Risk of high maintenance costs based on age/condition (1-10)', type: 'number', category: 'risk', enabled: false, required: false, isCalculated: true },
+    { id: 'marketRisk', name: 'Market Risk Score', description: 'Risk from market instability and trends (1-10)', type: 'number', category: 'risk', enabled: false, required: false, isCalculated: true },
+    { id: 'overallRiskScore', name: 'Overall Risk Score', description: 'Average of all risk scores (1-10)', type: 'number', category: 'risk', enabled: false, required: false, isCalculated: true },
     
-    // Market Analysis Calculated
-    { id: 'locationPremium', name: 'Location Premium (%)', description: 'Premium/discount based on location score', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'daysOnMarketScore', name: 'Days on Market Score', description: 'Score based on days on market vs. average (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceTrendScore', name: 'Price Trend Score', description: 'Score based on price history and market direction (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
+    // Market Analysis Calculated - Disabled by default
+    { id: 'locationPremium', name: 'Location Premium (%)', description: 'Premium/discount based on location score', type: 'percentage', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'daysOnMarketScore', name: 'Days on Market Score', description: 'Score based on days on market vs. average (1-10)', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true },
+    { id: 'priceTrendScore', name: 'Price Trend Score', description: 'Score based on price history and market direction (1-10)', type: 'number', category: 'calculated', enabled: false, required: false, isCalculated: true }
   ];
 }
 
