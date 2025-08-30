@@ -1624,6 +1624,99 @@
 .re-confirmation-modal {
   background: var(--re-background);
   color: var(--re-text-primary);
+  border: 1px solid var(--re-border);
+}
+
+.re-confirmation-modal * {
+  color: var(--re-text-primary);
+}
+
+.re-modal-body p {
+  color: var(--re-text-primary) !important;
+}
+
+/* ============================================================================ */
+/* MODAL CONTRAST COMPREHENSIVE FIXES */
+/* ============================================================================ */
+
+/* Override any hardcoded modal colors */
+#re-analysis-modal,
+#re-analysis-modal *,
+.re-modal-overlay,
+.re-modal-overlay * {
+  color: var(--re-text-primary) !important;
+}
+
+/* Specific modal element contrast */
+#re-analysis-modal .re-modal {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-modal-header {
+  background: var(--re-background-secondary) !important;
+  border-bottom-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-modal-content {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-modal-footer {
+  background: var(--re-background-secondary) !important;
+  border-top-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-analysis-section h4 {
+  color: var(--re-text-primary) !important;
+  border-bottom-color: var(--re-primary) !important;
+}
+
+#re-analysis-modal .re-property-detail {
+  background: var(--re-background-secondary) !important;
+  border-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-analysis-text {
+  background: var(--re-background-secondary) !important;
+  border-color: var(--re-border-light) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-detail-label {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analysis-modal .re-detail-value {
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-analysis-meta {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analysis-modal .re-property-link {
+  color: var(--re-primary) !important;
+}
+
+/* Ensure buttons have proper contrast */
+#re-analysis-modal .re-btn-primary {
+  background: var(--re-primary) !important;
+  color: var(--re-text-on-primary) !important;
+  border-color: var(--re-primary) !important;
+}
+
+#re-analysis-modal .re-btn-secondary {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+  border-color: var(--re-border) !important;
+}
+
+#re-analysis-modal .re-btn-ghost {
+  background: transparent !important;
+  color: var(--re-text-secondary) !important;
+  border: none !important;
 }
 
 .re-modal-close-btn {

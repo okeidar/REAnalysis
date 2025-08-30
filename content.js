@@ -2666,6 +2666,39 @@ Or enter your own property URL:`);
     console.log('🎨 Fixed text contrast for', problematicElements.length, 'elements');
   }
 
+  fixModalContrast(modal) {
+    if (!modal) return;
+    
+    // Find all elements with hardcoded colors that might cause contrast issues
+    const problematicElements = modal.querySelectorAll('[style*="color: #"], [style*="color:#"]');
+    
+    problematicElements.forEach(element => {
+      const style = element.getAttribute('style') || '';
+      
+      // Replace problematic colors with CSS variables
+      let newStyle = style
+        .replace(/color:\s*#000000/gi, 'color: var(--re-text-primary)')
+        .replace(/color:\s*#666666/gi, 'color: var(--re-text-secondary)')
+        .replace(/color:\s*#888888/gi, 'color: var(--re-text-muted)')
+        .replace(/color:\s*#ffffff/gi, 'color: var(--re-text-primary)')
+        .replace(/color:\s*#d1d5db/gi, 'color: var(--re-text-secondary)')
+        .replace(/color:\s*#9ca3af/gi, 'color: var(--re-text-muted)');
+      
+      if (newStyle !== style) {
+        element.setAttribute('style', newStyle);
+      }
+    });
+    
+    // Ensure modal background adapts to theme
+    const modalElement = modal.querySelector('.re-modal');
+    if (modalElement) {
+      modalElement.style.background = 'var(--re-background)';
+      modalElement.style.color = 'var(--re-text-primary)';
+    }
+    
+    console.log('🎨 Fixed modal contrast for', problematicElements.length, 'elements');
+  }
+
   updatePropertiesStats() {
     safeChromeFall(
       () => chrome.storage.local.get(['propertyHistory']),
@@ -3738,14 +3771,14 @@ Or enter your own property URL:`);
             <h4>🤖 Full ChatGPT Analysis</h4>
             <div class="re-analysis-text">
               ${analysisText === 'No full analysis text available' ? `
-                <div style="text-align: center; padding: 40px; color: #666;">
-                  <div style="font-size: 48px; margin-bottom: 16px;">🤔</div>
-                  <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No ChatGPT Analysis Found</div>
-                  <div style="font-size: 14px; line-height: 1.4; margin-bottom: 20px;">
+                <div class="re-modal-empty-state">
+                  <div class="re-empty-icon">🤔</div>
+                  <div class="re-empty-title">No ChatGPT Analysis Found</div>
+                  <div class="re-empty-description">
                     The full ChatGPT response wasn't saved for this property.<br>
                     This can happen if the analysis was interrupted or if you're viewing an older property.
                   </div>
-                  <div style="font-size: 13px; color: #888;">
+                  <div class="re-empty-help">
                     Try re-analyzing this property to get the full ChatGPT response.
                   </div>
                 </div>
@@ -3757,10 +3790,10 @@ Or enter your own property URL:`);
           <div class="re-analysis-section">
             <h4>📅 Analysis Details</h4>
             <div class="re-analysis-meta">
-              <div><strong>Date:</strong> ${property.date || 'Unknown'}</div>
-              <div><strong>Domain:</strong> ${property.domain || 'Unknown'}</div>
-              <div><strong>Data Points:</strong> ${Object.keys(extractedData).length}</div>
-              <div><strong>Analysis Length:</strong> ${analysisText.length} characters</div>
+              <div><strong style="color: var(--re-text-primary);">Date:</strong> <span style="color: var(--re-text-secondary);">${property.date || 'Unknown'}</span></div>
+              <div><strong style="color: var(--re-text-primary);">Domain:</strong> <span style="color: var(--re-text-secondary);">${property.domain || 'Unknown'}</span></div>
+              <div><strong style="color: var(--re-text-primary);">Data Points:</strong> <span style="color: var(--re-text-secondary);">${Object.keys(extractedData).length}</span></div>
+              <div><strong style="color: var(--re-text-primary);">Analysis Length:</strong> <span style="color: var(--re-text-secondary);">${analysisText.length} characters</span></div>
             </div>
           </div>
         </div>
@@ -3790,6 +3823,9 @@ Or enter your own property URL:`);
     
     // Add modal to page
     document.body.appendChild(modal);
+    
+    // Fix any remaining contrast issues in the modal
+    setTimeout(() => this.fixModalContrast(modal), 100);
     
     // Close modal when clicking outside
     modal.addEventListener('click', (e) => {
@@ -3830,14 +3866,16 @@ Or enter your own property URL:`);
   }
 
   formatAnalysisText(text) {
-    // Basic formatting to make the analysis more readable
-    return text
+    // Basic formatting to make the analysis more readable with proper contrast
+    const formatted = text
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br>')
       .replace(/^/, '<p>')
       .replace(/$/, '</p>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold text
-      .replace(/\*(.*?)\*/g, '<em>$1</em>'); // Italic text
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--re-text-primary); font-weight: 600;">$1</strong>') // Bold text with proper contrast
+      .replace(/\*(.*?)\*/g, '<em style="color: var(--re-text-primary);">$1</em>'); // Italic text with proper contrast
+    
+    return `<div style="color: var(--re-text-primary); line-height: 1.6;">${formatted}</div>`;
   }
 
   addModalStyles() {
@@ -3866,7 +3904,7 @@ Or enter your own property URL:`);
       }
       
       .re-modal {
-        background: var(--chatgpt-bg-primary, white) !important;
+        background: var(--re-background) !important;
         border-radius: 12px !important;
         max-width: 800px !important;
         max-height: 90vh !important;
@@ -3877,22 +3915,24 @@ Or enter your own property URL:`);
         flex-direction: column !important;
         position: relative !important;
         z-index: 1 !important;
-        color: #000000 !important; /* Ensure black text on bright backgrounds */
+        color: var(--re-text-primary) !important;
+        border: 1px solid var(--re-border) !important;
       }
       
       .re-modal-header {
         padding: 20px;
-        border-bottom: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        border-bottom: 1px solid var(--re-border-light);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        background: var(--re-background-secondary);
       }
       
       .re-modal-header h3 {
         margin: 0;
         font-size: 18px;
-        color: #000000 !important; /* Force black text for headers */
+        color: var(--re-text-primary) !important;
+        font-weight: 600;
       }
       
       .re-modal-close {
@@ -3900,7 +3940,7 @@ Or enter your own property URL:`);
         border: none;
         font-size: 24px;
         cursor: pointer;
-        color: #000000 !important; /* Force black text for close button */
+        color: var(--re-text-secondary) !important;
         padding: 0;
         width: 30px;
         height: 30px;
@@ -3912,7 +3952,8 @@ Or enter your own property URL:`);
       }
       
       .re-modal-close:hover {
-        background: var(--chatgpt-bg-hover, #e5e5e5);
+        background: var(--re-background-secondary);
+        color: var(--re-text-primary) !important;
       }
       
       .re-modal-content {
@@ -3920,7 +3961,8 @@ Or enter your own property URL:`);
         overflow-y: auto;
         flex: 1;
         max-height: 70vh;
-        color: #000000 !important; /* Ensure black text in modal content */
+        color: var(--re-text-primary) !important;
+        background: var(--re-background);
       }
       
       .re-analysis-section {
@@ -3930,13 +3972,14 @@ Or enter your own property URL:`);
       .re-analysis-section h4 {
         margin: 0 0 12px 0;
         font-size: 16px;
-        color: #000000 !important; /* Force black text for section headers */
-        border-bottom: 2px solid var(--chatgpt-accent, #10a37f);
+        color: var(--re-text-primary) !important;
+        border-bottom: 2px solid var(--re-primary);
         padding-bottom: 4px;
+        font-weight: 600;
       }
       
       .re-property-link {
-        color: var(--chatgpt-accent, #10a37f);
+        color: var(--re-primary) !important;
         text-decoration: none;
         word-break: break-all;
         font-size: 14px;
@@ -3953,34 +3996,36 @@ Or enter your own property URL:`);
       }
       
       .re-property-detail {
-        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        background: var(--re-background-secondary);
         padding: 12px;
         border-radius: 8px;
         display: flex;
         flex-direction: column;
         gap: 4px;
+        border: 1px solid var(--re-border-light);
       }
       
       .re-detail-label {
         font-size: 12px;
-        color: #666666 !important; /* Force dark gray for labels */
+        color: var(--re-text-secondary) !important;
         font-weight: 500;
       }
       
       .re-detail-value {
         font-size: 14px;
-        color: #000000 !important; /* Force black text for values */
+        color: var(--re-text-primary) !important;
         font-weight: 600;
       }
       
       .re-analysis-text {
-        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        background: var(--re-background-secondary);
         border-radius: 8px;
         padding: 16px;
         font-size: 14px;
         line-height: 1.6;
-        color: #000000 !important; /* Force black text for analysis content */
+        color: var(--re-text-primary) !important;
         white-space: pre-wrap;
+        border: 1px solid var(--re-border-light);
       }
       
       .re-analysis-text p {
@@ -3996,16 +4041,16 @@ Or enter your own property URL:`);
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 8px;
         font-size: 14px;
-        color: #666666 !important; /* Force dark gray for meta information */
+        color: var(--re-text-secondary) !important;
       }
       
       .re-modal-footer {
         padding: 20px;
-        border-top: 1px solid var(--chatgpt-border-light, #e5e5e5);
+        border-top: 1px solid var(--re-border-light);
         display: flex;
         gap: 12px;
         justify-content: flex-end;
-        background: var(--chatgpt-bg-secondary, #f7f7f7);
+        background: var(--re-background-secondary);
       }
       
       @media (max-width: 768px) {
@@ -4021,6 +4066,101 @@ Or enter your own property URL:`);
         .re-modal-footer {
           flex-direction: column;
         }
+      }
+      
+      /* Modal empty state styling */
+      .re-modal-empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--re-text-primary);
+      }
+      
+      .re-empty-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      
+      .re-empty-title {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: var(--re-text-primary) !important;
+      }
+      
+      .re-empty-description {
+        font-size: 14px;
+        line-height: 1.4;
+        margin-bottom: 20px;
+        color: var(--re-text-secondary) !important;
+      }
+      
+      .re-empty-help {
+        font-size: 13px;
+        color: var(--re-text-muted) !important;
+      }
+      
+      /* Force proper contrast for all modal text */
+      .re-modal * {
+        color: var(--re-text-primary);
+      }
+      
+      .re-modal .re-detail-label,
+      .re-modal .re-analysis-meta,
+      .re-modal .re-empty-description {
+        color: var(--re-text-secondary) !important;
+      }
+      
+      .re-modal .re-empty-help {
+        color: var(--re-text-muted) !important;
+      }
+      
+      /* Dark mode support for modal */
+      @media (prefers-color-scheme: dark) {
+        .re-modal {
+          background: var(--re-background) !important;
+          color: var(--re-text-primary) !important;
+          border-color: var(--re-border) !important;
+        }
+        
+        .re-modal-header {
+          background: var(--re-background-secondary) !important;
+          border-bottom-color: var(--re-border-light) !important;
+        }
+        
+        .re-modal-footer {
+          background: var(--re-background-secondary) !important;
+          border-top-color: var(--re-border-light) !important;
+        }
+        
+        .re-property-detail {
+          background: var(--re-background-secondary) !important;
+          border-color: var(--re-border-light) !important;
+        }
+        
+        .re-analysis-text {
+          background: var(--re-background-secondary) !important;
+          border-color: var(--re-border-light) !important;
+        }
+      }
+      
+      /* Ensure proper button contrast in modal */
+      .re-modal .re-btn {
+        color: inherit;
+      }
+      
+      .re-modal .re-btn-primary {
+        color: var(--re-text-on-primary) !important;
+        background: var(--re-primary) !important;
+      }
+      
+      .re-modal .re-btn-secondary {
+        color: var(--re-text-primary) !important;
+        background: var(--re-background-secondary) !important;
+        border-color: var(--re-border) !important;
+      }
+      
+      .re-modal .re-btn-ghost {
+        color: var(--re-text-secondary) !important;
       }
     `;
     
