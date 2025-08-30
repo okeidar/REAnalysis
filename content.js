@@ -1126,8 +1126,8 @@ class REAnalyzerEmbeddedUI {
           </div>
           <div class="re-view-actions">
             <button id="re-export-btn" class="re-btn re-btn-secondary re-btn-sm">
-              <span class="re-btn-icon">📄</span>
-              Export
+              <span class="re-btn-icon">📊</span>
+              Export CSV
             </button>
             <button id="re-manage-categories-btn" class="re-btn re-btn-ghost re-btn-sm">
               <span class="re-btn-icon">⚙️</span>
@@ -2213,11 +2213,11 @@ class REAnalyzerEmbeddedUI {
           <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
             View Analysis
           </button>
-          ${hasAnalysis ? `
-            <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
-              Export
-            </button>
-          ` : `
+                      ${hasAnalysis ? `
+              <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
+                📊 CSV
+              </button>
+            ` : `
             <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
               Analyze
             </button>
@@ -3529,7 +3529,7 @@ Or enter your own property URL:`);
             </button>
             ${hasAnalysis ? `
               <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
-                Export
+                📊 CSV
               </button>
             ` : `
               <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
@@ -4279,7 +4279,7 @@ Or enter your own property URL:`);
   }
 
   async exportProperty(url) {
-    console.log('📄 Export property:', url);
+    console.log('📊 Export property to CSV:', url);
     
     try {
       // Load property data
@@ -4296,38 +4296,85 @@ Or enter your own property URL:`);
         return;
       }
       
-      if (!property.analysis) {
-        this.showChatGPTMessage('warning', 'No analysis data to export');
+      if (!property.analysis || !property.analysis.extractedData) {
+        this.showChatGPTMessage('warning', 'No analysis data to export. Please analyze this property first.');
         return;
       }
       
-      // Create export data
-      const exportData = {
-        url: property.url,
-        domain: property.domain,
-        analysisDate: property.date,
-        extractedData: property.analysis.extractedData || {},
-        fullAnalysis: property.analysis.fullResponse || property.analysis.fullAnalysis || 'No full analysis available',
-        exportDate: new Date().toISOString()
-      };
+      // Create CSV headers
+      const headers = [
+        'Property URL',
+        'Domain',
+        'Analysis Date',
+        'Address',
+        'Price',
+        'Bedrooms',
+        'Bathrooms',
+        'Square Feet',
+        'Property Type',
+        'Year Built',
+        'Neighborhood',
+        'Location Score',
+        'Estimated Rental Income',
+        'Investment Grade',
+        'Key Advantages',
+        'Key Concerns'
+      ];
+      
+      const data = property.analysis.extractedData || {};
+      
+      // Create single property row
+      const row = [
+        property.url || '',
+        property.domain || '',
+        property.date || '',
+        data.address || data['Property Address'] || data['Street Name'] || '',
+        data.price || data['Property Price'] || data['Asking Price'] || '',
+        data.bedrooms || data['Number of Bedrooms'] || data['Bedrooms'] || '',
+        data.bathrooms || data['Bathrooms'] || '',
+        data.squareFootage || data['Square Footage'] || data.sqft || '',
+        data.propertyType || data['Type of Property'] || data['Property Type'] || '',
+        data.yearBuilt || data['Year Built'] || '',
+        data.neighborhood || data['Neighborhood'] || '',
+        data.locationScore || data['Location Score'] || '',
+        data.estimatedRentalIncome || data['Estimated Monthly Rent'] || '',
+        data.investmentGrade || data['Investment Grade'] || '',
+        data.pros || data['Key Advantages'] || '',
+        data.cons || data['Key Concerns'] || ''
+      ];
+      
+      // Escape CSV values that contain commas or quotes
+      const escapedRow = row.map(value => {
+        const strValue = String(value || '');
+        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
+        }
+        return strValue;
+      });
+      
+      // Create CSV content with headers and single row
+      const csvContent = [headers, escapedRow].map(row => row.join(',')).join('\n');
       
       // Create and download file
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataBlob = new Blob([dataStr], {type: 'application/json'});
+      const dataBlob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
+      
+      // Generate filename from property data
+      const domain = property.domain?.replace(/\./g, '-') || 'property';
+      const date = new Date().toISOString().split('T')[0];
       
       const link = document.createElement('a');
       link.href = URL.createObjectURL(dataBlob);
-      link.download = `property-analysis-${Date.now()}.json`;
+      link.download = `property-${domain}-${date}.csv`;
       
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      this.showChatGPTMessage('success', 'Property analysis exported successfully!');
+      this.showChatGPTMessage('success', 'Property exported to CSV successfully!');
       
     } catch (error) {
       console.error('❌ Failed to export property:', error);
-      this.showChatGPTMessage('error', 'Failed to export property analysis');
+      this.showChatGPTMessage('error', 'Failed to export property to CSV');
     }
   }
 
@@ -6558,9 +6605,9 @@ Or enter your own property URL:`);
     this.showMessage('success', 'Settings reset to defaults');
   }
 
-  exportProperties() {
-    // Placeholder for export functionality
-    this.showMessage('warning', 'Export functionality will be implemented in the next update');
+  async exportProperties() {
+    // Use the existing CSV export functionality
+    await this.exportPropertiesToCSV();
   }
 
   manageCategories() {
