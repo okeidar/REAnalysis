@@ -133,6 +133,7 @@
   overflow: hidden;
   transition: var(--re-transition);
   border: 1px solid var(--re-border);
+  box-sizing: border-box;
 }
 
 /* Panel states */
@@ -1672,6 +1673,15 @@
     max-width: none;
     left: 16px;
     right: 16px;
+    transform: none;
+  }
+  
+  .re-panel-collapsed {
+    transform: translateY(-100vh);
+  }
+  
+  .re-panel-expanded {
+    transform: translateY(0);
   }
   
   .re-panel-content {
@@ -1815,9 +1825,45 @@
 
 /* Prevent horizontal scrolling */
 #re-analyzer-panel,
-#re-analyzer-panel * {
+#re-analyzer-panel *,
+.re-tab-content,
+.re-tab-content * {
   max-width: 100%;
   overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Specific fixes for settings content */
+.re-settings-sections,
+.re-settings-section,
+.re-setting-item {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix grid layouts that might overflow */
+.re-form-group {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Fix button groups that might overflow */
+.re-settings-actions,
+.re-form-actions {
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Fix any inline styles that might cause overflow */
+#settings-tab [style*="grid-template-columns"] {
+  grid-template-columns: 1fr !important;
+}
+
+#settings-tab [style*="display: grid"] {
+  grid-template-columns: 1fr !important;
+  gap: var(--re-space-sm) !important;
 }
 
 .re-input,
@@ -1912,4 +1958,277 @@
 
 .re-high-contrast-mode .re-property-card {
   border-width: 2px;
+}
+
+/* ============================================================================ */
+/* SETTINGS TAB OVERFLOW FIXES */
+/* ============================================================================ */
+
+/* Force all settings content to fit within container */
+#settings-tab,
+#re-settings-section {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Fix tabular configuration section */
+.re-tabular-tabs {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+}
+
+.re-tabular-tab {
+  flex-shrink: 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Fix column container overflow */
+#re-columns-container,
+.re-columns-grid {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix form inputs and textareas */
+.re-form-input,
+textarea.re-form-input,
+input.re-form-input,
+select.re-form-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Fix button groups in settings */
+.re-section [style*="display: flex"] {
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Fix grid layouts in settings */
+.re-section [style*="grid-template-columns"] {
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Fix specific problem areas */
+#re-columns-stats,
+#re-prompt-desc-content {
+  width: 100%;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Force text content to wrap */
+.re-section,
+.re-section * {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Mobile-specific fixes for settings */
+@media (max-width: 768px) {
+  .re-tabular-tabs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .re-tabular-tab {
+    width: 100%;
+    text-align: center;
+    border-bottom: 1px solid var(--re-border-light);
+  }
+  
+  /* Force single column layouts on mobile */
+  #settings-tab [style*="grid-template-columns"],
+  .re-section [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: var(--re-space-sm) !important;
+  }
+  
+  /* Stack button groups vertically */
+  .re-section [style*="display: flex"]:not(.re-setting-label) {
+    flex-direction: column !important;
+    gap: var(--re-space-sm) !important;
+  }
+}
+
+/* ============================================================================ */
+/* SETTINGS SPECIFIC RESPONSIVE LAYOUTS */
+/* ============================================================================ */
+
+.re-export-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--re-space-sm);
+  margin-bottom: var(--re-space-md);
+  width: 100%;
+  max-width: 100%;
+}
+
+.re-data-management-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+}
+
+.re-url-bypass-setting {
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-sm);
+  cursor: pointer;
+  font-size: var(--re-font-size-xs);
+  color: #ffffff;
+  padding: var(--re-space-sm);
+  background: var(--re-background-secondary);
+  border-radius: var(--re-radius-sm);
+}
+
+.re-custom-column-inputs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--re-space-sm);
+  margin-bottom: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Mobile adjustments for settings */
+@media (max-width: 480px) {
+  .re-export-buttons-grid {
+    grid-template-columns: 1fr;
+    gap: var(--re-space-xs);
+  }
+  
+  .re-custom-column-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Fix button text overflow */
+  .re-btn-full {
+    min-width: 0;
+    overflow: hidden;
+  }
+  
+  .re-btn-full span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Settings button group styles */
+.re-prompt-actions,
+.re-editor-actions,
+.re-advanced-prompt-buttons,
+.re-tabular-actions,
+.re-custom-column-actions {
+  display: flex;
+  gap: var(--re-space-sm);
+  margin-top: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.re-custom-column-actions {
+  justify-content: flex-end;
+}
+
+/* Responsive adjustments for button groups */
+@media (max-width: 480px) {
+  .re-prompt-actions,
+  .re-editor-actions,
+  .re-advanced-prompt-buttons,
+  .re-tabular-actions,
+  .re-custom-column-actions {
+    flex-direction: column;
+    gap: var(--re-space-xs);
+  }
+  
+  .re-prompt-actions .re-btn,
+  .re-editor-actions .re-btn,
+  .re-advanced-prompt-buttons .re-btn,
+  .re-tabular-actions .re-btn,
+  .re-custom-column-actions .re-btn {
+    width: 100%;
+  }
+}
+
+/* Column selection button group */
+.re-column-selection-buttons {
+  display: flex;
+  gap: var(--re-space-xs);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Mobile adjustments for column selection */
+@media (max-width: 480px) {
+  .re-column-selection-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .re-column-selection-buttons .re-btn {
+    width: 100%;
+  }
+  
+  /* Fix the parent container that has inline styles */
+  #settings-tab [style*="justify-content: space-between"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--re-space-sm) !important;
+  }
+  
+  /* Override all potentially problematic inline styles on mobile */
+  #settings-tab [style*="display: grid"],
+  #re-settings-section [style*="display: grid"] {
+    display: block !important;
+  }
+  
+  #settings-tab [style*="display: flex"],
+  #re-settings-section [style*="display: flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--re-space-xs) !important;
+  }
+  
+  /* Force all buttons to be full width on mobile */
+  #settings-tab .re-btn,
+  #re-settings-section .re-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Additional overflow prevention */
+.re-panel-content {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Ensure tab content doesn't overflow */
+.re-tab-content {
+  padding: var(--re-space-md);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }

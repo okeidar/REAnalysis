@@ -715,7 +715,7 @@ class REAnalyzerEmbeddedUI {
             </div>
           </div>
           
-          <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <div class="re-prompt-actions">
             <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
               <div>💾</div>
               <span>Save</span>
@@ -738,7 +738,7 @@ class REAnalyzerEmbeddedUI {
             <div class="re-section-subtitle">Customize prompt templates</div>
           </div>
           
-          <div style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+          <div class="re-advanced-prompt-buttons">
             <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-default-prompt">
               📄 Edit Default
             </button>
@@ -759,7 +759,7 @@ class REAnalyzerEmbeddedUI {
                         style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
             </div>
             
-            <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <div class="re-editor-actions">
               <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">Save</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">Reset</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">Preview</button>
@@ -782,7 +782,7 @@ class REAnalyzerEmbeddedUI {
               </div>
             </div>
             
-            <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <div class="re-editor-actions">
               <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">Save</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">Reset</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">Preview</button>
@@ -817,7 +817,7 @@ class REAnalyzerEmbeddedUI {
                 <div style="font-size: 11px; color: #d1d5db;">
                   Select data points to extract
                 </div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <div class="re-column-selection-buttons">
                   <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all" style="font-size: 11px; padding: 4px 8px;">
                     ✅ All
                   </button>
@@ -853,7 +853,7 @@ class REAnalyzerEmbeddedUI {
               </div>
             </div>
             
-            <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <div class="re-editor-actions">
               <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">Save</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">Reset</button>
               <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">Preview</button>
@@ -883,7 +883,7 @@ class REAnalyzerEmbeddedUI {
                 <span id="re-form-title">Add Custom Column</span>
               </div>
               
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+              <div class="re-custom-column-inputs">
                 <div>
                   <label class="re-form-label" style="font-size: 11px;">Column Name *</label>
                   <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees, Pet Policy" style="font-size: 11px;" maxlength="50">
@@ -911,7 +911,7 @@ class REAnalyzerEmbeddedUI {
                 <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Help ChatGPT understand what to look for</div>
               </div>
               
-              <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <div class="re-custom-column-actions">
                 <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column" style="font-size: 11px;">
                   Cancel
                 </button>
@@ -923,7 +923,7 @@ class REAnalyzerEmbeddedUI {
           </div>
           
           <!-- Tabular Action Buttons -->
-          <div style="display: flex; gap: 6px; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--chatgpt-border-light);">
+          <div class="re-tabular-actions">
             <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-tabular">
               💾 Save All
             </button>
@@ -942,7 +942,7 @@ class REAnalyzerEmbeddedUI {
             <div class="re-section-title">Data Management</div>
           </div>
           
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+          <div class="re-export-buttons-grid">
             <button class="re-btn re-btn-secondary re-btn-full" id="re-export-all">
               <div>📄</div>
               <span>Export JSON</span>
@@ -961,13 +961,13 @@ class REAnalyzerEmbeddedUI {
             </button>
           </div>
           
-          <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="re-data-management-actions">
             <button class="re-btn re-btn-secondary re-btn-full" id="re-test-analysis">
               <div>🧪</div>
               <span>Test Analysis</span>
             </button>
             
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; color: #ffffff;">
+            <label class="re-url-bypass-setting">
               <input type="checkbox" id="re-allow-any-url" style="margin: 0;">
               <span>Allow any URL (bypass validation)</span>
             </label>
