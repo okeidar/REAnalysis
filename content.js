@@ -6314,6 +6314,30 @@ function detectConfirmation(responseText) {
   return result;
 }
 
+// Helper function to validate property links
+function isValidPropertyLink(link) {
+  if (!link || 
+      link === 'null' || 
+      link === 'undefined' || 
+      link === null || 
+      link === undefined ||
+      typeof link !== 'string' ||
+      link.trim().length === 0) {
+    return false;
+  }
+  
+  // Additional URL format validation
+  const trimmedLink = link.trim();
+  try {
+    new URL(trimmedLink);
+    return true;
+  } catch (e) {
+    // Not a valid URL format
+    console.warn('⚠️ Property link is not a valid URL format:', trimmedLink);
+    return false;
+  }
+}
+
 function resetPromptSplittingState() {
   promptSplittingState.currentPhase = null;
   promptSplittingState.pendingPropertyLink = null;
@@ -6376,9 +6400,17 @@ async function handleConfirmationReceived() {
   console.log('🔗 Checking pending property link:', promptSplittingState.pendingPropertyLink);
   console.log('🔗 Prompt splitting state:', promptSplittingState);
   
-  if (!promptSplittingState.pendingPropertyLink) {
-    console.error('❌ No pending property link to send');
+  // Enhanced validation for property link
+  const propertyLink = promptSplittingState.pendingPropertyLink;
+  
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid or missing property link detected:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
     console.error('❌ Current prompt splitting state:', promptSplittingState);
+    
+    // Reset state and exit gracefully
+    resetPromptSplittingState();
+    removePromptSplittingIndicator();
     return;
   }
   
@@ -6403,9 +6435,14 @@ async function handleConfirmationReceived() {
     const propertyLink = promptSplittingState.pendingPropertyLink;
     console.log('🔗 About to create link message with:', propertyLink);
     
-    if (!propertyLink || propertyLink === 'null' || propertyLink === 'undefined') {
-      console.error('❌ Invalid property link detected:', propertyLink);
-      await handleSplittingFallback();
+    // Double-check property link validation before using it
+    if (!isValidPropertyLink(propertyLink)) {
+      console.error('❌ Invalid property link detected at link creation:', propertyLink);
+      console.error('❌ Property link type:', typeof propertyLink);
+      
+      // Reset state and exit gracefully instead of fallback
+      resetPromptSplittingState();
+      removePromptSplittingIndicator();
       return;
     }
     
@@ -6533,9 +6570,17 @@ async function handleConfirmationTimeout() {
 
 // Fallback to single prompt approach
 async function handleSplittingFallback() {
-  if (!promptSplittingState.pendingPropertyLink) {
-    console.error('❌ No pending property link for fallback');
+  const propertyLink = promptSplittingState.pendingPropertyLink;
+  
+  // Enhanced validation for property link in fallback
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid or missing property link for fallback:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
+    console.error('❌ Cannot proceed with fallback - no valid property link');
+    
+    // Reset state and exit gracefully
     resetPromptSplittingState();
+    removePromptSplittingIndicator();
     return;
   }
   
@@ -11214,6 +11259,13 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('🔍 Property link type:', typeof propertyLink);
   console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
   
+  // Early validation to prevent null property links from proceeding
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid property link provided to insertPropertyAnalysisPrompt:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
+    throw new Error('Invalid property link provided for analysis');
+  }
+  
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
     console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis?.url || 'Unknown URL');
@@ -11262,9 +11314,16 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       // Split the prompt
       const splitPrompt = splitPromptContent(promptTemplate, propertyLink);
       
+      // Validate property link before setting up splitting state
+      if (!isValidPropertyLink(propertyLink)) {
+        console.error('❌ Invalid property link for prompt splitting:', propertyLink);
+        console.error('❌ Property link type:', typeof propertyLink);
+        throw new Error('Invalid property link provided for analysis');
+      }
+      
       // Set up state for the splitting process
       promptSplittingState.currentPhase = 'instructions';
-      promptSplittingState.pendingPropertyLink = propertyLink;
+      promptSplittingState.pendingPropertyLink = propertyLink.trim();
       
       console.log('📤 Sending instructions first...');
       console.log('📝 Instructions length:', splitPrompt.instructions.length);
@@ -11602,10 +11661,18 @@ function setupGlobalEventDelegation() {
       console.log('🔍 Link type:', typeof request.link);
       console.log('🔍 Link value:', request.link);
       
+      // Validate property link before processing
+      if (!isValidPropertyLink(request.link)) {
+        console.error('❌ Invalid property link received in message handler:', request.link);
+        console.error('❌ Link type:', typeof request.link);
+        sendResponse({ success: false, error: 'Invalid property link provided' });
+        return true;
+      }
+      
       // Handle async operation properly
       (async () => {
         try {
-          const success = await insertPropertyAnalysisPrompt(request.link);
+          const success = await insertPropertyAnalysisPrompt(request.link.trim());
           
           if (success) {
             // Optionally auto-submit (uncomment the next line if desired)
