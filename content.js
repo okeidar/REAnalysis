@@ -51,6 +51,8 @@ function safeChromeFall(apiCall, fallbackValue = null) {
   }
 }
 
+
+
 // Track if we've already notified about context invalidation to avoid spam
 let contextInvalidationNotified = false;
 
@@ -2117,15 +2119,15 @@ class REAnalyzerEmbeddedUI {
           <div>${property.date || 'Unknown date'}</div>
         </div>
         <div class="re-property-actions">
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+          <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
             View Analysis
           </button>
           ${hasAnalysis ? `
-            <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+            <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
               Export
             </button>
           ` : `
-            <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+            <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
               Analyze
             </button>
           `}
@@ -2134,6 +2136,8 @@ class REAnalyzerEmbeddedUI {
       
       propertiesList.appendChild(propertyCard);
     });
+
+    // Event listeners handled by global delegation
 
     // Add "View All" button if there are more properties
     if (properties.length > 10) {
@@ -2383,6 +2387,8 @@ Or enter your own property URL:`);
         }
         return;
       }
+      
+
       if (testUrl === '1') {
         urlToTest = testUrls[0];
       } else if (testUrl === '2') {
@@ -3149,15 +3155,15 @@ Or enter your own property URL:`);
             ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
           </div>
           <div class="re-property-actions">
-            <button class="re-btn re-btn-ghost re-btn-sm" onclick="embeddedUI.viewProperty('${property.url}')">
+            <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
               View
             </button>
             ${hasAnalysis ? `
-              <button class="re-btn re-btn-secondary re-btn-sm" onclick="embeddedUI.exportProperty('${property.url}')">
+              <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
                 Export
               </button>
             ` : `
-              <button class="re-btn re-btn-primary re-btn-sm" onclick="embeddedUI.analyzeExistingProperty('${property.url}')">
+              <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
                 Analyze
               </button>
             `}
@@ -3167,7 +3173,11 @@ Or enter your own property URL:`);
       
       propertiesList.appendChild(propertyItem);
     });
+
+    // Event listeners handled by global delegation
   }
+
+
 
   getDomainDisplayName(domain) {
     const domainNames = {
@@ -3251,10 +3261,7 @@ Or enter your own property URL:`);
 
   // Property action methods
   async viewProperty(url) {
-    console.log('📖 View saved analysis for property:', url);
-    
     try {
-      // Load property data from storage
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['propertyHistory']),
         { propertyHistory: [] }
@@ -3268,15 +3275,6 @@ Or enter your own property URL:`);
         return;
       }
       
-      // Debug what analysis data we have
-      console.log('🔍 DEBUG: Property found:', property.url);
-      console.log('🔍 DEBUG: Has analysis object:', !!property.analysis);
-      console.log('🔍 DEBUG: Analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
-      console.log('🔍 DEBUG: Has fullResponse:', !!(property.analysis?.fullResponse));
-      console.log('🔍 DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
-      console.log('🔍 DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 200) || 'No fullResponse');
-      console.log('🔍 DEBUG: All analysis data:', property.analysis);
-      
       if (!property.analysis) {
         this.showChatGPTMessage('warning', 'No analysis data found for this property. Click "Analyze" to generate analysis.');
         return;
@@ -3284,11 +3282,9 @@ Or enter your own property URL:`);
       
       if (!property.analysis.fullResponse && !property.analysis.fullAnalysis) {
         this.showChatGPTMessage('warning', 'No saved ChatGPT response found for this property. The analysis may not have completed properly. Try analyzing again.');
-        console.log('🔍 DEBUG: Available analysis fields:', Object.keys(property.analysis));
         return;
       }
       
-      // Show the saved ChatGPT analysis in a modal
       this.showAnalysisModal(property);
       
     } catch (error) {
@@ -3298,17 +3294,6 @@ Or enter your own property URL:`);
   }
 
   showAnalysisModal(property) {
-    console.log('🖼️ Showing analysis modal for:', property.url);
-    console.log('🔍 MODAL DEBUG: Full property object:', property);
-    console.log('🔍 MODAL DEBUG: Analysis data:', property.analysis);
-    console.log('🔍 MODAL DEBUG: Available analysis keys:', property.analysis ? Object.keys(property.analysis) : 'No analysis');
-    console.log('🔍 MODAL DEBUG: fullResponse exists:', !!(property.analysis?.fullResponse));
-    console.log('🔍 MODAL DEBUG: fullResponse length:', property.analysis?.fullResponse?.length || 0);
-    console.log('🔍 MODAL DEBUG: fullAnalysis exists:', !!(property.analysis?.fullAnalysis));
-    console.log('🔍 MODAL DEBUG: fullAnalysis length:', property.analysis?.fullAnalysis?.length || 0);
-    console.log('🔍 MODAL DEBUG: fullResponse preview:', property.analysis?.fullResponse?.substring(0, 300) || 'No fullResponse');
-    console.log('🔍 MODAL DEBUG: fullAnalysis preview:', property.analysis?.fullAnalysis?.substring(0, 300) || 'No fullAnalysis');
-    
     // Remove existing modal if any
     const existingModal = document.querySelector('#re-analysis-modal');
     if (existingModal) {
@@ -3327,14 +3312,14 @@ Or enter your own property URL:`);
     const propertyDetails = this.formatPropertyDetails(extractedData);
     const analysisText = analysisData.fullResponse || analysisData.fullAnalysis || 'No full analysis text available';
     
-    console.log('🔍 MODAL DEBUG: Final analysisText to display:', analysisText.substring(0, 300) + '...');
-    console.log('🔍 MODAL DEBUG: Final analysisText length:', analysisText.length);
+    // Log analysis text length for verification
+    console.log(`📏 Analysis text length: ${analysisText.length} characters`);
     
     modal.innerHTML = `
       <div class="re-modal">
         <div class="re-modal-header">
           <h3>Saved ChatGPT Analysis</h3>
-          <button class="re-modal-close" onclick="this.closest('.re-modal-overlay').remove()">×</button>
+          <button class="re-modal-close re-close-modal-btn">×</button>
         </div>
         
         <div class="re-modal-content">
@@ -3388,18 +3373,18 @@ Or enter your own property URL:`);
         
         <div class="re-modal-footer">
           ${analysisText === 'No full analysis text available' ? `
-            <button class="re-btn re-btn-primary" onclick="embeddedUI.reAnalyzeProperty('${property.url}'); this.closest('.re-modal-overlay').remove();">
+            <button class="re-btn re-btn-primary re-reanalyze-btn" data-property-url="${property.url}">
               🔍 Re-analyze Property
             </button>
           ` : `
-            <button class="re-btn re-btn-secondary" onclick="embeddedUI.copyAnalysisToClipboard('${property.url}')">
+            <button class="re-btn re-btn-secondary re-copy-btn" data-property-url="${property.url}">
               📋 Copy Analysis
             </button>
           `}
-          <button class="re-btn re-btn-secondary" onclick="window.open('${property.url}', '_blank')">
+          <button class="re-btn re-btn-secondary re-open-listing-btn" data-property-url="${property.url}">
             🔗 Open Original Listing
           </button>
-          <button class="re-btn re-btn-primary" onclick="this.closest('.re-modal-overlay').remove()">
+          <button class="re-btn re-btn-primary re-close-modal-btn">
             Close
           </button>
         </div>
@@ -3418,8 +3403,6 @@ Or enter your own property URL:`);
         modal.remove();
       }
     });
-    
-    console.log('✅ Analysis modal displayed');
   }
 
   formatPropertyDetails(extractedData) {
@@ -3473,29 +3456,33 @@ Or enter your own property URL:`);
     styles.id = 're-modal-styles';
     styles.textContent = `
       .re-modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        padding: 20px;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: rgba(0, 0, 0, 0.5) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 2147483647 !important;
+        padding: 20px !important;
+        visibility: visible !important;
+        opacity: 1 !important;
       }
       
       .re-modal {
-        background: var(--chatgpt-bg-primary, white);
-        border-radius: 12px;
-        max-width: 800px;
-        max-height: 90vh;
-        width: 100%;
-        overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        display: flex;
-        flex-direction: column;
+        background: var(--chatgpt-bg-primary, white) !important;
+        border-radius: 12px !important;
+        max-width: 800px !important;
+        max-height: 90vh !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        z-index: 1 !important;
       }
       
       .re-modal-header {
@@ -3537,6 +3524,7 @@ Or enter your own property URL:`);
         padding: 20px;
         overflow-y: auto;
         flex: 1;
+        max-height: 70vh;
       }
       
       .re-analysis-section {
@@ -3596,8 +3584,6 @@ Or enter your own property URL:`);
         font-size: 14px;
         line-height: 1.6;
         color: var(--chatgpt-text-primary, #333);
-        max-height: 400px;
-        overflow-y: auto;
         white-space: pre-wrap;
       }
       
@@ -5937,6 +5923,9 @@ if (isChatGPTSite()) {
         embeddedUI = new REAnalyzerEmbeddedUI();
         window.embeddedUI = embeddedUI; // Make globally available
         window.reAnalyzer = embeddedUI; // Make accessible for custom column management
+        
+        // Setup global event delegation for CSP-compliant button handling
+        setupGlobalEventDelegation();
       }, 1000);
     });
   } else {
@@ -5945,6 +5934,9 @@ if (isChatGPTSite()) {
       embeddedUI = new REAnalyzerEmbeddedUI();
       window.embeddedUI = embeddedUI; // Make globally available
       window.reAnalyzer = embeddedUI; // Make accessible for custom column management
+      
+      // Setup global event delegation for CSP-compliant button handling
+      setupGlobalEventDelegation();
     }, 1000);
   }
 } else {
@@ -10204,7 +10196,13 @@ function setupResponseMonitor() {
   };
   
   // Check for new messages every 500ms for better completion detection
-  const intervalId = setInterval(checkForNewMessages, 500);
+  // Only run when we have an active analysis session or prompt splitting
+  const intervalId = setInterval(() => {
+    // Only check if we have an active session
+    if (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle') {
+      checkForNewMessages();
+    }
+  }, 500);
   
   // Also use MutationObserver for more immediate detection
   const observer = new MutationObserver((mutations) => {
@@ -10234,7 +10232,7 @@ function setupResponseMonitor() {
       }
     });
     
-    if (shouldCheck) {
+    if (shouldCheck && (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle')) {
       console.log('🔍 MutationObserver detected potential message change');
       setTimeout(checkForNewMessages, 500); // Small delay to let content load
     }
@@ -11157,7 +11155,69 @@ if (isChatGPTSite()) {
     addExtensionIndicator();
   }
 
-  // Setup response monitoring
+  // Setup global event delegation for CSP-compliant button handling
+function setupGlobalEventDelegation() {
+  document.body.addEventListener('click', function(e) {
+    const target = e.target;
+    const propertyUrl = target.getAttribute('data-property-url');
+    
+    // Close modal buttons
+    if (target.classList.contains('re-close-modal-btn')) {
+      e.preventDefault();
+      const modal = target.closest('.re-modal-overlay');
+      if (modal) modal.remove();
+      return;
+    }
+    
+    if (!propertyUrl) return;
+    
+    // View Analysis buttons
+    if (target.classList.contains('re-view-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.viewProperty(propertyUrl);
+      return;
+    }
+    
+    // Export buttons
+    if (target.classList.contains('re-export-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.exportProperty(propertyUrl);
+      return;
+    }
+    
+    // Analyze buttons
+    if (target.classList.contains('re-analyze-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.analyzeExistingProperty(propertyUrl);
+      return;
+    }
+    
+    // Copy analysis buttons
+    if (target.classList.contains('re-copy-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.copyAnalysisToClipboard(propertyUrl);
+      return;
+    }
+    
+    // Re-analyze buttons
+    if (target.classList.contains('re-reanalyze-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.reAnalyzeProperty(propertyUrl);
+      const modal = target.closest('.re-modal-overlay');
+      if (modal) modal.remove();
+      return;
+    }
+    
+    // Open listing buttons
+    if (target.classList.contains('re-open-listing-btn')) {
+      e.preventDefault();
+      window.open(propertyUrl, '_blank');
+      return;
+    }
+  });
+}
+
+// Setup response monitoring
   setupResponseMonitor();
   
   // Listen for messages from popup or background script
@@ -11638,6 +11698,8 @@ window.testPromptSplitting = function(propertyLink) {
   insertPropertyAnalysisPrompt(testLink);
 };
 
+
+
 // Test View Analysis functionality
 window.testViewAnalysis = async function() {
   console.log('🧪 Testing View Analysis functionality...');
@@ -11689,5 +11751,7 @@ window.testViewAnalysis = async function() {
     console.error('❌ Error testing View Analysis:', error);
   }
 };
+
+
 
 } // End of multiple execution prevention block
