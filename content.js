@@ -810,12 +810,15 @@ class REAnalyzerEmbeddedUI {
                 <div style="font-size: 11px; color: #d1d5db;">
                   Select data points to extract
                 </div>
-                <div style="display: flex; gap: 6px;">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                   <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all" style="font-size: 11px; padding: 4px 8px;">
-                    All
+                    ✅ All
                   </button>
                   <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all" style="font-size: 11px; padding: 4px 8px;">
-                    None
+                    ❌ None
+                  </button>
+                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-defaults" style="font-size: 11px; padding: 4px 8px;">
+                    🏠 Defaults
                   </button>
                 </div>
               </div>
@@ -867,22 +870,28 @@ class REAnalyzerEmbeddedUI {
             </div>
             
             <!-- Add Custom Column Form -->
-            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 8px; margin-top: 8px;">
+            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 12px; margin-top: 8px; background: var(--chatgpt-surface-primary);">
+              <div style="font-size: 12px; font-weight: 500; color: #ffffff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                <span>➕</span>
+                <span id="re-form-title">Add Custom Column</span>
+              </div>
+              
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
                 <div>
-                  <label class="re-form-label" style="font-size: 11px;">Column Name</label>
-                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees" style="font-size: 11px;">
+                  <label class="re-form-label" style="font-size: 11px;">Column Name *</label>
+                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees, Pet Policy" style="font-size: 11px;" maxlength="50">
+                  <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Letters, numbers, spaces, hyphens, underscores only</div>
                 </div>
                 <div>
                   <label class="re-form-label" style="font-size: 11px;">Category</label>
                   <select id="re-new-column-category" class="re-form-input" style="font-size: 11px;">
-                    <option value="core">Core Info</option>
-                    <option value="location">Location</option>
-                    <option value="financial">Financial</option>
-                    <option value="features">Features</option>
-                    <option value="analysis">Analysis</option>
-                    <option value="market">Market</option>
-                    <option value="custom">Custom</option>
+                    <option value="core">🏠 Core Info</option>
+                    <option value="location">📍 Location</option>
+                    <option value="financial">💰 Financial</option>
+                    <option value="features">🔧 Features</option>
+                    <option value="analysis">📊 Analysis</option>
+                    <option value="market">📈 Market</option>
+                    <option value="custom" selected>➕ Custom</option>
                   </select>
                 </div>
               </div>
@@ -890,16 +899,17 @@ class REAnalyzerEmbeddedUI {
               <div class="re-form-group">
                 <label class="re-form-label" style="font-size: 11px;">Description</label>
                 <textarea id="re-new-column-description" class="re-form-input" rows="2" 
-                          placeholder="What should ChatGPT extract?"
-                          style="font-size: 11px;"></textarea>
+                          placeholder="Describe what ChatGPT should extract for this data point..."
+                          style="font-size: 11px;" maxlength="200"></textarea>
+                <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">Help ChatGPT understand what to look for</div>
               </div>
               
-              <div style="display: flex; gap: 6px;">
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column" style="font-size: 11px;">
-                  Save
-                </button>
+              <div style="display: flex; gap: 6px; justify-content: flex-end;">
                 <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column" style="font-size: 11px;">
                   Cancel
+                </button>
+                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column" style="font-size: 11px;">
+                  💾 Save Column
                 </button>
               </div>
             </div>
@@ -3483,6 +3493,7 @@ Or enter your own property URL:`);
         flex-direction: column !important;
         position: relative !important;
         z-index: 1 !important;
+        color: #000000 !important; /* Ensure black text on bright backgrounds */
       }
       
       .re-modal-header {
@@ -3497,7 +3508,7 @@ Or enter your own property URL:`);
       .re-modal-header h3 {
         margin: 0;
         font-size: 18px;
-        color: var(--chatgpt-text-primary, #333);
+        color: #000000 !important; /* Force black text for headers */
       }
       
       .re-modal-close {
@@ -3505,7 +3516,7 @@ Or enter your own property URL:`);
         border: none;
         font-size: 24px;
         cursor: pointer;
-        color: var(--chatgpt-text-secondary, #666);
+        color: #000000 !important; /* Force black text for close button */
         padding: 0;
         width: 30px;
         height: 30px;
@@ -3525,6 +3536,7 @@ Or enter your own property URL:`);
         overflow-y: auto;
         flex: 1;
         max-height: 70vh;
+        color: #000000 !important; /* Ensure black text in modal content */
       }
       
       .re-analysis-section {
@@ -3534,7 +3546,7 @@ Or enter your own property URL:`);
       .re-analysis-section h4 {
         margin: 0 0 12px 0;
         font-size: 16px;
-        color: var(--chatgpt-text-primary, #333);
+        color: #000000 !important; /* Force black text for section headers */
         border-bottom: 2px solid var(--chatgpt-accent, #10a37f);
         padding-bottom: 4px;
       }
@@ -3567,13 +3579,13 @@ Or enter your own property URL:`);
       
       .re-detail-label {
         font-size: 12px;
-        color: var(--chatgpt-text-secondary, #666);
+        color: #666666 !important; /* Force dark gray for labels */
         font-weight: 500;
       }
       
       .re-detail-value {
         font-size: 14px;
-        color: var(--chatgpt-text-primary, #333);
+        color: #000000 !important; /* Force black text for values */
         font-weight: 600;
       }
       
@@ -3583,7 +3595,7 @@ Or enter your own property URL:`);
         padding: 16px;
         font-size: 14px;
         line-height: 1.6;
-        color: var(--chatgpt-text-primary, #333);
+        color: #000000 !important; /* Force black text for analysis content */
         white-space: pre-wrap;
       }
       
@@ -3600,7 +3612,7 @@ Or enter your own property URL:`);
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 8px;
         font-size: 14px;
-        color: var(--chatgpt-text-secondary, #666);
+        color: #666666 !important; /* Force dark gray for meta information */
       }
       
       .re-modal-footer {
@@ -4835,6 +4847,7 @@ Or enter your own property URL:`);
     // Column management (existing)
     const selectAllBtn = this.panel.querySelector('#re-columns-select-all');
     const clearAllBtn = this.panel.querySelector('#re-columns-clear-all');
+    const selectDefaultsBtn = this.panel.querySelector('#re-columns-select-defaults');
     
     if (selectAllBtn) {
       selectAllBtn.addEventListener('click', () => this.selectAllColumns());
@@ -4842,6 +4855,10 @@ Or enter your own property URL:`);
     
     if (clearAllBtn) {
       clearAllBtn.addEventListener('click', () => this.clearAllColumns());
+    }
+    
+    if (selectDefaultsBtn) {
+      selectDefaultsBtn.addEventListener('click', () => this.selectDefaultColumns());
     }
     
     // Prompt template management
@@ -5059,10 +5076,44 @@ Or enter your own property URL:`);
     `;
     
     const enabledCount = columns.filter(col => col.enabled).length;
-    header.innerHTML = `
-      <span>${categoryName}</span>
-      <span style="font-size: 12px; color: #d1d5db;">${enabledCount}/${columns.length}</span>
+    const headerContent = document.createElement('div');
+    headerContent.style.cssText = 'display: flex; align-items: center; gap: 8px; width: 100%;';
+    
+    headerContent.innerHTML = `
+      <span style="flex: 1;">${categoryName}</span>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <button class="re-category-select-all" data-category="${categoryName}" style="background: none; border: 1px solid #d1d5db; color: #d1d5db; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;" title="Select all in category">All</button>
+        <button class="re-category-clear-all" data-category="${categoryName}" style="background: none; border: 1px solid #d1d5db; color: #d1d5db; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer;" title="Clear all in category">None</button>
+        <span style="font-size: 12px; color: #d1d5db;">${enabledCount}/${columns.length}</span>
+      </div>
     `;
+    
+    // Add category bulk actions
+    headerContent.querySelector('.re-category-select-all').addEventListener('click', (e) => {
+      e.stopPropagation();
+      columns.forEach(col => {
+        col.enabled = true;
+        const checkbox = content.querySelector(`input[data-column-id="${col.id}"]`);
+        if (checkbox) checkbox.checked = true;
+      });
+      this.updateColumnStats();
+      this.updateCategoryHeader(header, categoryName, columns);
+    });
+    
+    headerContent.querySelector('.re-category-clear-all').addEventListener('click', (e) => {
+      e.stopPropagation();
+      columns.forEach(col => {
+        if (!col.required) { // Don't disable required columns
+          col.enabled = false;
+          const checkbox = content.querySelector(`input[data-column-id="${col.id}"]`);
+          if (checkbox) checkbox.checked = false;
+        }
+      });
+      this.updateColumnStats();
+      this.updateCategoryHeader(header, categoryName, columns);
+    });
+    
+    header.appendChild(headerContent);
     
     // Category content
     const content = document.createElement('div');
@@ -5080,7 +5131,10 @@ Or enter your own property URL:`);
     
     // Toggle category
     let isExpanded = true;
-    header.addEventListener('click', () => {
+    header.addEventListener('click', (e) => {
+      // Don't toggle if clicking on buttons
+      if (e.target.tagName === 'BUTTON') return;
+      
       isExpanded = !isExpanded;
       content.style.display = isExpanded ? 'grid' : 'none';
       header.style.opacity = isExpanded ? '1' : '0.7';
@@ -5090,6 +5144,14 @@ Or enter your own property URL:`);
     section.appendChild(content);
     
     return section;
+  }
+
+  updateCategoryHeader(header, categoryName, columns) {
+    const enabledCount = columns.filter(col => col.enabled).length;
+    const countSpan = header.querySelector('span:last-child');
+    if (countSpan) {
+      countSpan.textContent = `${enabledCount}/${columns.length}`;
+    }
   }
 
   createColumnItem(column) {
@@ -5129,12 +5191,26 @@ Or enter your own property URL:`);
     label.style.cssText = 'flex: 1; line-height: 1.3;';
     
     const badges = [];
+    
+    // Add default indicator for built-in columns
+    const defaultColumns = getTabularDataColumns();
+    const isDefaultColumn = defaultColumns.some(defaultCol => defaultCol.id === column.id);
+    if (isDefaultColumn) {
+      badges.push('<span style="background: #10a37f; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">DEFAULT</span>');
+    }
+    
     if (column.required) badges.push('<span style="background: #ef4444; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">REQUIRED</span>');
     if (column.isCalculated) badges.push('<span style="background: #3b82f6; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">CALCULATED</span>');
     
+    // Add custom indicator for user-added columns
+    if (!isDefaultColumn) {
+      badges.push('<span style="background: #8b5cf6; color: white; padding: 1px 4px; border-radius: 2px; font-size: 10px;">CUSTOM</span>');
+    }
+    
     label.innerHTML = `
-      <div style="font-weight: 500; color: #ffffff;">
-        ${column.name} ${badges.join(' ')}
+      <div style="font-weight: 500; color: #ffffff; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+        <span>${column.name}</span>
+        ${badges.join(' ')}
       </div>
       ${column.description ? `<div style="font-size: 11px; color: #d1d5db; margin-top: 2px;">${column.description || ''}</div>` : ''}
     `;
@@ -5153,7 +5229,31 @@ Or enter your own property URL:`);
     const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
     const totalCount = checkboxes.length;
     
-    statsElement.textContent = `${enabledCount} of ${totalCount} columns selected`;
+    // Count defaults vs custom columns
+    const defaultColumns = getTabularDataColumns();
+    let defaultEnabledCount = 0;
+    let customEnabledCount = 0;
+    
+    Array.from(checkboxes).forEach(checkbox => {
+      if (checkbox.checked) {
+        const columnId = checkbox.dataset.columnId;
+        const isDefaultColumn = defaultColumns.some(col => col.id === columnId);
+        if (isDefaultColumn) {
+          defaultEnabledCount++;
+        } else {
+          customEnabledCount++;
+        }
+      }
+    });
+    
+    statsElement.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>${enabledCount} of ${totalCount} columns selected</span>
+        <span style="font-size: 10px; color: #9ca3af;">
+          🏠 ${defaultEnabledCount} default • ➕ ${customEnabledCount} custom
+        </span>
+      </div>
+    `;
   }
 
   selectAllColumns() {
@@ -5162,13 +5262,62 @@ Or enter your own property URL:`);
       checkbox.checked = true;
       checkbox.dispatchEvent(new Event('change'));
     });
+    
+    // Update all category headers
+    this.updateAllCategoryHeaders();
+    this.showChatGPTMessage('success', 'All columns selected');
   }
 
   clearAllColumns() {
     const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    const defaultColumns = getTabularDataColumns();
+    
     checkboxes.forEach(checkbox => {
-      checkbox.checked = false;
+      const columnId = checkbox.dataset.columnId;
+      // Find the column to check if it's required
+      const column = defaultColumns.find(col => col.id === columnId);
+      
+      // Only clear non-required columns
+      if (!column || !column.required) {
+        checkbox.checked = false;
+        checkbox.dispatchEvent(new Event('change'));
+      }
+    });
+    
+    // Update all category headers
+    this.updateAllCategoryHeaders();
+    this.showChatGPTMessage('success', 'All non-required columns cleared');
+  }
+
+  selectDefaultColumns() {
+    const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
+    const defaultColumns = getTabularDataColumns();
+    
+    checkboxes.forEach(checkbox => {
+      const columnId = checkbox.dataset.columnId;
+      // Check if this is a default column
+      const isDefaultColumn = defaultColumns.some(col => col.id === columnId);
+      
+      checkbox.checked = isDefaultColumn;
       checkbox.dispatchEvent(new Event('change'));
+    });
+    
+    // Update all category headers
+    this.updateAllCategoryHeaders();
+    this.showChatGPTMessage('success', 'Default columns selected');
+  }
+
+  updateAllCategoryHeaders() {
+    const categories = this.panel.querySelectorAll('.re-column-category');
+    categories.forEach(categoryElement => {
+      const categoryHeader = categoryElement.querySelector('div:first-child');
+      const checkboxes = categoryElement.querySelectorAll('input[type="checkbox"]');
+      const enabledCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+      
+      const countSpan = categoryHeader.querySelector('span:last-child');
+      if (countSpan) {
+        countSpan.textContent = `${enabledCount}/${checkboxes.length}`;
+      }
     });
   }
 
@@ -5404,26 +5553,45 @@ Or enter your own property URL:`);
       padding: 12px;
       margin-bottom: 8px;
       background: var(--chatgpt-surface-primary);
+      transition: all 0.2s ease;
     `;
+    
+    // Add hover effect
+    element.addEventListener('mouseenter', () => {
+      element.style.borderColor = 'var(--chatgpt-primary)';
+      element.style.boxShadow = '0 2px 8px rgba(16, 163, 127, 0.1)';
+    });
+    
+    element.addEventListener('mouseleave', () => {
+      element.style.borderColor = 'var(--chatgpt-border-light)';
+      element.style.boxShadow = 'none';
+    });
+    
+    // Get category display name and color
+    const categoryInfo = this.getCategoryDisplayInfo(column.category || 'custom');
     
     element.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div style="flex: 1;">
-          <div style="font-weight: 500; margin-bottom: 4px;">
-            ${column.name}
-            <span style="font-size: 11px; background: var(--chatgpt-surface-secondary); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">
-              ${column.category || 'custom'}
+          <div style="font-weight: 500; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="color: #ffffff;">${column.name}</span>
+            <span style="font-size: 11px; background: ${categoryInfo.color}; color: white; padding: 2px 6px; border-radius: 4px;">
+              ${categoryInfo.icon} ${categoryInfo.name}
             </span>
+            <span style="font-size: 10px; background: #8b5cf6; color: white; padding: 1px 4px; border-radius: 2px;">CUSTOM</span>
           </div>
-          <div style="font-size: 12px; color: var(--chatgpt-text-secondary); line-height: 1.4;">
+          <div style="font-size: 12px; color: #d1d5db; line-height: 1.4;">
             ${column.description || 'No description provided'}
+          </div>
+          <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
+            Type: ${column.type || 'text'} • ID: ${column.id}
           </div>
         </div>
         <div style="display: flex; gap: 4px; margin-left: 12px;">
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.editCustomColumn(${index})" title="Edit">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.editCustomColumn(${index})" title="Edit custom column">
             ✏️
           </button>
-          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.deleteCustomColumn(${index})" title="Delete">
+          <button class="re-btn re-btn-ghost re-btn-sm" onclick="reAnalyzer.deleteCustomColumn(${index})" title="Delete custom column" style="color: #ef4444;">
             🗑️
           </button>
         </div>
@@ -5431,6 +5599,23 @@ Or enter your own property URL:`);
     `;
     
     return element;
+  }
+
+  getCategoryDisplayInfo(category) {
+    const categoryMap = {
+      'core': { name: 'Core Info', icon: '🏠', color: '#10a37f' },
+      'location': { name: 'Location', icon: '📍', color: '#3b82f6' },
+      'financial': { name: 'Financial', icon: '💰', color: '#f59e0b' },
+      'features': { name: 'Features', icon: '🔧', color: '#8b5cf6' },
+      'analysis': { name: 'Analysis', icon: '📊', color: '#ef4444' },
+      'market': { name: 'Market', icon: '📈', color: '#06b6d4' },
+      'calculated': { name: 'Calculated', icon: '🧮', color: '#84cc16' },
+      'risk': { name: 'Risk', icon: '⚠️', color: '#f97316' },
+      'scoring': { name: 'Scoring', icon: '⭐', color: '#eab308' },
+      'custom': { name: 'Custom', icon: '➕', color: '#8b5cf6' }
+    };
+    
+    return categoryMap[category] || categoryMap['custom'];
   }
 
   showAddColumnForm() {
@@ -5460,13 +5645,23 @@ Or enter your own property URL:`);
       const nameField = this.panel.querySelector('#re-new-column-name');
       const categoryField = this.panel.querySelector('#re-new-column-category');
       const descriptionField = this.panel.querySelector('#re-new-column-description');
+      const saveBtn = this.panel.querySelector('#re-save-custom-column');
       
       const name = nameField.value.trim();
       const category = categoryField.value;
       const description = descriptionField.value.trim();
+      const editIndex = saveBtn.dataset.editIndex;
+      const isEditing = editIndex !== undefined;
       
       if (!name) {
         this.showChatGPTMessage('warning', 'Please enter a column name');
+        nameField.focus();
+        return;
+      }
+      
+      // Validate column name format
+      if (!/^[a-zA-Z0-9\s\-_()]+$/.test(name)) {
+        this.showChatGPTMessage('warning', 'Column name can only contain letters, numbers, spaces, hyphens, underscores, and parentheses');
         nameField.focus();
         return;
       }
@@ -5479,27 +5674,47 @@ Or enter your own property URL:`);
       
       const customColumns = result.customColumns || [];
       
-      // Check for duplicate names
-      if (customColumns.some(col => col.name.toLowerCase() === name.toLowerCase())) {
+      // Check for duplicate names (excluding current column when editing)
+      const duplicateCheck = customColumns.some((col, index) => {
+        if (isEditing && index === parseInt(editIndex)) return false; // Skip current column when editing
+        return col.name.toLowerCase() === name.toLowerCase();
+      });
+      
+      if (duplicateCheck) {
         this.showChatGPTMessage('warning', 'A column with this name already exists');
         nameField.focus();
         return;
       }
       
-      // Create new column
-      const newColumn = {
-        id: `custom_${Date.now()}`,
-        name: name,
-        category: category,
-        description: description,
-        type: 'text',
-        isCustom: true,
-        enabled: true,
-        required: false
-      };
-      
-      // Add to list
-      customColumns.push(newColumn);
+      if (isEditing) {
+        // Update existing column
+        const columnIndex = parseInt(editIndex);
+        customColumns[columnIndex] = {
+          ...customColumns[columnIndex],
+          name: name,
+          category: category,
+          description: description
+        };
+        
+        this.showChatGPTMessage('success', `Custom column "${name}" updated successfully!`);
+      } else {
+        // Create new column
+        const newColumn = {
+          id: `custom_${Date.now()}`,
+          name: name,
+          category: category,
+          description: description,
+          type: 'text',
+          isCustom: true,
+          enabled: true,
+          required: false
+        };
+        
+        // Add to list
+        customColumns.push(newColumn);
+        
+        this.showChatGPTMessage('success', `Custom column "${name}" added successfully!`);
+      }
       
       // Save
       await safeChromeFall(
@@ -5510,13 +5725,19 @@ Or enter your own property URL:`);
       // Reload the list
       this.loadCustomColumns();
       
-      // Hide form
+      // Hide form and reset save button
       this.hideAddColumnForm();
+      saveBtn.innerHTML = '💾 Save Column';
+      delete saveBtn.dataset.editIndex;
+      
+      // Reset form title
+      const formTitle = this.panel.querySelector('#re-form-title');
+      if (formTitle) {
+        formTitle.textContent = 'Add Custom Column';
+      }
       
       // Reload columns in the main tab
       this.loadTabularColumns();
-      
-      this.showChatGPTMessage('success', 'Custom column added successfully!');
       
     } catch (error) {
       console.error('Failed to save custom column:', error);
@@ -5537,6 +5758,46 @@ Or enter your own property URL:`);
     }
   }
 
+  async editCustomColumn(index) {
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['customColumns']),
+        { customColumns: [] }
+      );
+      
+      const customColumns = result.customColumns || [];
+      const column = customColumns[index];
+      
+      if (!column) {
+        this.showChatGPTMessage('error', 'Custom column not found');
+        return;
+      }
+      
+      // Show form with existing values
+      this.showAddColumnForm();
+      
+      // Populate form with existing values
+      this.panel.querySelector('#re-new-column-name').value = column.name;
+      this.panel.querySelector('#re-new-column-category').value = column.category || 'custom';
+      this.panel.querySelector('#re-new-column-description').value = column.description || '';
+      
+      // Change save button to update mode
+      const saveBtn = this.panel.querySelector('#re-save-custom-column');
+      const formTitle = this.panel.querySelector('#re-form-title');
+      if (saveBtn) {
+        saveBtn.innerHTML = '✏️ Update Column';
+        saveBtn.dataset.editIndex = index;
+      }
+      if (formTitle) {
+        formTitle.textContent = 'Edit Custom Column';
+      }
+      
+    } catch (error) {
+      console.error('Failed to edit custom column:', error);
+      this.showChatGPTMessage('error', 'Failed to load column for editing');
+    }
+  }
+
   async deleteCustomColumn(index) {
     if (confirm('Are you sure you want to delete this custom column?')) {
       try {
@@ -5546,6 +5807,7 @@ Or enter your own property URL:`);
         );
         
         const customColumns = result.customColumns || [];
+        const columnName = customColumns[index]?.name || 'Unknown';
         customColumns.splice(index, 1);
         
         await safeChromeFall(
@@ -5556,7 +5818,7 @@ Or enter your own property URL:`);
         this.loadCustomColumns();
         this.loadTabularColumns(); // Refresh main columns list
         
-        this.showChatGPTMessage('success', 'Custom column deleted');
+        this.showChatGPTMessage('success', `Custom column "${columnName}" deleted`);
         
       } catch (error) {
         console.error('Failed to delete custom column:', error);
@@ -6052,6 +6314,30 @@ function detectConfirmation(responseText) {
   return result;
 }
 
+// Helper function to validate property links
+function isValidPropertyLink(link) {
+  if (!link || 
+      link === 'null' || 
+      link === 'undefined' || 
+      link === null || 
+      link === undefined ||
+      typeof link !== 'string' ||
+      link.trim().length === 0) {
+    return false;
+  }
+  
+  // Additional URL format validation
+  const trimmedLink = link.trim();
+  try {
+    new URL(trimmedLink);
+    return true;
+  } catch (e) {
+    // Not a valid URL format
+    console.warn('⚠️ Property link is not a valid URL format:', trimmedLink);
+    return false;
+  }
+}
+
 function resetPromptSplittingState() {
   promptSplittingState.currentPhase = null;
   promptSplittingState.pendingPropertyLink = null;
@@ -6114,9 +6400,17 @@ async function handleConfirmationReceived() {
   console.log('🔗 Checking pending property link:', promptSplittingState.pendingPropertyLink);
   console.log('🔗 Prompt splitting state:', promptSplittingState);
   
-  if (!promptSplittingState.pendingPropertyLink) {
-    console.error('❌ No pending property link to send');
+  // Enhanced validation for property link
+  const propertyLink = promptSplittingState.pendingPropertyLink;
+  
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid or missing property link detected:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
     console.error('❌ Current prompt splitting state:', promptSplittingState);
+    
+    // Reset state and exit gracefully
+    resetPromptSplittingState();
+    removePromptSplittingIndicator();
     return;
   }
   
@@ -6141,9 +6435,14 @@ async function handleConfirmationReceived() {
     const propertyLink = promptSplittingState.pendingPropertyLink;
     console.log('🔗 About to create link message with:', propertyLink);
     
-    if (!propertyLink || propertyLink === 'null' || propertyLink === 'undefined') {
-      console.error('❌ Invalid property link detected:', propertyLink);
-      await handleSplittingFallback();
+    // Double-check property link validation before using it
+    if (!isValidPropertyLink(propertyLink)) {
+      console.error('❌ Invalid property link detected at link creation:', propertyLink);
+      console.error('❌ Property link type:', typeof propertyLink);
+      
+      // Reset state and exit gracefully instead of fallback
+      resetPromptSplittingState();
+      removePromptSplittingIndicator();
       return;
     }
     
@@ -6271,9 +6570,17 @@ async function handleConfirmationTimeout() {
 
 // Fallback to single prompt approach
 async function handleSplittingFallback() {
-  if (!promptSplittingState.pendingPropertyLink) {
-    console.error('❌ No pending property link for fallback');
+  const propertyLink = promptSplittingState.pendingPropertyLink;
+  
+  // Enhanced validation for property link in fallback
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid or missing property link for fallback:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
+    console.error('❌ Cannot proceed with fallback - no valid property link');
+    
+    // Reset state and exit gracefully
     resetPromptSplittingState();
+    removePromptSplittingIndicator();
     return;
   }
   
@@ -6410,7 +6717,14 @@ Property Link: {PROPERTY_URL}`;
 
 // Third prompt: Tabular Data Extraction Template
 function getTabularDataExtractionPrompt() {
-  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured tabular format suitable for spreadsheet import and export.
+
+**TABULAR OUTPUT FORMAT REQUIREMENTS:**
+- Provide your analysis in a structured tabular format suitable for spreadsheet import and export
+- Use clear column headers and consistent data formatting
+- Include currency symbols, proper number formatting, and standardized text
+- Organize data in rows and columns with clear labels
+- Format output as a table that can be easily copied into Excel or Google Sheets
 
 **PROPERTY DATA EXTRACTION REQUIREMENTS:**
 
@@ -6499,28 +6813,74 @@ For the following calculated metrics, provide the calculation steps:
 - Days on Market Score: 1-10 based on DOM relative to market average
 - Price Trend Score: 1-10 based on price history and market direction
 
-**OUTPUT FORMAT:**
-Please provide your analysis in the following structured format:
+**TABULAR OUTPUT FORMAT:**
+Please provide your analysis in the following structured tabular format:
 
-**PROPERTY DATA SUMMARY:**
-[Extract all requested data points with clear labels]
+**PROPERTY DATA TABLE:**
+| Data Point | Value |
+|------------|-------|
+| Property Address | [Extract complete address] |
+| Asking Price | [Include currency symbol] |
+| Property Type | [House/Apartment/Condo/etc.] |
+| Bedrooms | [Numeric value] |
+| Bathrooms | [Include .5 for half baths] |
+| Square Footage | [Numeric value] |
+| Year Built | [4-digit year] |
+| Lot Size | [Square feet or N/A] |
+| Neighborhood | [Area name] |
+| City | [City name] |
+| State | [State name] |
+| ZIP Code | [ZIP code or N/A] |
+| Estimated Monthly Rent | [Professional estimate with $] |
+| Location Score | [1-10 rating] |
+| Market Trend | [Rising/Stable/Declining] |
+| Days on Market | [Number or N/A] |
+| Price History | [Changes or N/A] |
+| Parking Spaces | [Number] |
+| Garage Type | [Attached/Detached/None] |
+| Heating Type | [System type] |
+| Cooling Type | [System type] |
+| Appliances Included | [List] |
+| Amenities | [Features list] |
+| Key Advantages | [Top 3 for investment] |
+| Key Concerns | [Top 3 limitations] |
+| Red Flags | [Warning signs] |
+| Investment Grade | [A/B/C/D] |
+| Rental Potential | [Assessment] |
+| Appreciation Potential | [Outlook] |
 
-**CALCULATED METRICS:**
-[Provide all calculated metrics with formulas shown]
+**CALCULATED METRICS TABLE:**
+| Metric | Value | Calculation |
+|--------|-------|-------------|
+| Price per Sq Ft | [Value] | [Asking Price ÷ Square Footage] |
+| Rent per Sq Ft | [Value] | [Monthly Rent ÷ Square Footage] |
+| Property Age | [Years] | [Current Year - Year Built] |
+| Gross Rent Multiplier | [Value] | [Price ÷ (Monthly Rent × 12)] |
+| Cap Rate | [%] | [(Monthly Rent × 12) ÷ Price × 100] |
+| 1% Rule Ratio | [%] | [Monthly Rent ÷ Price × 100] |
 
-**RISK ASSESSMENT:**
-[Provide risk scores with justification]
+**MARKET ANALYSIS TABLE:**
+| Market Factor | Value | Assessment |
+|---------------|-------|------------|
+| Market Type | [Buyer's/Seller's/Balanced] | [Analysis] |
+| Inventory Level | [Low/Medium/High] | [Current state] |
+| Demand Level | [Low/Medium/High] | [Current demand] |
+| Job Growth Rate | [%] | [Local rate] |
+| Population Growth | [%] | [Local rate] |
+| School Quality | [1-10] | [Rating] |
 
-**MARKET ANALYSIS:**
-[Provide market analysis data with supporting information]
-
-**INVESTMENT RECOMMENDATION:**
-[Overall investment assessment with key factors]
+**RISK ASSESSMENT TABLE:**
+| Risk Factor | Score (1-10) | Justification |
+|-------------|--------------|---------------|
+| Vacancy Risk | [Score] | [Market demand factors] |
+| Maintenance Risk | [Score] | [Age and condition factors] |
+| Market Risk | [Score] | [Market stability factors] |
+| Overall Risk | [Average] | [Combined assessment] |
 
 Property Link: {PROPERTY_URL}
 Analysis Date: {DATE}
 
-Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+Focus on data accuracy and provide specific, measurable values in tabular format that can be easily imported into spreadsheets for property comparison and investment decision-making.`;
 }
 
 // Default dynamic prompt template with column placeholders
@@ -6551,7 +6911,14 @@ Thank you for providing accurate, structured data for investment analysis.`;
 
 // Default tabular prompt template with placeholder for columns
 function getDefaultTabularPromptTemplate() {
-  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured tabular format suitable for spreadsheet import and export.
+
+**TABULAR OUTPUT FORMAT REQUIREMENTS:**
+- Provide your analysis in a structured tabular format suitable for spreadsheet import and export
+- Use clear column headers and consistent data formatting
+- Include currency symbols, proper number formatting, and standardized text
+- Organize data in rows and columns with clear labels
+- Format output as a table that can be easily copied into Excel or Google Sheets
 
 **PROPERTY DATA EXTRACTION REQUIREMENTS:**
 
@@ -6565,13 +6932,28 @@ function getDefaultTabularPromptTemplate() {
 - Ensure all numeric values are properly formatted
 - Use standardized abbreviations for consistency
 
-**OUTPUT FORMAT:**
-Please provide your analysis in a structured format with clear labels for each requested data point. Organize the information clearly and ensure accuracy.
+**TABULAR OUTPUT FORMAT:**
+Please provide your analysis in a structured tabular format with the following structure:
+
+**PROPERTY DATA TABLE:**
+| Data Point | Value |
+|------------|-------|
+[For each requested data point above, create a row with the data point name and extracted value]
+
+**CALCULATED METRICS TABLE:** (if applicable)
+| Metric | Value | Calculation |
+|--------|-------|-------------|
+[Include any calculated metrics with their values and formulas]
+
+**ANALYSIS SUMMARY TABLE:** (if applicable)
+| Analysis Factor | Assessment | Details |
+|-----------------|------------|---------|
+[Include qualitative analysis points in tabular format]
 
 Property Link: {PROPERTY_URL}
 Analysis Date: {DATE}
 
-Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+Focus on data accuracy and provide specific, measurable values in tabular format that can be easily imported into spreadsheets for property comparison and investment decision-making.`;
 }
 
 // Function to generate tabular prompt with selected columns
@@ -6628,7 +7010,14 @@ async function getTabularDataExtractionPromptWithColumns(enabledColumnIds) {
     }
     
     // Build complete prompt
-    const customPrompt = `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured format suitable for spreadsheet analysis.
+    const customPrompt = `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured tabular format suitable for spreadsheet import and export.
+
+**TABULAR OUTPUT FORMAT REQUIREMENTS:**
+- Provide your analysis in a structured tabular format suitable for spreadsheet import and export
+- Use clear column headers and consistent data formatting
+- Include currency symbols, proper number formatting, and standardized text
+- Organize data in rows and columns with clear labels
+- Format output as a table that can be easily copied into Excel or Google Sheets
 
 **PROPERTY DATA EXTRACTION REQUIREMENTS:**
 
@@ -6642,13 +7031,28 @@ ${promptSections.join('\n\n')}
 - Ensure all numeric values are properly formatted
 - Use standardized abbreviations for consistency
 
-**OUTPUT FORMAT:**
-Please provide your analysis in a structured format with clear labels for each requested data point.
+**TABULAR OUTPUT FORMAT:**
+Please provide your analysis in the following structured tabular format:
+
+**PROPERTY DATA TABLE:**
+| Data Point | Value |
+|------------|-------|
+[Create a row for each requested data point above with the data point name and extracted value]
+
+**CALCULATED METRICS TABLE:** (if applicable)
+| Metric | Value | Calculation |
+|--------|-------|-------------|
+[Include any calculated metrics with their values and formulas]
+
+**ANALYSIS SUMMARY TABLE:** (if applicable)
+| Analysis Factor | Assessment | Details |
+|-----------------|------------|---------|
+[Include qualitative analysis points in tabular format]
 
 Property Link: {PROPERTY_URL}
 Analysis Date: {DATE}
 
-Focus on data accuracy and provide specific, measurable values that can be used for property comparison and investment decision-making.`;
+Focus on data accuracy and provide specific, measurable values in tabular format that can be easily imported into spreadsheets for property comparison and investment decision-making.`;
 
     return customPrompt;
     
@@ -10855,6 +11259,13 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('🔍 Property link type:', typeof propertyLink);
   console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
   
+  // Early validation to prevent null property links from proceeding
+  if (!isValidPropertyLink(propertyLink)) {
+    console.error('❌ Invalid property link provided to insertPropertyAnalysisPrompt:', propertyLink);
+    console.error('❌ Property link type:', typeof propertyLink);
+    throw new Error('Invalid property link provided for analysis');
+  }
+  
   // Clear any previous analysis tracking to prevent cross-contamination
   if (currentPropertyAnalysis) {
     console.log('⚠️ Clearing previous property analysis for:', currentPropertyAnalysis?.url || 'Unknown URL');
@@ -10903,9 +11314,16 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       // Split the prompt
       const splitPrompt = splitPromptContent(promptTemplate, propertyLink);
       
+      // Validate property link before setting up splitting state
+      if (!isValidPropertyLink(propertyLink)) {
+        console.error('❌ Invalid property link for prompt splitting:', propertyLink);
+        console.error('❌ Property link type:', typeof propertyLink);
+        throw new Error('Invalid property link provided for analysis');
+      }
+      
       // Set up state for the splitting process
       promptSplittingState.currentPhase = 'instructions';
-      promptSplittingState.pendingPropertyLink = propertyLink;
+      promptSplittingState.pendingPropertyLink = propertyLink.trim();
       
       console.log('📤 Sending instructions first...');
       console.log('📝 Instructions length:', splitPrompt.instructions.length);
@@ -11243,10 +11661,18 @@ function setupGlobalEventDelegation() {
       console.log('🔍 Link type:', typeof request.link);
       console.log('🔍 Link value:', request.link);
       
+      // Validate property link before processing
+      if (!isValidPropertyLink(request.link)) {
+        console.error('❌ Invalid property link received in message handler:', request.link);
+        console.error('❌ Link type:', typeof request.link);
+        sendResponse({ success: false, error: 'Invalid property link provided' });
+        return true;
+      }
+      
       // Handle async operation properly
       (async () => {
         try {
-          const success = await insertPropertyAnalysisPrompt(request.link);
+          const success = await insertPropertyAnalysisPrompt(request.link.trim());
           
           if (success) {
             // Optionally auto-submit (uncomment the next line if desired)
