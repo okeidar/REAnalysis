@@ -391,9 +391,16 @@ class REAnalyzerEmbeddedUI {
     // Add to page
     document.body.appendChild(this.fab);
 
-    // FAB click handler
+    // FAB click and keyboard handlers
     this.fab.addEventListener('click', () => {
       this.togglePanel();
+    });
+    
+    this.fab.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.togglePanel();
+      }
     });
 
     console.log('🎯 Created ChatGPT-style floating toggle');
@@ -1183,14 +1190,21 @@ class REAnalyzerEmbeddedUI {
                 <input type="checkbox" id="re-auto-categorize" class="re-checkbox">
                 <span class="re-setting-title">Auto-categorize properties</span>
               </label>
-              <p class="re-setting-description">Automatically suggest categories for new properties</p>
+              <p class="re-setting-description">Automatically organize properties by source website for better management</p>
             </div>
             <div class="re-setting-item">
               <label class="re-setting-label">
                 <input type="checkbox" id="re-show-notifications" class="re-checkbox" checked>
                 <span class="re-setting-title">Show analysis notifications</span>
               </label>
-              <p class="re-setting-description">Display notifications when analysis is complete</p>
+              <p class="re-setting-description">Display success/error messages when property analysis completes</p>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-auto-switch-tab" class="re-checkbox" checked>
+                <span class="re-setting-title">Auto-switch to Properties tab</span>
+              </label>
+              <p class="re-setting-description">Automatically navigate to Properties tab after successful analysis</p>
             </div>
           </div>
 
@@ -1204,6 +1218,7 @@ class REAnalyzerEmbeddedUI {
               <label class="re-setting-label">
                 <span class="re-setting-title">Panel Position</span>
               </label>
+              <p class="re-setting-description">Choose where the analyzer panel appears on your screen</p>
               <select id="re-panel-position" class="re-select">
                 <option value="right">Right Side</option>
                 <option value="left">Left Side</option>
@@ -1215,7 +1230,14 @@ class REAnalyzerEmbeddedUI {
                 <input type="checkbox" id="re-compact-mode" class="re-checkbox">
                 <span class="re-setting-title">Compact mode</span>
               </label>
-              <p class="re-setting-description">Use smaller interface elements</p>
+              <p class="re-setting-description">Use smaller interface elements to save screen space</p>
+            </div>
+            <div class="re-setting-item">
+              <label class="re-setting-label">
+                <input type="checkbox" id="re-high-contrast" class="re-checkbox">
+                <span class="re-setting-title">High contrast mode</span>
+              </label>
+              <p class="re-setting-description">Increase color contrast for better accessibility</p>
             </div>
           </div>
 
@@ -1229,10 +1251,11 @@ class REAnalyzerEmbeddedUI {
               <label class="re-setting-label">
                 <span class="re-setting-title">Default Export Format</span>
               </label>
+              <p class="re-setting-description">Choose the default file format for property exports</p>
               <select id="re-export-format" class="re-select">
-                <option value="word">Word Document</option>
-                <option value="csv">CSV Spreadsheet</option>
-                <option value="json">JSON Data</option>
+                <option value="word">Word Document (.docx)</option>
+                <option value="csv">CSV Spreadsheet (.csv)</option>
+                <option value="json">JSON Data (.json)</option>
               </select>
             </div>
             <div class="re-setting-item">
@@ -1240,6 +1263,7 @@ class REAnalyzerEmbeddedUI {
                 <input type="checkbox" id="re-include-full-analysis" class="re-checkbox" checked>
                 <span class="re-setting-title">Include full analysis text</span>
               </label>
+              <p class="re-setting-description">Include complete ChatGPT analysis in exported documents</p>
             </div>
           </div>
         </div>
@@ -1401,6 +1425,7 @@ class REAnalyzerEmbeddedUI {
     const exportCsvBtn = this.panel.querySelector('#re-export-csv');
     const testBtn = this.panel.querySelector('#re-test-analysis');
     const clearBtn = this.panel.querySelector('#re-clear-data');
+    const clearAllDataBtn = this.panel.querySelector('#re-clear-all-data-btn');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => this.exportAllProperties());
@@ -1429,6 +1454,34 @@ class REAnalyzerEmbeddedUI {
 
     if (clearBtn) {
       clearBtn.addEventListener('click', () => this.clearAllData());
+    }
+
+    if (clearAllDataBtn) {
+      clearAllDataBtn.addEventListener('click', () => this.clearAllDataWithConfirmation());
+    }
+
+    // Settings checkboxes
+    const autoSwitchTabCheckbox = this.panel.querySelector('#re-auto-switch-tab');
+    const highContrastCheckbox = this.panel.querySelector('#re-high-contrast');
+
+    if (autoSwitchTabCheckbox) {
+      autoSwitchTabCheckbox.checked = uiSettings.autoShow !== false;
+      autoSwitchTabCheckbox.addEventListener('change', () => {
+        uiSettings.autoShow = autoSwitchTabCheckbox.checked;
+        this.saveSettings();
+      });
+    }
+
+    if (highContrastCheckbox) {
+      highContrastCheckbox.checked = uiSettings.highContrast || false;
+      highContrastCheckbox.addEventListener('change', () => {
+        uiSettings.highContrast = highContrastCheckbox.checked;
+        this.saveSettings();
+        this.applyHighContrastMode(highContrastCheckbox.checked);
+      });
+      
+      // Apply on initialization
+      this.applyHighContrastMode(highContrastCheckbox.checked);
     }
     
     // Custom prompt events
@@ -1911,6 +1964,26 @@ class REAnalyzerEmbeddedUI {
     
     this.currentTab = tabId;
     
+    // Update tab buttons (new tab structure)
+    const tabButtons = this.panel.querySelectorAll('.re-tab-btn');
+    tabButtons.forEach(btn => {
+      btn.classList.remove('re-tab-active');
+      btn.setAttribute('aria-selected', 'false');
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('re-tab-active');
+        btn.setAttribute('aria-selected', 'true');
+      }
+    });
+
+    // Update tab content (new tab structure)
+    const tabContents = this.panel.querySelectorAll('.re-tab-content');
+    tabContents.forEach(content => {
+      content.classList.remove('re-tab-active');
+      if (content.id === `${tabId}-tab`) {
+        content.classList.add('re-tab-active');
+      }
+    });
+    
     // Tab-specific logic
     if (tabId === 'properties') {
       this.loadChatGPTPropertyData();
@@ -2068,6 +2141,7 @@ class REAnalyzerEmbeddedUI {
       const sources = [...new Set(properties.map(p => p.domain))].length;
       
       this.updateChatGPTStats(properties.length, analyzedCount, sources);
+      this.updatePropertiesStats();
       
       // Show properties or empty state
       if (properties.length > 0) {
@@ -2451,6 +2525,143 @@ Or enter your own property URL:`);
         this.loadChatGPTPropertyData();
       });
     }
+  }
+
+  clearAllDataWithConfirmation() {
+    this.showConfirmationDialog({
+      title: 'Clear All Property Data',
+      message: 'Are you sure you want to delete all property analyses? This action cannot be undone.',
+      confirmText: 'Clear All Data',
+      cancelText: 'Cancel',
+      onConfirm: () => {
+        safeChromeFall(
+          () => chrome.storage.local.remove(['propertyHistory']),
+          null
+        ).then(() => {
+          this.showChatGPTMessage('success', 'All property data has been cleared');
+          this.loadChatGPTPropertyData();
+          this.updatePropertiesStats();
+          
+          // Update display immediately
+          this.displayProperties();
+        });
+      }
+    });
+  }
+
+  deleteProperty(propertyUrl) {
+    this.showConfirmationDialog({
+      title: 'Delete Property',
+      message: 'Are you sure you want to delete this property analysis? This action cannot be undone.',
+      confirmText: 'Delete Property',
+      cancelText: 'Cancel',
+      onConfirm: () => {
+        safeChromeFall(
+          () => chrome.storage.local.get(['propertyHistory']),
+          { propertyHistory: [] }
+        ).then(result => {
+          const properties = result.propertyHistory || [];
+          const updatedProperties = properties.filter(p => p.url !== propertyUrl);
+          
+          return safeChromeFall(
+            () => chrome.storage.local.set({ propertyHistory: updatedProperties }),
+            null
+          );
+        }).then(() => {
+          this.showChatGPTMessage('success', 'Property deleted successfully');
+          this.loadChatGPTPropertyData();
+          this.updatePropertiesStats();
+          
+          // Update display immediately
+          this.displayProperties();
+        }).catch(error => {
+          this.showChatGPTMessage('error', 'Failed to delete property: ' + error.message);
+        });
+      }
+    });
+  }
+
+  showConfirmationDialog(options) {
+    const modal = document.createElement('div');
+    modal.className = 're-modal-overlay';
+    modal.innerHTML = `
+      <div class="re-confirmation-modal">
+        <div class="re-modal-header">
+          <h3>${options.title}</h3>
+          <button class="re-modal-close-btn">×</button>
+        </div>
+        <div class="re-modal-body">
+          <p>${options.message}</p>
+        </div>
+        <div class="re-modal-footer">
+          <button class="re-btn re-btn-ghost re-modal-cancel-btn">${options.cancelText}</button>
+          <button class="re-btn re-btn-danger re-modal-confirm-btn">${options.confirmText}</button>
+        </div>
+      </div>
+    `;
+
+    // Add event listeners
+    const closeBtn = modal.querySelector('.re-modal-close-btn');
+    const cancelBtn = modal.querySelector('.re-modal-cancel-btn');
+    const confirmBtn = modal.querySelector('.re-modal-confirm-btn');
+
+    const closeModal = () => modal.remove();
+    
+    closeBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    confirmBtn.addEventListener('click', () => {
+      options.onConfirm();
+      closeModal();
+    });
+
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    document.body.appendChild(modal);
+  }
+
+  applyHighContrastMode(enabled) {
+    const panel = document.querySelector('#re-analyzer-panel');
+    if (panel) {
+      if (enabled) {
+        panel.classList.add('re-high-contrast-mode');
+      } else {
+        panel.classList.remove('re-high-contrast-mode');
+      }
+    }
+  }
+
+  updatePropertiesStats() {
+    safeChromeFall(
+      () => chrome.storage.local.get(['propertyHistory']),
+      { propertyHistory: [] }
+    ).then(result => {
+      const properties = result.propertyHistory || [];
+      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
+      const pendingCount = properties.length - analyzedCount;
+      
+      // Update stats in properties tab
+      const totalElement = this.panel.querySelector('#re-total-properties');
+      const analyzedElement = this.panel.querySelector('#re-analyzed-count');
+      const pendingElement = this.panel.querySelector('#re-pending-count');
+      
+      if (totalElement) totalElement.textContent = properties.length;
+      if (analyzedElement) analyzedElement.textContent = analyzedCount;
+      if (pendingElement) pendingElement.textContent = pendingCount;
+      
+      // Update notification badge
+      const notification = this.panel.querySelector('#properties-notification');
+      if (notification) {
+        if (pendingCount > 0) {
+          notification.textContent = pendingCount;
+          notification.classList.add('re-show');
+        } else {
+          notification.classList.remove('re-show');
+        }
+      }
+    });
   }
 
   checkExtensionContext() {
@@ -2842,10 +3053,73 @@ Or enter your own property URL:`);
     const progressSection = this.panel.querySelector('#re-analysis-progress');
     if (progressSection) {
       progressSection.classList.remove('re-hidden');
+      
+      // Update progress property info if currentPropertyAnalysis is available
+      if (currentPropertyAnalysis && currentPropertyAnalysis.url) {
+        const urlElement = this.panel.querySelector('#re-progress-url');
+        const domainElement = this.panel.querySelector('#re-progress-domain');
+        
+        if (urlElement) {
+          urlElement.textContent = this.truncateUrl(currentPropertyAnalysis.url, 50);
+        }
+        if (domainElement) {
+          domainElement.textContent = this.extractDomainFromUrl(currentPropertyAnalysis.url);
+        }
+      }
+      
+      // Start progress timer
+      this.startProgressTimer();
     }
     
     // Also update the properties tab to show pending status
     this.updatePendingAnalysisInProperties();
+  }
+
+  startProgressTimer() {
+    const timeElement = this.panel.querySelector('#re-progress-time');
+    const etaElement = this.panel.querySelector('#re-progress-eta');
+    
+    if (!timeElement) return;
+    
+    let seconds = 0;
+    const timer = setInterval(() => {
+      seconds++;
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      timeElement.textContent = `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+      
+      // Update ETA
+      if (etaElement) {
+        const estimatedTotal = 45; // 45 seconds average
+        const remaining = Math.max(0, estimatedTotal - seconds);
+        if (remaining > 0) {
+          etaElement.textContent = `~${remaining}s remaining`;
+        } else {
+          etaElement.textContent = 'Finishing up...';
+        }
+      }
+    }, 1000);
+    
+    // Store timer to clear it later
+    this.progressTimer = timer;
+  }
+
+  hideAnalysisProgress() {
+    const progressSection = this.panel.querySelector('#re-analysis-progress');
+    if (progressSection) {
+      progressSection.classList.add('re-hidden');
+    }
+    
+    // Clear progress timer
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+  }
+
+  truncateUrl(url, maxLength) {
+    if (url.length <= maxLength) return url;
+    return url.substring(0, maxLength - 3) + '...';
   }
   
   updatePendingAnalysisInProperties() {
@@ -2989,6 +3263,9 @@ Or enter your own property URL:`);
     
     // Show notification on FAB
     this.showFabNotification();
+    
+    // Update properties stats immediately
+    this.updatePropertiesStats();
     
     // Reload property data to show the new analysis
     this.loadChatGPTPropertyData();
@@ -3151,16 +3428,25 @@ Or enter your own property URL:`);
       
       const propertyItem = document.createElement('div');
       propertyItem.className = `re-property-item ${hasAnalysis ? 're-analyzed' : 're-pending'}`;
+      const propertyInfo = this.getPropertyDisplayInfo(property);
+      
       propertyItem.innerHTML = `
         <div class="re-property-content">
           <div class="re-property-header">
-            <h5 class="re-property-title">${this.getPropertyTitle(property)}</h5>
+            <div class="re-property-main-info">
+              <h5 class="re-property-title">${propertyInfo.title}</h5>
+              ${propertyInfo.keyDetails ? `
+                <div class="re-property-key-details">
+                  ${propertyInfo.keyDetails}
+                </div>
+              ` : ''}
+            </div>
             <span class="re-property-status ${hasAnalysis ? 're-status-analyzed' : 're-status-pending'}">
               ${hasAnalysis ? '✅ Analyzed' : '⏳ Pending'}
             </span>
           </div>
           <div class="re-property-details">
-            <span class="re-property-domain">${property.domain}</span>
+            <span class="re-property-domain">${this.getDomainDisplayName(property.domain)}</span>
             <span class="re-property-date">${property.date || 'Unknown date'}</span>
             ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
           </div>
@@ -3177,6 +3463,9 @@ Or enter your own property URL:`);
                 Analyze
               </button>
             `}
+            <button class="re-btn re-btn-danger re-btn-sm re-delete-btn" data-property-url="${property.url}" title="Delete property">
+              🗑️
+            </button>
           </div>
         </div>
       `;
@@ -3202,6 +3491,61 @@ Or enter your own property URL:`);
     };
     
     return domainNames[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
+  }
+
+  getPropertyDisplayInfo(property) {
+    const hasAnalysis = property.analysis && property.analysis.extractedData;
+    let title = '';
+    let keyDetails = '';
+
+    if (hasAnalysis) {
+      const data = property.analysis.extractedData;
+      
+      // Prioritize address, then bedrooms, then price
+      if (data.address || data['Property Address'] || data['Street Name']) {
+        title = data.address || data['Property Address'] || data['Street Name'];
+      } else if (data.bedrooms || data['Number of Bedrooms'] || data['Bedrooms']) {
+        const bedrooms = data.bedrooms || data['Number of Bedrooms'] || data['Bedrooms'];
+        title = `${bedrooms} Bedroom Property`;
+      } else if (data.price || data['Property Price'] || data['Asking Price']) {
+        const price = data.price || data['Property Price'] || data['Asking Price'];
+        title = `Property - ${price}`;
+      } else {
+        title = this.getPropertyTitle(property);
+      }
+
+      // Build key details string
+      const details = [];
+      
+      // Add price if available
+      const price = data.price || data['Property Price'] || data['Asking Price'];
+      if (price) {
+        details.push(`💰 ${price}`);
+      }
+      
+      // Add bedrooms/bathrooms if available
+      const bedrooms = data.bedrooms || data['Number of Bedrooms'] || data['Bedrooms'];
+      const bathrooms = data.bathrooms || data['Bathrooms'];
+      if (bedrooms) {
+        if (bathrooms) {
+          details.push(`🛏️ ${bedrooms}bd/${bathrooms}ba`);
+        } else {
+          details.push(`🛏️ ${bedrooms} bedrooms`);
+        }
+      }
+      
+      // Add square footage if available
+      const sqft = data.squareFootage || data['Square Footage'] || data.sqft;
+      if (sqft) {
+        details.push(`📐 ${sqft} sq ft`);
+      }
+
+      keyDetails = details.join(' • ');
+    } else {
+      title = this.getPropertyTitle(property);
+    }
+
+    return { title, keyDetails };
   }
 
   getPropertyTitle(property) {
@@ -11630,6 +11974,13 @@ function setupGlobalEventDelegation() {
     if (target.classList.contains('re-open-listing-btn')) {
       e.preventDefault();
       window.open(propertyUrl, '_blank');
+      return;
+    }
+    
+    // Delete property buttons
+    if (target.classList.contains('re-delete-btn')) {
+      e.preventDefault();
+      window.embeddedUI?.deleteProperty(propertyUrl);
       return;
     }
   });
