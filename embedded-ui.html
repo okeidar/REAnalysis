@@ -6,11 +6,7 @@
     <title>RE Analyzer - Embedded UI</title>
 </head>
 <body>
-    <!-- Floating Action Button -->
-    <div id="re-analyzer-fab" class="re-fab" title="RE Analyzer">
-        <div class="re-fab-icon">🏠</div>
-        <div class="re-fab-notification" id="re-fab-notification"></div>
-    </div>
+    <!-- RE Analyzer will be integrated into ChatGPT UI or use fallback FAB -->
 
     <!-- Main Embedded Panel -->
     <div id="re-analyzer-panel" class="re-panel re-panel-collapsed">
@@ -32,18 +28,18 @@
         </div>
 
         <!-- Tab Navigation -->
-        <div class="re-tab-nav" id="re-tab-nav">
-            <button class="re-tab-btn re-tab-active" data-tab="analyzer">
-                <span class="re-tab-icon">🔍</span>
+        <div class="re-tab-nav" id="re-tab-nav" role="tablist">
+            <button class="re-tab-btn re-tab-active" data-tab="analyzer" role="tab" aria-selected="true" aria-controls="analyzer-tab">
+                <span class="re-tab-icon" aria-hidden="true">🔍</span>
                 <span class="re-tab-label">Analyzer</span>
             </button>
-            <button class="re-tab-btn" data-tab="properties">
-                <span class="re-tab-icon">📊</span>
+            <button class="re-tab-btn" data-tab="properties" role="tab" aria-selected="false" aria-controls="properties-tab">
+                <span class="re-tab-icon" aria-hidden="true">📊</span>
                 <span class="re-tab-label">Properties</span>
-                <span class="re-tab-notification" id="properties-notification"></span>
+                <span class="re-tab-notification" id="properties-notification" aria-label="Pending analyses count"></span>
             </button>
-            <button class="re-tab-btn" data-tab="settings">
-                <span class="re-tab-icon">⚙️</span>
+            <button class="re-tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="settings-tab">
+                <span class="re-tab-icon" aria-hidden="true">⚙️</span>
                 <span class="re-tab-label">Settings</span>
             </button>
         </div>
@@ -106,7 +102,16 @@
                 <div id="re-analysis-progress" class="re-progress-section re-hidden">
                     <div class="re-progress-header">
                         <h4>Analysis in Progress</h4>
-                        <span class="re-progress-time" id="re-progress-time">0:00</span>
+                        <div class="re-progress-meta">
+                            <span class="re-progress-time" id="re-progress-time">0:00</span>
+                            <span class="re-progress-eta" id="re-progress-eta">~45s remaining</span>
+                        </div>
+                    </div>
+                    <div class="re-progress-property" id="re-progress-property">
+                        <div class="re-progress-property-info">
+                            <span class="re-progress-url" id="re-progress-url"></span>
+                            <span class="re-progress-domain" id="re-progress-domain"></span>
+                        </div>
                     </div>
                     <div class="re-progress-steps">
                         <div class="re-progress-step" data-step="validate">
@@ -128,7 +133,7 @@
                     </div>
                     <div class="re-progress-tip">
                         <span class="re-tip-icon">💡</span>
-                        <span>Analysis typically takes 30-60 seconds</span>
+                        <span>Analysis typically takes 30-60 seconds. You can continue using ChatGPT normally.</span>
                     </div>
                 </div>
 
@@ -163,6 +168,10 @@
                             <span class="re-stat-label">Analyzed</span>
                         </div>
                         <div class="re-stat-item">
+                            <span class="re-stat-number" id="re-pending-count">0</span>
+                            <span class="re-stat-label">Pending</span>
+                        </div>
+                        <div class="re-stat-item">
                             <span class="re-stat-number" id="re-categories-count">0</span>
                             <span class="re-stat-label">Categories</span>
                         </div>
@@ -183,8 +192,8 @@
                     </div>
                     <div class="re-view-actions">
                         <button id="re-export-btn" class="re-btn re-btn-secondary re-btn-sm">
-                            <span class="re-btn-icon">📄</span>
-                            Export
+                            <span class="re-btn-icon">📊</span>
+                            Export CSV
                         </button>
                         <button id="re-manage-categories-btn" class="re-btn re-btn-ghost re-btn-sm">
                             <span class="re-btn-icon">⚙️</span>
@@ -301,6 +310,24 @@
                                 <span class="re-setting-title">Include full analysis text</span>
                             </label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Data Management Section -->
+                <div class="re-settings-section">
+                    <h3>
+                        <span class="re-settings-icon">🗑️</span>
+                        Data Management
+                    </h3>
+                    <div class="re-setting-item">
+                        <label class="re-setting-label">
+                            <span class="re-setting-title">Clear All Property Data</span>
+                        </label>
+                        <p class="re-setting-description">Remove all saved property analyses and start fresh</p>
+                        <button id="re-clear-all-data-btn" class="re-btn re-btn-danger re-btn-sm">
+                            <span class="re-btn-icon">🗑️</span>
+                            Clear All Data
+                        </button>
                     </div>
                 </div>
 

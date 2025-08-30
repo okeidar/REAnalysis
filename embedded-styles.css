@@ -11,18 +11,22 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
-/* CSS Variables for theming */
+/* CSS Variables for theming - WCAG AA Compliant */
 :root {
-  --re-primary: #10a37f;
-  --re-primary-hover: #0d8a69;
+  --re-primary: #0d8a69;
+  --re-primary-hover: #0a6b56;
   --re-background: #ffffff;
-  --re-background-secondary: #f7f7f8;
-  --re-text-primary: #2d3748;
-  --re-text-secondary: #718096;
-  --re-border: #e2e8f0;
-  --re-border-light: #f1f3f4;
-  --re-success: #16a34a;
-  --re-warning: #f59e0b;
+  --re-background-secondary: #f8f9fa;
+  --re-text-primary: #1a202c;
+  --re-text-secondary: #4a5568;
+  --re-text-muted: #6b7280;
+  --re-text-light: #9ca3af;
+  --re-text-on-dark: #f9fafb;
+  --re-text-on-primary: #ffffff;
+  --re-border: #d1d5db;
+  --re-border-light: #e5e7eb;
+  --re-success: #059669;
+  --re-warning: #d97706;
   --re-error: #dc2626;
   --re-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --re-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -52,7 +56,123 @@
   --re-z-index-modal: 10001;
 }
 
-/* Floating Action Button */
+/* ============================================================================ */
+/* INTEGRATED CHATGPT UI BUTTON */
+/* ============================================================================ */
+
+.re-integrated-button {
+  margin: var(--re-space-md) auto;
+  padding: var(--re-space-md);
+  background: var(--re-background);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius-lg);
+  cursor: pointer;
+  transition: var(--re-transition);
+  user-select: none;
+  position: relative;
+  max-width: 100%;
+  width: 100%;
+  box-shadow: var(--re-shadow-sm);
+}
+
+.re-integrated-button:hover {
+  background: var(--re-background-secondary);
+  border-color: var(--re-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--re-shadow-md);
+}
+
+.re-integrated-button:active {
+  transform: translateY(0);
+  box-shadow: var(--re-shadow-sm);
+}
+
+.re-integrated-content {
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-md);
+}
+
+.re-integrated-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.re-integrated-text {
+  flex: 1;
+}
+
+.re-integrated-title {
+  font-size: var(--re-font-size-lg);
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-text-primary);
+  margin-bottom: var(--re-space-xs);
+}
+
+.re-integrated-subtitle {
+  font-size: var(--re-font-size-sm);
+  color: var(--re-text-secondary);
+  line-height: 1.4;
+}
+
+.re-integrated-arrow {
+  font-size: var(--re-font-size-lg);
+  color: var(--re-primary);
+  font-weight: bold;
+}
+
+/* Fallback positioning when integration fails */
+.re-integrated-fallback {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  max-width: 300px;
+  z-index: var(--re-z-index-fab);
+}
+
+/* Dark mode support for integrated button */
+@media (prefers-color-scheme: dark) {
+  .re-integrated-button {
+    background: var(--re-background-secondary);
+    border-color: var(--re-primary);
+  }
+  
+  .re-integrated-button:hover {
+    background: rgba(16, 163, 127, 0.1);
+  }
+}
+
+/* Responsive styles for integrated button */
+@media (max-width: 768px) {
+  .re-integrated-button {
+    margin: var(--re-space-md) var(--re-space-sm);
+    padding: var(--re-space-sm);
+  }
+  
+  .re-integrated-content {
+    gap: var(--re-space-sm);
+  }
+  
+  .re-integrated-icon {
+    font-size: 24px;
+  }
+  
+  .re-integrated-title {
+    font-size: var(--re-font-size-base);
+  }
+  
+  .re-integrated-subtitle {
+    font-size: var(--re-font-size-xs);
+  }
+  
+  .re-integrated-fallback {
+    bottom: 60px;
+    right: 16px;
+    max-width: 280px;
+  }
+}
+
+/* Floating Action Button (Fallback) */
 #re-analyzer-fab {
   position: fixed;
   bottom: 24px;
@@ -133,6 +253,7 @@
   overflow: hidden;
   transition: var(--re-transition);
   border: 1px solid var(--re-border);
+  box-sizing: border-box;
 }
 
 /* Panel states */
@@ -377,6 +498,18 @@
   color: var(--re-text-primary);
 }
 
+.re-btn-danger {
+  background: var(--re-error);
+  color: white;
+  border: 1px solid var(--re-error);
+}
+
+.re-btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  transform: translateY(-1px);
+}
+
 .re-btn-icon {
   padding: var(--re-space-sm);
   min-width: auto;
@@ -548,6 +681,23 @@
   color: var(--re-text-secondary);
 }
 
+/* Ensure status indicators have proper contrast */
+.re-status-connected .re-status-title {
+  color: var(--re-text-primary);
+}
+
+.re-status-connected .re-status-subtitle {
+  color: var(--re-text-secondary);
+}
+
+.re-status-error .re-status-title {
+  color: var(--re-text-primary);
+}
+
+.re-status-error .re-status-subtitle {
+  color: var(--re-text-secondary);
+}
+
 .re-status-checking .re-status-icon {
   background: rgba(16, 163, 127, 0.1);
   color: var(--re-primary);
@@ -596,6 +746,60 @@
   border-radius: var(--re-radius-md);
   padding: var(--re-space-md);
   margin-bottom: var(--re-space-lg);
+}
+
+.re-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--re-space-md);
+}
+
+.re-progress-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--re-space-xs);
+}
+
+.re-progress-time {
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-primary);
+  font-size: var(--re-font-size-sm);
+}
+
+.re-progress-eta {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  font-style: italic;
+}
+
+.re-progress-property {
+  background: var(--re-background);
+  border: 1px solid var(--re-border-light);
+  border-radius: var(--re-radius-sm);
+  padding: var(--re-space-sm);
+  margin-bottom: var(--re-space-md);
+}
+
+.re-progress-property-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--re-space-xs);
+}
+
+.re-progress-url {
+  font-weight: var(--re-font-weight-medium);
+  color: var(--re-text-primary);
+  font-size: var(--re-font-size-sm);
+  word-break: break-all;
+}
+
+.re-progress-domain {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .re-progress-header {
@@ -924,7 +1128,17 @@
 }
 
 .re-setting-item {
-  margin-bottom: var(--re-space-md);
+  margin-bottom: var(--re-space-lg);
+  padding: var(--re-space-md);
+  background: var(--re-background);
+  border: 1px solid var(--re-border-light);
+  border-radius: var(--re-radius-md);
+  transition: var(--re-transition);
+}
+
+.re-setting-item:hover {
+  border-color: var(--re-border);
+  box-shadow: var(--re-shadow-sm);
 }
 
 .re-setting-item:last-child {
@@ -940,16 +1154,25 @@
 }
 
 .re-setting-title {
-  font-weight: var(--re-font-weight-medium);
+  font-weight: var(--re-font-weight-semibold);
   color: var(--re-text-primary);
   font-size: var(--re-font-size-sm);
 }
 
 .re-setting-description {
-  margin: 0;
+  margin: var(--re-space-xs) 0 0 0;
   font-size: var(--re-font-size-xs);
   color: var(--re-text-secondary);
   line-height: 1.4;
+}
+
+.re-setting-item .re-select {
+  margin-top: var(--re-space-xs);
+  width: 100%;
+}
+
+.re-setting-item .re-btn {
+  margin-top: var(--re-space-sm);
 }
 
 .re-settings-actions {
@@ -997,16 +1220,7 @@
 }
 
 /* Dark mode support (optional - can be enabled based on ChatGPT's theme) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --re-background: #1a1a1a;
-    --re-background-secondary: #2d2d2d;
-    --re-text-primary: #ffffff;
-    --re-text-secondary: #a0a0a0;
-    --re-border: #404040;
-    --re-border-light: #2d2d2d;
-  }
-}
+
 
 /* Animation for panel entrance */
 @keyframes re-panel-enter {
@@ -1361,13 +1575,25 @@
   margin-bottom: 8px;
 }
 
+.re-property-main-info {
+  flex: 1;
+  margin-right: 12px;
+}
+
 .re-property-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--re-text-primary);
   line-height: 1.3;
-  flex: 1;
-  margin-right: 12px;
+  margin: 0 0 4px 0;
+}
+
+.re-property-key-details {
+  font-size: 12px;
+  color: var(--re-text-secondary);
+  font-weight: 500;
+  line-height: 1.2;
+  margin-top: 4px;
 }
 
 .re-property-status {
@@ -1468,12 +1694,260 @@
   font-size: var(--re-font-size-base);
 }
 
-/* Enhanced responsive styles */
+/* ============================================================================ */
+/* CONFIRMATION MODAL STYLES */
+/* ============================================================================ */
+
+.re-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--re-z-index-modal);
+  animation: re-fade-in 0.2s ease-out;
+}
+
+.re-confirmation-modal {
+  background: var(--re-background);
+  border-radius: var(--re-radius-lg);
+  box-shadow: var(--re-shadow-xl);
+  width: 90%;
+  max-width: 400px;
+  animation: re-scale-in 0.2s ease-out;
+}
+
+.re-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--re-space-lg) var(--re-space-lg) var(--re-space-md);
+  border-bottom: 1px solid var(--re-border-light);
+}
+
+.re-modal-header h3 {
+  margin: 0;
+  font-size: var(--re-font-size-lg);
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-text-primary);
+}
+
+/* Ensure modal content has proper contrast */
+.re-confirmation-modal {
+  background: var(--re-background);
+  color: var(--re-text-primary);
+  border: 1px solid var(--re-border);
+}
+
+.re-confirmation-modal * {
+  color: var(--re-text-primary);
+}
+
+.re-modal-body p {
+  color: var(--re-text-primary) !important;
+}
+
+/* ============================================================================ */
+/* MODAL CONTRAST COMPREHENSIVE FIXES */
+/* ============================================================================ */
+
+/* Override any hardcoded modal colors */
+#re-analysis-modal,
+#re-analysis-modal *,
+.re-modal-overlay,
+.re-modal-overlay * {
+  color: var(--re-text-primary) !important;
+}
+
+/* Specific modal element contrast */
+#re-analysis-modal .re-modal {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-modal-header {
+  background: var(--re-background-secondary) !important;
+  border-bottom-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-modal-content {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-modal-footer {
+  background: var(--re-background-secondary) !important;
+  border-top-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-analysis-section h4 {
+  color: var(--re-text-primary) !important;
+  border-bottom-color: var(--re-primary) !important;
+}
+
+#re-analysis-modal .re-property-detail {
+  background: var(--re-background-secondary) !important;
+  border-color: var(--re-border-light) !important;
+}
+
+#re-analysis-modal .re-analysis-text {
+  background: var(--re-background-secondary) !important;
+  border-color: var(--re-border-light) !important;
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-detail-label {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analysis-modal .re-detail-value {
+  color: var(--re-text-primary) !important;
+}
+
+#re-analysis-modal .re-analysis-meta {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analysis-modal .re-property-link {
+  color: var(--re-primary) !important;
+}
+
+/* Ensure buttons have proper contrast */
+#re-analysis-modal .re-btn-primary {
+  background: var(--re-primary) !important;
+  color: var(--re-text-on-primary) !important;
+  border-color: var(--re-primary) !important;
+}
+
+#re-analysis-modal .re-btn-secondary {
+  background: var(--re-background) !important;
+  color: var(--re-text-primary) !important;
+  border-color: var(--re-border) !important;
+}
+
+#re-analysis-modal .re-btn-ghost {
+  background: transparent !important;
+  color: var(--re-text-secondary) !important;
+  border: none !important;
+}
+
+.re-modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--re-text-secondary);
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--re-radius-sm);
+}
+
+.re-modal-close-btn:hover {
+  background: var(--re-background-secondary);
+  color: var(--re-text-primary);
+}
+
+.re-modal-body {
+  padding: var(--re-space-lg);
+}
+
+.re-modal-body p {
+  margin: 0;
+  color: var(--re-text-primary);
+  line-height: 1.5;
+}
+
+.re-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--re-space-sm);
+  padding: var(--re-space-md) var(--re-space-lg) var(--re-space-lg);
+  border-top: 1px solid var(--re-border-light);
+}
+
+@keyframes re-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes re-scale-in {
+  from { 
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================ */
+/* RESPONSIVE DESIGN IMPROVEMENTS */
+/* ============================================================================ */
+
+/* Tablet styles */
+@media (max-width: 768px) {
+  #re-analyzer-panel {
+    width: calc(100vw - 32px);
+    max-width: none;
+    left: 16px;
+    right: 16px;
+    transform: none;
+  }
+  
+  .re-panel-collapsed {
+    transform: translateY(-100vh);
+  }
+  
+  .re-panel-expanded {
+    transform: translateY(0);
+  }
+  
+  .re-panel-content {
+    padding: var(--re-space-md);
+  }
+  
+  .re-view-controls {
+    flex-direction: column;
+    gap: var(--re-space-md);
+    align-items: stretch;
+  }
+  
+  .re-view-toggle {
+    justify-content: center;
+  }
+  
+  .re-view-actions {
+    justify-content: center;
+  }
+  
+  .re-property-actions {
+    flex-wrap: wrap;
+    gap: var(--re-space-xs);
+  }
+  
+  .re-confirmation-modal {
+    width: 95%;
+    margin: var(--re-space-md);
+  }
+}
+
+/* Mobile styles */
 @media (max-width: 480px) {
-  .re-panel:not(.re-mobile-mode) {
+  #re-analyzer-panel {
     width: calc(100vw - 16px);
-    left: 8px !important;
-    right: 8px !important;
+    left: 8px;
+    right: 8px;
+    top: 60px;
+    max-height: calc(100vh - 120px);
   }
   
   .re-fab {
@@ -1487,19 +1961,784 @@
     font-size: 20px;
   }
   
+  .re-panel-content {
+    padding: var(--re-space-sm);
+  }
+  
+  .re-quick-actions {
+    gap: var(--re-space-sm);
+  }
+  
+  .re-btn-large {
+    padding: var(--re-space-sm) var(--re-space-md);
+    font-size: var(--re-font-size-sm);
+  }
+  
   .re-property-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--re-space-sm);
   }
   
-  .re-property-meta {
+  .re-property-main-info {
+    margin-right: 0;
+    margin-bottom: var(--re-space-xs);
+  }
+  
+  .re-property-details {
     flex-direction: column;
-    gap: 4px;
+    gap: var(--re-space-xs);
   }
   
   .re-property-actions {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--re-space-xs);
+    width: 100%;
   }
+  
+  .re-property-actions .re-btn {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .re-categories-grid {
+    grid-template-columns: 1fr;
+    gap: var(--re-space-sm);
+  }
+  
+  .re-form-actions {
+    flex-direction: column;
+    gap: var(--re-space-sm);
+  }
+  
+  .re-form-actions .re-btn {
+    width: 100%;
+  }
+  
+  .re-settings-actions {
+    flex-direction: column;
+    gap: var(--re-space-sm);
+  }
+  
+  .re-settings-actions .re-btn {
+    width: 100%;
+  }
+  
+  .re-tab-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .re-tab-btn {
+    flex-shrink: 0;
+    min-width: 80px;
+  }
+  
+  .re-confirmation-modal {
+    width: calc(100vw - 32px);
+    margin: 16px;
+  }
+  
+  .re-modal-footer {
+    flex-direction: column;
+    gap: var(--re-space-sm);
+  }
+  
+  .re-modal-footer .re-btn {
+    width: 100%;
+  }
+}
+
+/* Prevent horizontal scrolling */
+#re-analyzer-panel,
+#re-analyzer-panel *,
+.re-tab-content,
+.re-tab-content * {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Specific fixes for settings content */
+.re-settings-sections,
+.re-settings-section,
+.re-setting-item {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix grid layouts that might overflow */
+.re-form-group {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Fix button groups that might overflow */
+.re-settings-actions,
+.re-form-actions {
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Fix any inline styles that might cause overflow */
+#settings-tab [style*="grid-template-columns"] {
+  grid-template-columns: 1fr !important;
+}
+
+#settings-tab [style*="display: grid"] {
+  grid-template-columns: 1fr !important;
+  gap: var(--re-space-sm) !important;
+}
+
+.re-input,
+.re-select {
+  min-width: 0;
+  width: 100%;
+}
+
+.re-property-title,
+.re-property-key-details {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* ============================================================================ */
+/* HIGH CONTRAST MODE SUPPORT */
+/* ============================================================================ */
+
+@media (prefers-contrast: high) {
+  :root {
+    --re-text-primary: #000000;
+    --re-text-secondary: #333333;
+    --re-border: #666666;
+    --re-border-light: #999999;
+    --re-primary: #0066cc;
+    --re-success: #006600;
+    --re-warning: #cc6600;
+    --re-error: #cc0000;
+  }
+  
+  .re-btn {
+    border-width: 2px;
+  }
+  
+  .re-property-card {
+    border-width: 2px;
+  }
+}
+
+/* ============================================================================ */
+/* ACCESSIBILITY IMPROVEMENTS */
+/* ============================================================================ */
+
+/* Focus indicators */
+.re-btn:focus,
+.re-input:focus,
+.re-select:focus {
+  outline: 2px solid var(--re-primary);
+  outline-offset: 2px;
+}
+
+/* Screen reader only content */
+.re-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard navigation improvements */
+.re-tab-btn:focus {
+  z-index: 1;
+  box-shadow: 0 0 0 2px var(--re-primary);
+}
+
+.re-property-card:focus-within {
+  outline: 2px solid var(--re-primary);
+  outline-offset: 2px;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --re-background: #212121;
+    --re-background-secondary: #2f2f2f;
+    --re-text-primary: #ececec;
+    --re-text-secondary: #b4b4b4;
+    --re-text-muted: #8e8ea0;
+    --re-text-light: #a0a0a0;
+    --re-text-on-dark: #ececec;
+    --re-text-on-primary: #ffffff;
+    --re-border: #404040;
+    --re-border-light: #363636;
+    --re-primary: #10a37f;
+    --re-success: #16a34a;
+    --re-warning: #f59e0b;
+    --re-error: #ef4444;
+  }
+  
+  /* Ensure all text elements have proper contrast in dark mode */
+  .re-property-title {
+    color: var(--re-text-primary);
+  }
+  
+  .re-property-details {
+    color: var(--re-text-secondary);
+  }
+  
+  .re-setting-title {
+    color: var(--re-text-primary);
+  }
+  
+  .re-setting-description {
+    color: var(--re-text-secondary);
+  }
+}
+
+/* High contrast mode */
+.re-high-contrast-mode {
+  --re-text-primary: #000000;
+  --re-text-secondary: #333333;
+  --re-border: #666666;
+  --re-border-light: #999999;
+  --re-primary: #0066cc;
+  --re-success: #006600;
+  --re-warning: #cc6600;
+  --re-error: #cc0000;
+}
+
+/* Dark mode high contrast */
+@media (prefers-color-scheme: dark) {
+  .re-high-contrast-mode {
+    --re-text-primary: #ffffff;
+    --re-text-secondary: #cccccc;
+    --re-border: #888888;
+    --re-border-light: #666666;
+    --re-background: #000000;
+    --re-background-secondary: #1a1a1a;
+  }
+}
+
+.re-high-contrast-mode .re-btn {
+  border-width: 2px;
+  font-weight: var(--re-font-weight-semibold);
+}
+
+.re-high-contrast-mode .re-property-card {
+  border-width: 2px;
+}
+
+/* ============================================================================ */
+/* TEXT CONTRAST FIXES */
+/* ============================================================================ */
+
+/* Fix inline style overrides for better contrast */
+.re-text-description {
+  color: var(--re-text-secondary) !important;
+  font-size: var(--re-font-size-xs) !important;
+}
+
+.re-text-muted {
+  color: var(--re-text-muted) !important;
+}
+
+.re-text-light {
+  color: var(--re-text-light) !important;
+}
+
+.re-text-on-dark {
+  color: var(--re-text-on-dark) !important;
+}
+
+.re-text-on-primary {
+  color: var(--re-text-on-primary) !important;
+}
+
+/* Fix specific problematic areas */
+.re-section [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+.re-section [style*="color: #9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+.re-section [style*="color: #ffffff"] {
+  color: var(--re-text-primary) !important;
+}
+
+/* Fix tabular tab colors */
+.re-tabular-tab {
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  transition: var(--re-transition);
+}
+
+.re-tabular-tab:hover {
+  color: var(--re-text-primary);
+  background: var(--re-background-secondary);
+}
+
+.re-tabular-tab-active {
+  color: var(--re-text-primary);
+  border-bottom-color: var(--re-primary);
+  font-weight: var(--re-font-weight-medium);
+}
+
+/* Fix form descriptions */
+.re-form-group [style*="color: #d1d5db"],
+.re-form-group [style*="color: #9ca3af"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Fix version info */
+.re-version-info,
+[style*="color: #9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+/* Fix custom column form text */
+.re-section [style*="font-weight: 500; color: #ffffff"] {
+  color: var(--re-text-primary) !important;
+  font-weight: var(--re-font-weight-semibold) !important;
+}
+
+/* Fix button text in settings */
+.re-section .re-btn [style*="color: #d1d5db"] {
+  color: inherit !important;
+}
+
+/* Comprehensive inline style overrides for contrast */
+#re-analyzer-panel [style*="color: #d1d5db"],
+#re-analyzer-panel [style*="color:#d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+#re-analyzer-panel [style*="color: #9ca3af"],
+#re-analyzer-panel [style*="color:#9ca3af"] {
+  color: var(--re-text-muted) !important;
+}
+
+#re-analyzer-panel [style*="color: #ffffff"],
+#re-analyzer-panel [style*="color:#ffffff"]:not(.re-btn):not(button) {
+  color: var(--re-text-primary) !important;
+}
+
+#re-analyzer-panel [style*="color: #666666"],
+#re-analyzer-panel [style*="color:#666666"] {
+  color: var(--re-text-light) !important;
+}
+
+/* Fix any remaining hardcoded light colors on potentially dark backgrounds */
+.re-tabular-tabs [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+.re-form-group [style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Ensure proper contrast for badges and small text */
+.re-category-btn,
+[style*="font-size: 10px"][style*="color: #d1d5db"],
+[style*="font-size: 11px"][style*="color: #d1d5db"],
+[style*="font-size: 12px"][style*="color: #d1d5db"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Universal contrast fixes */
+#re-analyzer-panel * {
+  /* Ensure no text is invisible due to contrast issues */
+  min-contrast: 4.5;
+}
+
+/* Force readable text on all backgrounds */
+#re-analyzer-panel .re-section,
+#re-analyzer-panel .re-form-group,
+#re-analyzer-panel .re-setting-item {
+  color: var(--re-text-primary);
+}
+
+/* Ensure all small text is readable */
+#re-analyzer-panel [style*="font-size: 10px"],
+#re-analyzer-panel [style*="font-size: 11px"],
+#re-analyzer-panel [style*="font-size: 12px"] {
+  color: var(--re-text-secondary) !important;
+}
+
+/* Fix any remaining light text on light backgrounds */
+@media (prefers-color-scheme: light) {
+  #re-analyzer-panel [style*="color: #ffffff"] {
+    color: var(--re-text-primary) !important;
+  }
+  
+  #re-analyzer-panel [style*="color: #f9fafb"] {
+    color: var(--re-text-primary) !important;
+  }
+}
+
+/* New helper classes for consistent text styling */
+.re-prompt-description {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  padding: var(--re-space-sm);
+  background: var(--re-background-secondary);
+  border-radius: var(--re-radius-sm);
+  border: 1px solid var(--re-border-light);
+}
+
+.re-form-header {
+  font-size: var(--re-font-size-sm);
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-text-primary);
+  margin-bottom: var(--re-space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-sm);
+}
+
+.re-input-help {
+  font-size: 10px;
+  color: var(--re-text-muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.re-section-subtitle {
+  font-size: var(--re-font-size-sm);
+  font-weight: var(--re-font-weight-medium);
+  color: var(--re-text-primary);
+}
+
+/* Column styling classes */
+.re-column-label {
+  font-weight: var(--re-font-weight-medium);
+  color: var(--re-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-xs);
+  flex-wrap: wrap;
+}
+
+.re-column-description {
+  font-size: 11px;
+  color: var(--re-text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.re-column-meta {
+  font-size: 11px;
+  color: var(--re-text-muted);
+  margin-top: 4px;
+}
+
+.re-category-btn {
+  background: none;
+  border: 1px solid var(--re-border);
+  color: var(--re-text-secondary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: var(--re-transition);
+}
+
+.re-category-btn:hover {
+  border-color: var(--re-primary);
+  color: var(--re-primary);
+  background: rgba(13, 138, 105, 0.1);
+}
+
+.re-category-count {
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-secondary);
+  font-weight: var(--re-font-weight-medium);
+}
+
+/* ============================================================================ */
+/* SETTINGS TAB OVERFLOW FIXES */
+/* ============================================================================ */
+
+/* Force all settings content to fit within container */
+#settings-tab,
+#re-settings-section {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Fix tabular configuration section */
+.re-tabular-tabs {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+}
+
+.re-tabular-tab {
+  flex-shrink: 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* Fix column container overflow */
+#re-columns-container,
+.re-columns-grid {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix form inputs and textareas */
+.re-form-input,
+textarea.re-form-input,
+input.re-form-input,
+select.re-form-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Fix button groups in settings */
+.re-section [style*="display: flex"] {
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Fix grid layouts in settings */
+.re-section [style*="grid-template-columns"] {
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Fix specific problem areas */
+#re-columns-stats,
+#re-prompt-desc-content {
+  width: 100%;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Force text content to wrap */
+.re-section,
+.re-section * {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Mobile-specific fixes for settings */
+@media (max-width: 768px) {
+  .re-tabular-tabs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .re-tabular-tab {
+    width: 100%;
+    text-align: center;
+    border-bottom: 1px solid var(--re-border-light);
+  }
+  
+  /* Force single column layouts on mobile */
+  #settings-tab [style*="grid-template-columns"],
+  .re-section [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: var(--re-space-sm) !important;
+  }
+  
+  /* Stack button groups vertically */
+  .re-section [style*="display: flex"]:not(.re-setting-label) {
+    flex-direction: column !important;
+    gap: var(--re-space-sm) !important;
+  }
+}
+
+/* ============================================================================ */
+/* SETTINGS SPECIFIC RESPONSIVE LAYOUTS */
+/* ============================================================================ */
+
+.re-export-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--re-space-sm);
+  margin-bottom: var(--re-space-md);
+  width: 100%;
+  max-width: 100%;
+}
+
+.re-data-management-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+}
+
+.re-url-bypass-setting {
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-sm);
+  cursor: pointer;
+  font-size: var(--re-font-size-xs);
+  color: var(--re-text-primary);
+  padding: var(--re-space-sm);
+  background: var(--re-background-secondary);
+  border-radius: var(--re-radius-sm);
+  border: 1px solid var(--re-border-light);
+}
+
+.re-custom-column-inputs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--re-space-sm);
+  margin-bottom: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Mobile adjustments for settings */
+@media (max-width: 480px) {
+  .re-export-buttons-grid {
+    grid-template-columns: 1fr;
+    gap: var(--re-space-xs);
+  }
+  
+  .re-custom-column-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Fix button text overflow */
+  .re-btn-full {
+    min-width: 0;
+    overflow: hidden;
+  }
+  
+  .re-btn-full span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Settings button group styles */
+.re-prompt-actions,
+.re-editor-actions,
+.re-advanced-prompt-buttons,
+.re-tabular-actions,
+.re-custom-column-actions {
+  display: flex;
+  gap: var(--re-space-sm);
+  margin-top: var(--re-space-sm);
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.re-custom-column-actions {
+  justify-content: flex-end;
+}
+
+/* Responsive adjustments for button groups */
+@media (max-width: 480px) {
+  .re-prompt-actions,
+  .re-editor-actions,
+  .re-advanced-prompt-buttons,
+  .re-tabular-actions,
+  .re-custom-column-actions {
+    flex-direction: column;
+    gap: var(--re-space-xs);
+  }
+  
+  .re-prompt-actions .re-btn,
+  .re-editor-actions .re-btn,
+  .re-advanced-prompt-buttons .re-btn,
+  .re-tabular-actions .re-btn,
+  .re-custom-column-actions .re-btn {
+    width: 100%;
+  }
+}
+
+/* Column selection button group */
+.re-column-selection-buttons {
+  display: flex;
+  gap: var(--re-space-xs);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Mobile adjustments for column selection */
+@media (max-width: 480px) {
+  .re-column-selection-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .re-column-selection-buttons .re-btn {
+    width: 100%;
+  }
+  
+  /* Fix the parent container that has inline styles */
+  #settings-tab [style*="justify-content: space-between"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--re-space-sm) !important;
+  }
+  
+  /* Override all potentially problematic inline styles on mobile */
+  #settings-tab [style*="display: grid"],
+  #re-settings-section [style*="display: grid"] {
+    display: block !important;
+  }
+  
+  #settings-tab [style*="display: flex"],
+  #re-settings-section [style*="display: flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--re-space-xs) !important;
+  }
+  
+  /* Force all buttons to be full width on mobile */
+  #settings-tab .re-btn,
+  #re-settings-section .re-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Additional overflow prevention */
+.re-panel-content {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Ensure tab content doesn't overflow */
+.re-tab-content {
+  padding: var(--re-space-md);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
