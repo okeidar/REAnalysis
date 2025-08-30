@@ -56,7 +56,123 @@
   --re-z-index-modal: 10001;
 }
 
-/* Floating Action Button */
+/* ============================================================================ */
+/* INTEGRATED CHATGPT UI BUTTON */
+/* ============================================================================ */
+
+.re-integrated-button {
+  margin: var(--re-space-md) auto;
+  padding: var(--re-space-md);
+  background: var(--re-background);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius-lg);
+  cursor: pointer;
+  transition: var(--re-transition);
+  user-select: none;
+  position: relative;
+  max-width: 100%;
+  width: 100%;
+  box-shadow: var(--re-shadow-sm);
+}
+
+.re-integrated-button:hover {
+  background: var(--re-background-secondary);
+  border-color: var(--re-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--re-shadow-md);
+}
+
+.re-integrated-button:active {
+  transform: translateY(0);
+  box-shadow: var(--re-shadow-sm);
+}
+
+.re-integrated-content {
+  display: flex;
+  align-items: center;
+  gap: var(--re-space-md);
+}
+
+.re-integrated-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.re-integrated-text {
+  flex: 1;
+}
+
+.re-integrated-title {
+  font-size: var(--re-font-size-lg);
+  font-weight: var(--re-font-weight-semibold);
+  color: var(--re-text-primary);
+  margin-bottom: var(--re-space-xs);
+}
+
+.re-integrated-subtitle {
+  font-size: var(--re-font-size-sm);
+  color: var(--re-text-secondary);
+  line-height: 1.4;
+}
+
+.re-integrated-arrow {
+  font-size: var(--re-font-size-lg);
+  color: var(--re-primary);
+  font-weight: bold;
+}
+
+/* Fallback positioning when integration fails */
+.re-integrated-fallback {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  max-width: 300px;
+  z-index: var(--re-z-index-fab);
+}
+
+/* Dark mode support for integrated button */
+@media (prefers-color-scheme: dark) {
+  .re-integrated-button {
+    background: var(--re-background-secondary);
+    border-color: var(--re-primary);
+  }
+  
+  .re-integrated-button:hover {
+    background: rgba(16, 163, 127, 0.1);
+  }
+}
+
+/* Responsive styles for integrated button */
+@media (max-width: 768px) {
+  .re-integrated-button {
+    margin: var(--re-space-md) var(--re-space-sm);
+    padding: var(--re-space-sm);
+  }
+  
+  .re-integrated-content {
+    gap: var(--re-space-sm);
+  }
+  
+  .re-integrated-icon {
+    font-size: 24px;
+  }
+  
+  .re-integrated-title {
+    font-size: var(--re-font-size-base);
+  }
+  
+  .re-integrated-subtitle {
+    font-size: var(--re-font-size-xs);
+  }
+  
+  .re-integrated-fallback {
+    bottom: 60px;
+    right: 16px;
+    max-width: 280px;
+  }
+}
+
+/* Floating Action Button (Fallback) */
 #re-analyzer-fab {
   position: fixed;
   bottom: 24px;

@@ -381,12 +381,252 @@ class REAnalyzerEmbeddedUI {
       existingFab.remove();
     }
 
-    // Create ChatGPT-style floating toggle
-    this.fab = document.createElement('button');
-    this.fab.id = 're-analyzer-toggle';
-    this.fab.className = 're-floating-toggle re-chatgpt-native';
-    this.fab.title = 'RE Analyzer';
-    this.fab.innerHTML = '🏠';
+    // Try to integrate into ChatGPT UI first
+    const integratedSuccessfully = this.integrateIntoChatGPTUI();
+    
+    if (!integratedSuccessfully) {
+      // Fallback to floating action button
+      this.createFallbackFAB();
+    }
+  }
+
+  integrateIntoChatGPTUI() {
+    try {
+      // Find the ChatGPT input area or form container
+      const inputContainer = this.findChatGPTInputContainer();
+      
+      if (inputContainer) {
+        this.createIntegratedIcon(inputContainer);
+        return true;
+      }
+      
+      // If not found immediately, try again after a short delay
+      setTimeout(() => {
+        const delayedContainer = this.findChatGPTInputContainer();
+        if (delayedContainer && !document.querySelector('#re-analyzer-integrated')) {
+          console.log('🔄 Retrying ChatGPT UI integration after delay');
+          this.createIntegratedIcon(delayedContainer);
+        }
+      }, 2000);
+      
+      return false;
+    } catch (error) {
+      console.warn('❌ Failed to integrate into ChatGPT UI:', error);
+      return false;
+    }
+  }
+
+  findChatGPTInputContainer() {
+    // First, try to find the input field itself
+    const inputField = document.querySelector('textarea[placeholder*="Message"], textarea, [contenteditable="true"]');
+    
+    if (inputField) {
+      // Look for the container that holds the input area
+      const containers = [
+        inputField.closest('main'),
+        inputField.closest('form'),
+        inputField.closest('div[class*="flex"][class*="col"]'),
+        inputField.closest('div[class*="relative"]'),
+        inputField.parentElement,
+        document.querySelector('main')
+      ];
+      
+      for (const container of containers) {
+        if (container && this.isValidIntegrationTarget(container)) {
+          console.log('✅ Found ChatGPT integration target via input field');
+          return container;
+        }
+      }
+    }
+    
+    // Fallback: Look for main chat interface area
+    const selectors = [
+      'main',
+      'div[class*="conversation"]',
+      'div[class*="chat"]',
+      'body'
+    ];
+
+    for (const selector of selectors) {
+      try {
+        const element = document.querySelector(selector);
+        if (element && this.isValidIntegrationTarget(element)) {
+          console.log('✅ Found ChatGPT integration target:', selector);
+          return element;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    console.warn('❌ Could not find suitable ChatGPT integration target');
+    return null;
+  }
+
+  isValidIntegrationTarget(element) {
+    const rect = element.getBoundingClientRect();
+    
+    // Check if element is visible and has reasonable dimensions
+    return rect.width > 200 && 
+           rect.height > 100 && 
+           element.offsetParent !== null &&
+           !element.classList.contains('re-analyzer-element') && // Avoid our own elements
+           !element.id?.includes('re-analyzer'); // Avoid our own elements
+  }
+
+  createIntegratedIcon(container) {
+    // Create the integrated icon/button
+    this.fab = document.createElement('div');
+    this.fab.id = 're-analyzer-integrated';
+    this.fab.className = 're-integrated-button';
+    this.fab.title = 'Open RE Analyzer';
+    this.fab.setAttribute('role', 'button');
+    this.fab.setAttribute('tabindex', '0');
+    this.fab.setAttribute('aria-label', 'Open Real Estate Analyzer');
+    
+    this.fab.innerHTML = `
+      <div class="re-integrated-content">
+        <div class="re-integrated-icon">🏠</div>
+        <div class="re-integrated-text">
+          <div class="re-integrated-title">RE Analyzer</div>
+          <div class="re-integrated-subtitle">Analyze real estate properties with ChatGPT</div>
+        </div>
+        <div class="re-integrated-arrow">→</div>
+      </div>
+      <div class="re-fab-notification" id="re-fab-notification" aria-label="Pending analyses count"></div>
+    `;
+
+    // Insert the icon in the ChatGPT UI
+    this.insertIntegratedIcon(container);
+
+    // Add event handlers
+    this.fab.addEventListener('click', () => {
+      this.togglePanel();
+    });
+    
+    this.fab.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.togglePanel();
+      }
+    });
+
+    console.log('🎯 Created integrated ChatGPT UI button');
+    
+    // Set up observer to maintain integration if ChatGPT UI changes
+    this.setupUIIntegrationObserver();
+  }
+
+  setupUIIntegrationObserver() {
+    // Watch for changes in the ChatGPT UI that might affect our integration
+    const observer = new MutationObserver((mutations) => {
+      let shouldReintegrate = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          // Check if ChatGPT UI has changed significantly
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // If a form or main content area was added, we might need to reintegrate
+              if (node.tagName === 'FORM' || 
+                  node.tagName === 'MAIN' ||
+                  node.querySelector?.('textarea, [contenteditable="true"]')) {
+                shouldReintegrate = true;
+                break;
+              }
+            }
+          }
+        }
+      });
+      
+      // Check if our integrated button is still in the DOM
+      const ourButton = document.querySelector('#re-analyzer-integrated, #re-analyzer-fab');
+      if (!ourButton && shouldReintegrate) {
+        console.log('🔄 ChatGPT UI changed, attempting reintegration');
+        setTimeout(() => {
+          if (!document.querySelector('#re-analyzer-integrated, #re-analyzer-fab')) {
+            this.createFloatingActionButton();
+          }
+        }, 1000);
+      }
+    });
+    
+    // Observe the document body for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    console.log('👀 Set up UI integration observer');
+  }
+
+  insertIntegratedIcon(container) {
+    // Strategy: Place the RE Analyzer button below the ChatGPT input area
+    const inputField = document.querySelector('textarea, [contenteditable="true"]');
+    
+    if (inputField) {
+      // Find the form or input container
+      const inputForm = inputField.closest('form');
+      const inputContainer = inputField.closest('div[class*="relative"], div[class*="flex"]');
+      
+      // Try to place after the form first
+      if (inputForm && inputForm.parentNode) {
+        inputForm.parentNode.insertBefore(this.fab, inputForm.nextSibling);
+        console.log('✅ Integrated icon placed after ChatGPT form');
+        return;
+      }
+      
+      // Try to place after the input container
+      if (inputContainer && inputContainer.parentNode) {
+        inputContainer.parentNode.insertBefore(this.fab, inputContainer.nextSibling);
+        console.log('✅ Integrated icon placed after input container');
+        return;
+      }
+      
+      // Try to place within the main content area
+      const mainContent = inputField.closest('main');
+      if (mainContent) {
+        mainContent.appendChild(this.fab);
+        console.log('✅ Integrated icon placed in main content area');
+        return;
+      }
+    }
+    
+    // Alternative: Look for specific ChatGPT UI elements to position relative to
+    const chatElements = [
+      document.querySelector('div[class*="conversation"]'),
+      document.querySelector('div[class*="chat"]'),
+      document.querySelector('main'),
+      document.querySelector('body')
+    ];
+    
+    for (const element of chatElements) {
+      if (element) {
+        element.appendChild(this.fab);
+        if (element === document.body) {
+          this.fab.classList.add('re-integrated-fallback');
+        }
+        console.log('✅ Integrated icon placed in:', element.tagName);
+        return;
+      }
+    }
+    
+    console.warn('❌ Could not find suitable insertion point');
+  }
+
+  createFallbackFAB() {
+    // Create floating action button as fallback
+    this.fab = document.createElement('div');
+    this.fab.id = 're-analyzer-fab';
+    this.fab.className = 're-fab';
+    this.fab.title = 'Open RE Analyzer';
+    this.fab.setAttribute('role', 'button');
+    this.fab.setAttribute('tabindex', '0');
+    this.fab.setAttribute('aria-label', 'Open Real Estate Analyzer');
+    this.fab.innerHTML = `
+      <div class="re-fab-icon">🏠</div>
+      <div class="re-fab-notification" id="re-fab-notification" aria-label="Pending analyses count"></div>
+    `;
 
     // Add to page
     document.body.appendChild(this.fab);
@@ -403,7 +643,7 @@ class REAnalyzerEmbeddedUI {
       }
     });
 
-    console.log('🎯 Created ChatGPT-style floating toggle');
+    console.log('🎯 Created fallback floating action button');
   }
 
   createEmbeddedPanel() {
