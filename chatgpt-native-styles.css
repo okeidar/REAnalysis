@@ -757,6 +757,50 @@
 }
 
 /* ============================================================================ */
+/* MODAL TEXT COLOR ENHANCEMENTS */
+/* ============================================================================ */
+
+/* Ensure black text on bright backgrounds for modal content */
+.re-modal-overlay .re-modal {
+  --modal-text-primary: #000000 !important;
+  --modal-text-secondary: #666666 !important;
+}
+
+.re-modal-overlay .re-modal * {
+  color: var(--modal-text-primary) !important;
+}
+
+.re-modal-overlay .re-modal .re-detail-label {
+  color: var(--modal-text-secondary) !important;
+}
+
+.re-modal-overlay .re-modal .re-analysis-meta {
+  color: var(--modal-text-secondary) !important;
+}
+
+/* Preserve link colors */
+.re-modal-overlay .re-modal .re-property-link {
+  color: var(--chatgpt-primary) !important;
+}
+
+/* Preserve button colors */
+.re-modal-overlay .re-modal .re-btn {
+  color: inherit !important;
+}
+
+.re-modal-overlay .re-modal .re-btn-primary {
+  color: white !important;
+}
+
+.re-modal-overlay .re-modal .re-btn-secondary {
+  color: #000000 !important;
+}
+
+.re-modal-overlay .re-modal .re-btn-ghost {
+  color: #666666 !important;
+}
+
+/* ============================================================================ */
 /* DARK MODE SUPPORT */
 /* ============================================================================ */
 
@@ -772,5 +816,11 @@
     --chatgpt-text-tertiary: #8e8ea0;
     --chatgpt-hover-bg: #2f2f2f;
     --chatgpt-active-bg: #404040;
+  }
+  
+  /* Adjust modal text colors for dark mode */
+  .re-modal-overlay .re-modal {
+    --modal-text-primary: #ececec !important;
+    --modal-text-secondary: #b4b4b4 !important;
   }
 }
