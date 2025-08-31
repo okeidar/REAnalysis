@@ -2567,6 +2567,44 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
+  async testColumnConfiguration() {
+    console.log('🧪 Testing column configuration...');
+    
+    try {
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['tabularColumnConfiguration', 'customColumns']),
+        { tabularColumnConfiguration: null, customColumns: [] }
+      );
+      
+      console.log('📊 Column Configuration Test Results:');
+      console.log('   Raw saved config:', result.tabularColumnConfiguration);
+      console.log('   Custom columns:', result.customColumns);
+      
+      if (result.tabularColumnConfiguration) {
+        const enabled = result.tabularColumnConfiguration.filter(c => c.enabled);
+        console.log(`   Enabled columns in storage: ${enabled.length}`);
+        enabled.forEach(col => console.log(`     - ${col.id}`));
+      } else {
+        console.log('   No saved configuration found');
+      }
+      
+      // Test the merge process
+      const defaultColumns = getTabularDataColumns();
+      const customColumns = result.customColumns || [];
+      const allColumns = [...defaultColumns, ...customColumns];
+      
+      if (result.tabularColumnConfiguration) {
+        const merged = this.mergeColumnConfigurations(allColumns, result.tabularColumnConfiguration);
+        const enabledMerged = merged.filter(col => col.enabled);
+        console.log(`   After merge: ${enabledMerged.length} enabled columns`);
+        enabledMerged.forEach(col => console.log(`     - ${col.id}: ${col.name}`));
+      }
+      
+    } catch (error) {
+      console.error('❌ Column configuration test failed:', error);
+    }
+  }
+
   async exportPropertiesToCSV() {
     try {
       // Load all property data and column configuration
@@ -2594,23 +2632,73 @@ class REAnalyzerEmbeddedUI {
       }
       
       // Filter to only enabled columns
-      const enabledColumns = columns.filter(col => col.enabled);
+      let enabledColumns = columns.filter(col => col.enabled);
+      
+      // Additional check: If the merge didn't work properly, try direct mapping
+      if (result.tabularColumnConfiguration && enabledColumns.length === 0) {
+        console.log('🔄 Merge failed, trying direct configuration mapping...');
+        const enabledIds = result.tabularColumnConfiguration
+          .filter(saved => saved.enabled)
+          .map(saved => saved.id);
+        
+        enabledColumns = allColumns.filter(col => enabledIds.includes(col.id));
+        console.log(`   Found ${enabledColumns.length} enabled columns via direct mapping`);
+      }
       
       console.log('📊 CSV Export Debug Info:');
       console.log(`   Total columns available: ${allColumns.length}`);
+      console.log(`   Saved configuration:`, result.tabularColumnConfiguration ? 
+        `${result.tabularColumnConfiguration.length} items` : 'None');
       console.log(`   Enabled columns: ${enabledColumns.length}`);
       console.log(`   Enabled column IDs: ${enabledColumns.map(c => c.id).join(', ')}`);
+      
+      // Show sample of saved configuration for debugging
+      if (result.tabularColumnConfiguration) {
+        const enabledInConfig = result.tabularColumnConfiguration.filter(c => c.enabled);
+        console.log(`   Enabled in saved config: ${enabledInConfig.length} columns`);
+        console.log(`   Enabled config IDs: ${enabledInConfig.map(c => c.id).join(', ')}`);
+      }
       
       // Fallback: If no columns are enabled, use the 4 core default columns
       if (enabledColumns.length === 0) {
         console.log('⚠️ No enabled columns found, using default core columns for CSV export');
-        const coreColumns = columns.filter(col => 
+        const coreColumns = allColumns.filter(col => 
           ['propertyAddress', 'askingPrice', 'bedrooms', 'propertyType'].includes(col.id) ||
           ['streetName', 'price'].includes(col.id)
         );
         coreColumns.forEach(col => col.enabled = true);
         enabledColumns.push(...coreColumns);
         console.log(`   Using core columns: ${coreColumns.map(c => c.id).join(', ')}`);
+      }
+      
+      // Final validation: Check if we're actually getting the user's current choices
+      console.log('🔍 Final CSV Export Column Validation:');
+      console.log(`   Will export ${enabledColumns.length} columns`);
+      enabledColumns.forEach((col, index) => {
+        console.log(`   ${index + 1}. ${col.name} (${col.id}) - enabled: ${col.enabled}`);
+      });
+      
+      // Cross-check with UI state if possible
+      const uiCheckboxes = this.panel?.querySelectorAll('#re-columns-container input[type="checkbox"]:checked');
+      if (uiCheckboxes) {
+        const uiEnabledIds = Array.from(uiCheckboxes).map(cb => cb.dataset.columnId);
+        console.log('🔍 UI Cross-check:');
+        console.log(`   UI shows ${uiEnabledIds.length} enabled columns: ${uiEnabledIds.join(', ')}`);
+        
+        // Check for mismatches
+        const csvIds = enabledColumns.map(c => c.id);
+        const missing = uiEnabledIds.filter(id => !csvIds.includes(id));
+        const extra = csvIds.filter(id => !uiEnabledIds.includes(id));
+        
+        if (missing.length > 0) {
+          console.warn(`⚠️ UI enabled but missing from CSV: ${missing.join(', ')}`);
+        }
+        if (extra.length > 0) {
+          console.warn(`⚠️ CSV includes but not enabled in UI: ${extra.join(', ')}`);
+        }
+        if (missing.length === 0 && extra.length === 0) {
+          console.log('✅ UI and CSV column selection perfectly synchronized!');
+        }
       }
       
       // Create CSV headers using only enabled columns
@@ -2803,13 +2891,14 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, or 6):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, 6, or 7):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
 4. Monitor ChatGPT responses (for debugging)
 5. Debug saved analysis data
 6. Test View Analysis functionality
+7. Test Column Configuration (for CSV export)
       
 Or enter your own property URL:`);
       
@@ -2841,6 +2930,11 @@ Or enter your own property URL:`);
         return;
       }
       
+      // Test Column Configuration
+      if (testUrl === '7') {
+        this.testColumnConfiguration();
+        return;
+      }
 
       if (testUrl === '1') {
         urlToTest = testUrls[0];
@@ -5919,10 +6013,28 @@ Or enter your own property URL:`);
   }
 
   mergeColumnConfigurations(defaultColumns, savedConfig) {
-    return defaultColumns.map(defaultCol => {
+    console.log('🔄 Merging column configurations...');
+    console.log(`   Default columns: ${defaultColumns.length}`);
+    console.log(`   Saved config items: ${savedConfig.length}`);
+    
+    const merged = defaultColumns.map(defaultCol => {
       const savedCol = savedConfig.find(saved => saved.id === defaultCol.id);
-      return savedCol ? { ...defaultCol, ...savedCol } : defaultCol;
+      const result = savedCol ? { ...defaultCol, ...savedCol } : defaultCol;
+      
+      // Debug: Log what happened for each column
+      if (savedCol) {
+        console.log(`   ✅ Merged ${defaultCol.id}: enabled=${result.enabled} (from saved config)`);
+      } else {
+        console.log(`   ⚠️ No saved config for ${defaultCol.id}: enabled=${result.enabled} (using default)`);
+      }
+      
+      return result;
     });
+    
+    const enabledCount = merged.filter(col => col.enabled).length;
+    console.log(`   Merge result: ${enabledCount}/${merged.length} columns enabled`);
+    
+    return merged;
   }
 
   renderColumnsUI(columns) {
@@ -6030,6 +6142,9 @@ Or enter your own property URL:`);
       });
       this.updateColumnStats();
       this.updateCategoryHeader(header, categoryName, columns);
+      
+      // Auto-save after bulk changes
+      this.saveColumnConfiguration(true);
     });
     
     headerContent.querySelector('.re-category-clear-all').addEventListener('click', (e) => {
@@ -6043,6 +6158,9 @@ Or enter your own property URL:`);
       });
       this.updateColumnStats();
       this.updateCategoryHeader(header, categoryName, columns);
+      
+      // Auto-save after bulk changes
+      this.saveColumnConfiguration(true);
     });
     
     header.appendChild(headerContent);
@@ -6117,6 +6235,9 @@ Or enter your own property URL:`);
     checkbox.addEventListener('change', () => {
       column.enabled = checkbox.checked;
       this.updateColumnStats();
+      
+      // Auto-save column configuration when user makes changes (no message for individual changes)
+      this.saveColumnConfiguration(false);
     });
     
     const label = document.createElement('div');
@@ -6253,7 +6374,7 @@ Or enter your own property URL:`);
     });
   }
 
-  async saveColumnConfiguration() {
+  async saveColumnConfiguration(showMessage = true) {
     try {
       const checkboxes = this.panel.querySelectorAll('#re-columns-container input[type="checkbox"]');
       const columnConfig = Array.from(checkboxes).map(checkbox => ({
@@ -6266,12 +6387,17 @@ Or enter your own property URL:`);
         null
       );
       
-      this.showChatGPTMessage('success', 'Column configuration saved successfully!');
+      if (showMessage) {
+        this.showChatGPTMessage('success', 'Column configuration saved successfully!');
+      }
       console.log('💾 Tabular column configuration saved:', columnConfig);
+      console.log(`   Enabled columns: ${columnConfig.filter(c => c.enabled).length}/${columnConfig.length}`);
       
     } catch (error) {
       console.error('Failed to save column configuration:', error);
-      this.showChatGPTMessage('error', 'Failed to save column configuration');
+      if (showMessage) {
+        this.showChatGPTMessage('error', 'Failed to save column configuration');
+      }
     }
   }
 
