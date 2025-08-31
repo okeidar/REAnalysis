@@ -8921,10 +8921,13 @@ function extractFromTabularFormat(responseText, analysis) {
           (cleanValue.match(/[a-zA-Z0-9$%.,'-]/) || cleanValue.match(/[\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff]/)); // Allow international text
         
         if (isValidData) {
+          // Ensure the value is always a string, never an object
+          const stringValue = String(cleanValue);
+          
           // Don't overwrite existing data unless the new value is more complete
-          if (!analysis.extractedData[columnId] || cleanValue.length > (analysis.extractedData[columnId]?.length || 0)) {
-            analysis.extractedData[columnId] = cleanValue;
-            console.log(`✅ Extracted from table - ${columnId}:`, cleanValue);
+          if (!analysis.extractedData[columnId] || stringValue.length > (String(analysis.extractedData[columnId] || '')).length) {
+            analysis.extractedData[columnId] = stringValue;
+            console.log(`✅ Extracted from table - ${columnId}:`, stringValue);
             extractedCount++;
           }
         } else {
@@ -8982,10 +8985,13 @@ function extractFromTabularFormat(responseText, analysis) {
           cleanMetricValue.match(/[a-zA-Z0-9$%.,'-]/); // Contains valid characters
         
         if (isValidMetric) {
+          // Ensure the value is always a string, never an object
+          const stringMetricValue = String(cleanMetricValue);
+          
           // Don't overwrite existing calculated metrics unless the new value is more complete
-          if (!analysis.calculatedMetrics[metricId] || cleanMetricValue.length > (analysis.calculatedMetrics[metricId]?.length || 0)) {
-            analysis.calculatedMetrics[metricId] = cleanMetricValue;
-            console.log(`✅ Extracted calculated metric - ${metricId}:`, cleanMetricValue);
+          if (!analysis.calculatedMetrics[metricId] || stringMetricValue.length > (String(analysis.calculatedMetrics[metricId] || '')).length) {
+            analysis.calculatedMetrics[metricId] = stringMetricValue;
+            console.log(`✅ Extracted calculated metric - ${metricId}:`, stringMetricValue);
             extractedCount++;
           }
         } else {
@@ -9015,8 +9021,10 @@ function extractFromTabularFormat(responseText, analysis) {
           cleanValue.match(/[a-zA-Z0-9$%.,'-]/);
         
         if (isValidColonData && !analysis.extractedData[columnId]) {
-          analysis.extractedData[columnId] = cleanValue;
-          console.log(`✅ Extracted from colon format - ${columnId}:`, cleanValue);
+          // Ensure the value is always a string, never an object
+          const stringValue = String(cleanValue);
+          analysis.extractedData[columnId] = stringValue;
+          console.log(`✅ Extracted from colon format - ${columnId}:`, stringValue);
           extractedCount++;
         }
       }
@@ -9040,8 +9048,10 @@ function extractFromTabularFormat(responseText, analysis) {
             if (flexValue.length > 0 && flexValue.length <= 200 && 
                 !flexValue.match(/^(extract|include|analysis|assessment)$/i) &&
                 flexValue.match(/[a-zA-Z0-9$%]/)) {
-              analysis.extractedData[columnId] = flexValue;
-              console.log(`✅ Flexible extraction - ${columnId}:`, flexValue);
+              // Ensure the value is always a string, never an object
+              const stringValue = String(flexValue);
+              analysis.extractedData[columnId] = stringValue;
+              console.log(`✅ Flexible extraction - ${columnId}:`, stringValue);
               extractedCount++;
             }
           }
@@ -10357,9 +10367,24 @@ function validateAndCleanData(data) {
   const cleanedData = { ...data };
   
   try {
+    // First pass: Convert any objects to strings to prevent validation errors
+    console.log('🔍 Pre-validation data types:', Object.entries(cleanedData).map(([key, value]) => `${key}: ${typeof value}`).join(', '));
+    
+    for (const [key, value] of Object.entries(cleanedData)) {
+      if (typeof value === 'object' && value !== null) {
+        console.log(`⚠️ Converting object to string for ${key}:`, value);
+        cleanedData[key] = String(value);
+      }
+    }
     // Clean and validate price
     if (cleanedData.price) {
       let priceValue = cleanedData.price;
+      
+      // Handle object values - convert to string first
+      if (typeof priceValue === 'object') {
+        console.log('⚠️ Price value is an object, converting to string:', priceValue);
+        priceValue = String(priceValue);
+      }
       
       // Handle descriptive responses - extract the actual price
       if (typeof priceValue === 'string') {
@@ -10402,6 +10427,12 @@ function validateAndCleanData(data) {
     if (cleanedData.bedrooms) {
       let bedroomValue = cleanedData.bedrooms;
       
+      // Handle object values - convert to string first
+      if (typeof bedroomValue === 'object') {
+        console.log('⚠️ Bedrooms value is an object, converting to string:', bedroomValue);
+        bedroomValue = String(bedroomValue);
+      }
+      
       // Handle complex descriptive responses - extract the actual number
       if (typeof bedroomValue === 'string') {
         // Look for "Estimated X bedrooms" or similar patterns
@@ -10437,6 +10468,12 @@ function validateAndCleanData(data) {
     // Clean and validate bathrooms
     if (cleanedData.bathrooms) {
       let bathroomValue = cleanedData.bathrooms;
+      
+      // Handle object values - convert to string first
+      if (typeof bathroomValue === 'object') {
+        console.log('⚠️ Bathrooms value is an object, converting to string:', bathroomValue);
+        bathroomValue = String(bathroomValue);
+      }
       
       // Handle complex descriptive responses - extract the actual number
       if (typeof bathroomValue === 'string') {
@@ -10474,6 +10511,12 @@ function validateAndCleanData(data) {
     if (cleanedData.squareFeet) {
       let sqftValue = cleanedData.squareFeet;
       
+      // Handle object values - convert to string first
+      if (typeof sqftValue === 'object') {
+        console.log('⚠️ Square feet value is an object, converting to string:', sqftValue);
+        sqftValue = String(sqftValue);
+      }
+      
       // Handle descriptive responses - extract the actual number
       if (typeof sqftValue === 'string') {
         // Look for numbers followed by sq ft indicators
@@ -10505,6 +10548,12 @@ function validateAndCleanData(data) {
     if (cleanedData.yearBuilt) {
       let yearValue = cleanedData.yearBuilt;
       
+      // Handle object values - convert to string first
+      if (typeof yearValue === 'object') {
+        console.log('⚠️ Year built value is an object, converting to string:', yearValue);
+        yearValue = String(yearValue);
+      }
+      
       // Handle descriptive responses - extract the year
       if (typeof yearValue === 'string') {
         // Look for 4-digit years
@@ -10534,6 +10583,12 @@ function validateAndCleanData(data) {
     // Clean and validate estimated rental income
     if (cleanedData.estimatedRentalIncome) {
       let rentalValue = cleanedData.estimatedRentalIncome;
+      
+      // Handle object values - convert to string first
+      if (typeof rentalValue === 'object') {
+        console.log('⚠️ Rental income value is an object, converting to string:', rentalValue);
+        rentalValue = String(rentalValue);
+      }
       
       // Handle descriptive responses - extract the actual amount
       if (typeof rentalValue === 'string') {
@@ -12824,7 +12879,20 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
       
       // Set up state for the splitting process
       promptSplittingState.currentPhase = 'instructions';
-      promptSplittingState.pendingPropertyLink = propertyLink.trim();
+      
+      // Validate property link before setting it
+      if (!propertyLink || typeof propertyLink !== 'string') {
+        console.error('❌ Invalid property link type before setting:', typeof propertyLink, propertyLink);
+        throw new Error('Property link must be a valid string');
+      }
+      
+      const trimmedLink = propertyLink.trim();
+      if (!isValidPropertyLink(trimmedLink)) {
+        console.error('❌ Invalid property link format before setting:', trimmedLink);
+        throw new Error('Property link must be a valid URL');
+      }
+      
+      promptSplittingState.pendingPropertyLink = trimmedLink;
       
       console.log('📤 Sending instructions first...');
       console.log('📝 Instructions length:', splitPrompt.instructions.length);
