@@ -2636,6 +2636,13 @@ class REAnalyzerEmbeddedUI {
           console.log(`   Available data keys:`, Object.keys(property.analysis.extractedData || {}));
           console.log(`   Available calculated metrics:`, Object.keys(property.analysis.calculatedMetrics || {}));
           
+          // Show sample of extracted data for debugging
+          const sampleData = {};
+          Object.entries(property.analysis.extractedData || {}).slice(0, 5).forEach(([key, val]) => {
+            sampleData[key] = typeof val === 'string' ? val.substring(0, 50) + (val.length > 50 ? '...' : '') : val;
+          });
+          console.log(`   Sample extracted data:`, sampleData);
+          
           // Add extracted data columns (only enabled ones)
           enabledColumns.forEach(col => {
             let value = '';
@@ -2660,7 +2667,30 @@ class REAnalyzerEmbeddedUI {
                   'bedrooms': ['Number of Bedrooms', 'Bedrooms'],
                   'bathrooms': ['Bathrooms'],
                   'squareFootage': ['squareFeet', 'Square Footage', 'Square Feet'],
-                  'estimatedRent': ['estimatedRentalIncome', 'Estimated Monthly Rental Income']
+                  'estimatedRent': ['estimatedRentalIncome', 'Estimated Monthly Rental Income'],
+                  'propertyType': ['Type of Property', 'Property Type'],
+                  'yearBuilt': ['Year Built'],
+                  'lotSize': ['Lot Size', 'Lot Size (sq ft)'],
+                  'neighborhood': ['Neighborhood'],
+                  'city': ['City'],
+                  'state': ['State'],
+                  'zipCode': ['ZIP Code', 'Zip Code'],
+                  'locationScore': ['Location Score', 'Location Score (1-10)'],
+                  'marketTrend': ['Market Trend'],
+                  'daysOnMarket': ['Days on Market'],
+                  'priceHistory': ['Price History'],
+                  'parkingSpaces': ['Parking Spaces'],
+                  'garageType': ['Garage Type'],
+                  'heatingType': ['Heating Type'],
+                  'coolingType': ['Cooling Type'],
+                  'appliances': ['Appliances Included', 'Appliances'],
+                  'amenities': ['Amenities'],
+                  'keyAdvantages': ['Key Advantages', 'Advantages', 'Pros'],
+                  'keyConcerns': ['Key Concerns', 'Concerns', 'Cons'],
+                  'redFlags': ['Red Flags'],
+                  'investmentGrade': ['Investment Grade'],
+                  'rentalPotential': ['Rental Potential'],
+                  'appreciationPotential': ['Appreciation Potential']
                 };
                 
                 const alternativeKeys = idMappings[col.id] || [];
@@ -2674,7 +2704,7 @@ class REAnalyzerEmbeddedUI {
               }
             }
             
-            // Format value for CSV
+            // Format value for CSV with additional validation
             if (value === null || value === undefined) {
               value = '';
             } else if (typeof value === 'number') {
@@ -2682,9 +2712,23 @@ class REAnalyzerEmbeddedUI {
             } else if (typeof value === 'string') {
               // Clean up the value
               value = value.trim();
-              // Escape commas and quotes for CSV
-              if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                value = `"${value.replace(/"/g, '""')}"`;
+              
+              // Additional validation to prevent gibberish in CSV
+              const isValidForCSV = value.length <= 1000 &&
+                !value.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) && // Not all special characters
+                !value.match(/^[\u4e00-\u9fff\u3400-\u4dbf]+$/u) && // Not Chinese characters
+                !value.match(/^[\u0400-\u04ff]+$/i) && // Not Cyrillic
+                !value.match(/^[\u0590-\u05ff]+$/i) && // Not Hebrew
+                !value.match(/^[\u0600-\u06ff]+$/i); // Not Arabic
+              
+              if (!isValidForCSV) {
+                console.log(`⚠️ Filtering out invalid CSV value for ${col.id}:`, value);
+                value = '';
+              } else {
+                // Escape commas and quotes for CSV
+                if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                  value = `"${value.replace(/"/g, '""')}"`;
+                }
               }
             } else {
               // Convert other types to string
@@ -2692,6 +2736,13 @@ class REAnalyzerEmbeddedUI {
             }
             
             row.push(value);
+            
+            // Debug: Log what value was added for this column
+            if (value) {
+              console.log(`   ✅ ${col.name} (${col.id}): ${typeof value === 'string' ? value.substring(0, 30) + (value.length > 30 ? '...' : '') : value}`);
+            } else {
+              console.log(`   ❌ ${col.name} (${col.id}): NO DATA`);
+            }
           });
           
           rows.push(row);
@@ -8574,6 +8625,276 @@ async function loadPromptSplittingSettings() {
   }
 }
 
+// Function to extract data from tabular format (pipe-delimited tables)
+function extractFromTabularFormat(responseText, analysis) {
+  console.log('🔍 Attempting to extract data from tabular format...');
+  
+  try {
+    // Look for tables with pipe delimiters
+    const tablePatterns = [
+      // Standard markdown table format
+      /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/g,
+      // Table with headers and data rows
+      /\|\s*Data\s+Point\s*\|\s*Value\s*\|[\s\S]*?\|([^|]+)\|([^|]+)\|/gi,
+      // Property data table format
+      /\|\s*Property\s+Address\s*\|\s*([^|]+)\s*\|/gi
+    ];
+    
+    // Column name mappings for table data
+    const columnMappings = {
+      // Basic property info - multiple variations
+      'property address': 'propertyAddress',
+      'street name': 'propertyAddress', // Legacy mapping
+      'address': 'propertyAddress',
+      'asking price': 'askingPrice',
+      'property price': 'askingPrice', // Legacy mapping  
+      'price': 'askingPrice', // Legacy mapping
+      'property type': 'propertyType',
+      'type of property': 'propertyType',
+      'bedrooms': 'bedrooms',
+      'number of bedrooms': 'bedrooms',
+      'bathrooms': 'bathrooms',
+      'square footage': 'squareFootage',
+      'year built': 'yearBuilt',
+      'lot size': 'lotSize',
+      'lot size (sq ft)': 'lotSize',
+      'neighborhood': 'neighborhood',
+      'city': 'city',
+      'state': 'state',
+      'zip code': 'zipCode',
+      
+      // Market data
+      'estimated monthly rent': 'estimatedRent',
+      'location score': 'locationScore',
+      'market trend': 'marketTrend',
+      'days on market': 'daysOnMarket',
+      'price history': 'priceHistory',
+      
+      // Features
+      'parking spaces': 'parkingSpaces',
+      'garage type': 'garageType',
+      'heating type': 'heatingType',
+      'cooling type': 'coolingType',
+      'appliances included': 'appliances',
+      'amenities': 'amenities',
+      
+      // Analysis
+      'key advantages': 'keyAdvantages',
+      'key concerns': 'keyConcerns',
+      'red flags': 'redFlags',
+      'investment grade': 'investmentGrade',
+      'rental potential': 'rentalPotential',
+      'appreciation potential': 'appreciationPotential',
+      
+      // Market analysis
+      'market type': 'marketType',
+      'market cycle': 'marketCycle',
+      'inventory level': 'inventoryLevel',
+      'demand level': 'demandLevel',
+      'job growth rate': 'jobGrowth',
+      'population growth rate': 'populationGrowth',
+      'income growth rate': 'incomeGrowth',
+      'unemployment rate': 'unemploymentRate',
+      'new construction level': 'newConstruction',
+      'infrastructure development': 'infrastructureDev',
+      'commercial development': 'commercialDev',
+      'school quality rating': 'schoolQuality'
+    };
+    
+    // Extract data from pipe-delimited tables (handle both 2-column and 3-column tables)
+    const tableRegex = /\|([^|]+)\|([^|]+)\|(?:([^|]*)\|)?/g;
+    let match;
+    let extractedCount = 0;
+    
+    while ((match = tableRegex.exec(responseText)) !== null) {
+      const leftColumn = match[1].trim().toLowerCase();
+      const rightColumn = match[2].trim();
+      const thirdColumn = match[3] ? match[3].trim() : null;
+      
+      // Skip header rows and separators
+      if (leftColumn.includes('---') || leftColumn.includes('data point') || 
+          leftColumn.includes('metric') || leftColumn.includes('factor') ||
+          rightColumn.includes('---') || rightColumn.includes('value') ||
+          rightColumn.includes('assessment')) {
+        continue;
+      }
+      
+      // Find matching column mapping (check both predefined and custom columns)
+      let columnId = columnMappings[leftColumn];
+      
+      // If not found in predefined mappings, check if it might be a custom column
+      if (!columnId) {
+        // Simple mapping for custom columns - use the left column as the ID with some cleaning
+        const potentialCustomId = leftColumn.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        if (potentialCustomId.length > 2) {
+          columnId = potentialCustomId;
+          console.log(`🔍 Potential custom column detected: ${leftColumn} → ${columnId}`);
+        }
+      }
+      
+      if (columnId && rightColumn && rightColumn !== 'N/A' && rightColumn !== '' && 
+          rightColumn !== '[' && !rightColumn.startsWith('[') && !rightColumn.includes('Extract')) {
+        
+        // Clean the value
+        let cleanValue = rightColumn.replace(/\[|\]/g, '').trim();
+        
+        // Additional cleaning for common issues
+        cleanValue = cleanValue.replace(/^["']|["']$/g, ''); // Remove quotes
+        cleanValue = cleanValue.replace(/\s+/g, ' '); // Normalize whitespace
+        cleanValue = cleanValue.replace(/^\s*-\s*/, ''); // Remove leading dash
+        cleanValue = cleanValue.replace(/\s*\|\s*$/, ''); // Remove trailing pipe
+        
+        // Validate the value isn't placeholder text, gibberish, or template text
+        const isValidData = cleanValue && 
+          cleanValue.length >= 1 && 
+          cleanValue.length <= 500 &&
+          !cleanValue.match(/^(extract|include|numeric|professional|rating|assessment|analysis|top\s*\d+|buyer|seller|balanced|low|medium|high|rising|stable|declining)$/i) &&
+          !cleanValue.match(/^\[.*\]$/) && // Not template brackets
+          !cleanValue.match(/^(n\/a|na|not available|unknown|tbd|to be determined)$/i) &&
+          !cleanValue.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) && // Not all special characters (gibberish)
+          !cleanValue.match(/^[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\uf900-\ufaff\u3300-\u33ff\ufe30-\ufe4f\uf900-\ufaff\u{2f800}-\u{2fa1f}]+$/u) && // Not Chinese characters
+          !cleanValue.match(/^[\u0400-\u04ff]+$/i) && // Not Cyrillic
+          !cleanValue.match(/^[\u0590-\u05ff]+$/i) && // Not Hebrew
+          !cleanValue.match(/^[\u0600-\u06ff]+$/i) && // Not Arabic
+          cleanValue.match(/[a-zA-Z0-9$%.,'-]/) && // Contains valid characters
+          (cleanValue.match(/[a-zA-Z]/) || cleanValue.match(/\d/)); // Contains letters or numbers
+        
+        if (isValidData) {
+          // Don't overwrite existing data unless the new value is more complete
+          if (!analysis.extractedData[columnId] || cleanValue.length > (analysis.extractedData[columnId]?.length || 0)) {
+            analysis.extractedData[columnId] = cleanValue;
+            console.log(`✅ Extracted from table - ${columnId}:`, cleanValue);
+            extractedCount++;
+          }
+        } else {
+          console.log(`⚠️ Skipped invalid table value for ${columnId}:`, cleanValue);
+        }
+      }
+    }
+    
+    // Also try to extract from calculated metrics tables
+    const metricsTableRegex = /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]*)\s*\|/g;
+    while ((match = metricsTableRegex.exec(responseText)) !== null) {
+      const metricName = match[1].trim().toLowerCase();
+      const metricValue = match[2].trim();
+      const calculation = match[3].trim();
+      
+      // Skip headers
+      if (metricName.includes('metric') || metricName.includes('---') || 
+          metricValue.includes('value') || metricValue.includes('---')) {
+        continue;
+      }
+      
+      // Map calculated metrics
+      const calculatedMappings = {
+        'price per sq ft': 'pricePerSqFt',
+        'rent per sq ft': 'rentPerSqFt', 
+        'property age': 'propertyAge',
+        'bedroom ratio': 'bedroomRatio',
+        'gross rent multiplier': 'grossRentMultiplier',
+        'cap rate': 'capRate',
+        '1% rule ratio': 'onePercentRule',
+        'price-to-rent ratio': 'priceToRentRatio',
+        'vacancy risk': 'vacancyRisk',
+        'maintenance risk': 'maintenanceRisk',
+        'market risk': 'marketRisk',
+        'overall risk score': 'overallRiskScore',
+        'location premium': 'locationPremium',
+        'days on market score': 'daysOnMarketScore',
+        'price trend score': 'priceTrendScore'
+      };
+      
+      const metricId = calculatedMappings[metricName];
+      if (metricId && metricValue && metricValue !== 'N/A' && !metricValue.startsWith('[')) {
+        let cleanMetricValue = metricValue.replace(/\[|\]/g, '').trim();
+        cleanMetricValue = cleanMetricValue.replace(/^["']|["']$/g, '');
+        cleanMetricValue = cleanMetricValue.replace(/^\s*-\s*/, '');
+        cleanMetricValue = cleanMetricValue.replace(/\s*\|\s*$/, '');
+        
+        // Validate metric value
+        const isValidMetric = cleanMetricValue && 
+          cleanMetricValue.length >= 1 && 
+          cleanMetricValue.length <= 200 &&
+          !cleanMetricValue.match(/^(value|calculation|formula|metric|score|rating|assessment)$/i) &&
+          !cleanMetricValue.match(/^\[.*\]$/) &&
+          !cleanMetricValue.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) && // Not gibberish
+          cleanMetricValue.match(/[a-zA-Z0-9$%.,'-]/); // Contains valid characters
+        
+        if (isValidMetric) {
+          // Don't overwrite existing calculated metrics unless the new value is more complete
+          if (!analysis.calculatedMetrics[metricId] || cleanMetricValue.length > (analysis.calculatedMetrics[metricId]?.length || 0)) {
+            analysis.calculatedMetrics[metricId] = cleanMetricValue;
+            console.log(`✅ Extracted calculated metric - ${metricId}:`, cleanMetricValue);
+            extractedCount++;
+          }
+        } else {
+          console.log(`⚠️ Skipped invalid metric value for ${metricId}:`, cleanMetricValue);
+        }
+      }
+    }
+    
+    // Also try to extract from colon-separated format (key: value pairs)
+    const colonSeparatedRegex = /^([^:]+):\s*(.+)$/gm;
+    while ((match = colonSeparatedRegex.exec(responseText)) !== null) {
+      const keyName = match[1].trim().toLowerCase();
+      const keyValue = match[2].trim();
+      
+      // Check if this is a property data point
+      const columnId = columnMappings[keyName];
+      if (columnId && keyValue && keyValue.length > 0 && keyValue.length <= 500) {
+        // Clean the value
+        let cleanValue = keyValue.replace(/\[|\]/g, '').trim();
+        cleanValue = cleanValue.replace(/^["']|["']$/g, '');
+        
+        // Validate it's not placeholder text
+        const isValidColonData = cleanValue &&
+          !cleanValue.match(/^(extract|include|numeric|professional|rating|assessment|analysis|top\s*\d+)$/i) &&
+          !cleanValue.match(/^\[.*\]$/) &&
+          !cleanValue.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) &&
+          cleanValue.match(/[a-zA-Z0-9$%.,'-]/);
+        
+        if (isValidColonData && !analysis.extractedData[columnId]) {
+          analysis.extractedData[columnId] = cleanValue;
+          console.log(`✅ Extracted from colon format - ${columnId}:`, cleanValue);
+          extractedCount++;
+        }
+      }
+    }
+    
+    // Final fallback: Look for any mention of the column names with values nearby
+    if (extractedCount === 0) {
+      console.log('🔄 No table data found, trying flexible extraction...');
+      
+      Object.entries(columnMappings).forEach(([keyName, columnId]) => {
+        if (!analysis.extractedData[columnId]) {
+          // Create a flexible regex for this field
+          const flexibleRegex = new RegExp(`${keyName.replace(/\s+/g, '\\s+')}[:\\s-]*([^\\n,;|]{1,200})`, 'gi');
+          const flexMatch = flexibleRegex.exec(responseText);
+          
+          if (flexMatch && flexMatch[1]) {
+            let flexValue = flexMatch[1].trim();
+            flexValue = flexValue.replace(/\[|\]|"|'/g, '').trim();
+            
+            // Basic validation for flexible extraction
+            if (flexValue.length > 0 && flexValue.length <= 200 && 
+                !flexValue.match(/^(extract|include|analysis|assessment)$/i) &&
+                flexValue.match(/[a-zA-Z0-9$%]/)) {
+              analysis.extractedData[columnId] = flexValue;
+              console.log(`✅ Flexible extraction - ${columnId}:`, flexValue);
+              extractedCount++;
+            }
+          }
+        }
+      });
+    }
+    
+    console.log(`📊 Table extraction completed: ${extractedCount} values extracted`);
+    
+  } catch (error) {
+    console.error('❌ Error in table extraction:', error);
+  }
+}
+
 // Function to extract key information from ChatGPT response
 function extractPropertyAnalysisData(responseText) {
   if (!responseText || typeof responseText !== 'string') {
@@ -8634,6 +8955,9 @@ function extractPropertyAnalysisData(responseText) {
     console.log('✅ Found structured INVESTMENT SUMMARY section');
     extractFromInvestmentSummary(structuredSections.investmentSummary, analysis);
   }
+  
+  // Try to extract from tabular format (pipe-delimited tables)
+  extractFromTabularFormat(responseText, analysis);
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
   // Pattern performance optimization: Most specific patterns first, broad patterns last
