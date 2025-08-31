@@ -2635,6 +2635,34 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
+  refreshAllTabs() {
+    console.log('🔄 Refreshing all UI tabs...');
+    
+    try {
+      // Update properties tab
+      this.loadChatGPTPropertyData();
+      this.updatePropertiesStats();
+      this.displayProperties();
+      
+      // Update analyzer tab
+      const analyzerTab = this.panel.querySelector('#re-analyzer-tab');
+      if (analyzerTab && analyzerTab.style.display !== 'none') {
+        this.displayAnalyzer();
+      }
+      
+      // Update any category views
+      const propertiesTab = this.panel.querySelector('#re-properties-tab');
+      if (propertiesTab && propertiesTab.style.display !== 'none') {
+        this.loadChatGPTPropertyData();
+      }
+      
+      console.log('✅ All tabs refreshed');
+      
+    } catch (error) {
+      console.error('❌ Error refreshing tabs:', error);
+    }
+  }
+
   async testTableParsing() {
     console.log('🧪 Testing table parsing with sample data...');
     
@@ -3278,12 +3306,45 @@ Or enter your own property URL:`);
 
   clearAllData() {
     if (confirm('Are you sure you want to clear all property data? This action cannot be undone.')) {
-      safeChromeFall(
-        () => chrome.storage.local.remove(['propertyHistory']),
-        null
-      ).then(() => {
-        this.showChatGPTMessage('success', 'All property data has been cleared');
-        this.loadChatGPTPropertyData();
+      console.log('🗑️ Clearing all property data...');
+      
+      // Immediately clear the UI display for instant feedback
+      const propertiesList = this.panel.querySelector('#re-properties-list');
+      if (propertiesList) {
+        propertiesList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--re-text-secondary);">No properties found</div>';
+      }
+      
+      // Update stats immediately
+      this.updateChatGPTStats(0, 0, 0);
+      
+      // Clear from both chrome storage and localStorage
+      const clearPromises = [];
+      
+      // Clear chrome storage
+      clearPromises.push(
+        safeChromeFall(
+          () => chrome.storage.local.remove(['propertyHistory']),
+          null
+        )
+      );
+      
+      // Clear localStorage
+      try {
+        localStorage.removeItem('reAnalyzer_propertyHistory');
+        console.log('🧹 Cleared localStorage backup');
+      } catch (e) {
+        console.warn('Failed to clear localStorage:', e);
+      }
+      
+              Promise.all(clearPromises).then(() => {
+          this.showChatGPTMessage('success', 'All property data has been cleared');
+          
+          // Use comprehensive refresh function
+          this.refreshAllTabs();
+          
+        }).catch(error => {
+        console.error('❌ Clear all data error:', error);
+        this.showChatGPTMessage('error', 'Failed to clear all data: ' + error.message);
       });
     }
   }
@@ -3295,16 +3356,45 @@ Or enter your own property URL:`);
       confirmText: 'Clear All Data',
       cancelText: 'Cancel',
       onConfirm: () => {
-        safeChromeFall(
-          () => chrome.storage.local.remove(['propertyHistory']),
-          null
-        ).then(() => {
+        console.log('🗑️ Clearing all property data with confirmation...');
+        
+        // Immediately clear the UI display for instant feedback
+        const propertiesList = this.panel.querySelector('#re-properties-list');
+        if (propertiesList) {
+          propertiesList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--re-text-secondary);">No properties found</div>';
+        }
+        
+        // Update stats immediately
+        this.updateChatGPTStats(0, 0, 0);
+        
+        // Clear from both chrome storage and localStorage
+        const clearPromises = [];
+        
+        // Clear chrome storage
+        clearPromises.push(
+          safeChromeFall(
+            () => chrome.storage.local.remove(['propertyHistory']),
+            null
+          )
+        );
+        
+        // Clear localStorage
+        try {
+          localStorage.removeItem('reAnalyzer_propertyHistory');
+          console.log('🧹 Cleared localStorage backup');
+        } catch (e) {
+          console.warn('Failed to clear localStorage:', e);
+        }
+        
+        Promise.all(clearPromises).then(() => {
           this.showChatGPTMessage('success', 'All property data has been cleared');
-          this.loadChatGPTPropertyData();
-          this.updatePropertiesStats();
           
-          // Update display immediately
-          this.displayProperties();
+          // Use comprehensive refresh function
+          this.refreshAllTabs();
+          
+        }).catch(error => {
+          console.error('❌ Clear all data with confirmation error:', error);
+          this.showChatGPTMessage('error', 'Failed to clear all data: ' + error.message);
         });
       }
     });
@@ -3317,25 +3407,66 @@ Or enter your own property URL:`);
       confirmText: 'Delete Property',
       cancelText: 'Cancel',
       onConfirm: () => {
+        console.log('🗑️ Deleting property:', propertyUrl);
+        
+        // Immediately remove the property from UI for instant feedback
+        const propertyElements = this.panel.querySelectorAll(`[data-property-url="${propertyUrl}"]`);
+        propertyElements.forEach(element => {
+          element.style.opacity = '0.5';
+          element.style.pointerEvents = 'none';
+          console.log('🔄 Immediately hiding property element');
+        });
+        
+        // Try chrome storage first, fallback to localStorage
         safeChromeFall(
           () => chrome.storage.local.get(['propertyHistory']),
-          { propertyHistory: [] }
+          null
         ).then(result => {
-          const properties = result.propertyHistory || [];
-          const updatedProperties = properties.filter(p => p.url !== propertyUrl);
+          let properties = [];
           
-          return safeChromeFall(
-            () => chrome.storage.local.set({ propertyHistory: updatedProperties }),
-            null
+          if (result) {
+            properties = result.propertyHistory || [];
+          } else {
+            // Fallback to localStorage
+            try {
+              const localData = localStorage.getItem('reAnalyzer_propertyHistory');
+              properties = localData ? JSON.parse(localData) : [];
+            } catch (e) {
+              console.warn('Failed to load from localStorage for deletion:', e);
+              properties = [];
+            }
+          }
+          
+          const updatedProperties = properties.filter(p => p.url !== propertyUrl);
+          console.log(`🔄 Filtered properties: ${properties.length} → ${updatedProperties.length}`);
+          
+          // Save to both chrome storage and localStorage
+          const savePromises = [];
+          
+          // Try chrome storage
+          savePromises.push(
+            safeChromeFall(
+              () => chrome.storage.local.set({ propertyHistory: updatedProperties }),
+              null
+            )
           );
+          
+          // Also save to localStorage as backup
+          try {
+            localStorage.setItem('reAnalyzer_propertyHistory', JSON.stringify(updatedProperties));
+          } catch (e) {
+            console.warn('Failed to save to localStorage:', e);
+          }
+          
+          return Promise.all(savePromises);
         }).then(() => {
           this.showChatGPTMessage('success', 'Property deleted successfully');
-          this.loadChatGPTPropertyData();
-          this.updatePropertiesStats();
           
-          // Update display immediately
-          this.displayProperties();
+          // Use comprehensive refresh function
+          this.refreshAllTabs();
+          
         }).catch(error => {
+          console.error('❌ Delete property error:', error);
           this.showChatGPTMessage('error', 'Failed to delete property: ' + error.message);
         });
       }
