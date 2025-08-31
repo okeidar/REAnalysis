@@ -2605,7 +2605,142 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
+  async exportDirectTableToCSV() {
+    try {
+      // Load all property data
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      console.log('📊 Direct Table-to-CSV Export:');
+      console.log(`   Processing ${properties.length} properties`);
+      
+      // Create a unified CSV structure
+      const allTables = [];
+      let exportedCount = 0;
+      
+      properties.forEach((property, index) => {
+        if (property.analysis && property.analysis.fullResponse) {
+          console.log(`📋 Processing property ${index + 1}: ${property.url}`);
+          
+          // Parse tables directly from ChatGPT response
+          const tables = parseTableToCSV(property.analysis.fullResponse);
+          
+          if (tables.length > 0) {
+            // Add property metadata to each table
+            tables.forEach((table, tableIndex) => {
+              const tableWithMetadata = {
+                propertyIndex: index + 1,
+                url: property.url || '',
+                domain: property.domain || '',
+                date: property.date || '',
+                tableIndex: tableIndex + 1,
+                csvContent: table.csvContent,
+                rowCount: table.rowCount
+              };
+              
+              allTables.push(tableWithMetadata);
+            });
+            
+            exportedCount++;
+            console.log(`✅ Exported ${tables.length} tables for property ${index + 1}`);
+          } else {
+            console.log(`⚠️ No tables found in property ${index + 1} response`);
+          }
+        }
+      });
+      
+      if (allTables.length === 0) {
+        this.showChatGPTMessage('warning', 'No tabular data found in property responses');
+        return;
+      }
+      
+      // Create unified CSV content
+      let csvContent = 'Property Index,URL,Domain,Analysis Date,Table Index,Data Point,Value\n';
+      
+      allTables.forEach(tableData => {
+        const tableLines = tableData.csvContent.split('\n');
+        
+        tableLines.forEach(line => {
+          if (line.trim()) {
+            const cells = line.split(',');
+            if (cells.length >= 2) {
+              // Add metadata columns + table data
+              csvContent += `${tableData.propertyIndex},"${tableData.url}","${tableData.domain}","${tableData.date}",${tableData.tableIndex},${line}\n`;
+            }
+          }
+        });
+      });
+      
+      // Create and download file
+      const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `property-tables-direct-${Date.now()}.csv`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', `Exported ${exportedCount} properties with ${allTables.length} tables converted directly from ChatGPT output!`);
+      
+    } catch (error) {
+      console.error('❌ Failed to export direct table CSV:', error);
+      this.showChatGPTMessage('error', 'Failed to export direct table CSV');
+    }
+  }
+
   async exportPropertiesToCSV() {
+    try {
+      // Load property data to check what format we have
+      const result = await safeChromeFall(
+        () => chrome.storage.local.get(['propertyHistory']),
+        { propertyHistory: [] }
+      );
+      
+      const properties = result.propertyHistory || [];
+      
+      if (properties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties to export');
+        return;
+      }
+      
+      // Check if we have tabular data in the responses
+      let hasTabularData = false;
+      for (const property of properties) {
+        if (property.analysis && property.analysis.fullResponse) {
+          if (property.analysis.fullResponse.includes('|') && 
+              property.analysis.fullResponse.includes('Data Point')) {
+            hasTabularData = true;
+            break;
+          }
+        }
+      }
+      
+      // Choose export method based on available data
+      if (hasTabularData) {
+        console.log('📊 Tabular data detected, using direct table export');
+        return this.exportDirectTableToCSV();
+      } else {
+        console.log('📊 No tabular data detected, using column-based export');
+        return this.exportColumnBasedCSV();
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to export properties to CSV:', error);
+      this.showChatGPTMessage('error', 'Failed to export properties to CSV');
+    }
+  }
+
+  async exportColumnBasedCSV() {
     try {
       // Load all property data and column configuration
       const result = await safeChromeFall(
@@ -8785,6 +8920,121 @@ function extractNumberFromDescription(text, fieldType) {
     return text;
   }
 }
+
+// Function to directly parse ChatGPT table output to CSV format
+function parseTableToCSV(responseText) {
+  console.log('🔄 Parsing ChatGPT table output directly to CSV format...');
+  
+  try {
+    const tables = [];
+    
+    // Enhanced table detection - handle multiple table formats
+    const tablePatterns = [
+      // Standard markdown tables with headers and separators
+      /\|[^|\n]+\|[^|\n]+\|[^\n]*\n\|[-\s|:]+\|\n(\|[^|\n]*\|[^|\n]*\|[^\n]*\n?)*/g,
+      // Tables without separators (just header + data rows)
+      /\|[^|\n]+\|[^|\n]+\|[^\n]*\n(\|[^|\n]*\|[^|\n]*\|[^\n]*\n?)+/g,
+      // Property data table format
+      /\|\s*Data\s+Point\s*\|\s*Value\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
+      // Calculated metrics table
+      /\|\s*Metric\s*\|\s*Value\s*\|\s*Calculation\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
+      // Market analysis table
+      /\|\s*Market\s+Factor\s*\|\s*Value\s*\|\s*Assessment\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
+      // Risk assessment table
+      /\|\s*Risk\s+Factor\s*\|\s*Score\s*\|\s*Justification\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
+      // Any table with at least 2 columns
+      /\|[^|\n]+\|[^|\n]+(?:\|[^|\n]*)?\|?\n(\|[^|\n]*\|[^|\n]*(?:\|[^|\n]*)?\|?\n?)+/g
+    ];
+    
+    let allMatches = [];
+    
+    // Collect all table matches
+    tablePatterns.forEach(pattern => {
+      const matches = [...responseText.matchAll(pattern)];
+      allMatches.push(...matches);
+    });
+    
+    // Remove duplicates by checking content overlap
+    const uniqueTables = [];
+    allMatches.forEach(match => {
+      const tableText = match[0];
+      const isDuplicate = uniqueTables.some(existing => 
+        existing.includes(tableText.substring(0, 50)) || 
+        tableText.includes(existing.substring(0, 50))
+      );
+      
+      if (!isDuplicate) {
+        uniqueTables.push(tableText);
+      }
+    });
+    
+    console.log(`📊 Found ${uniqueTables.length} unique tables in response`);
+    
+    uniqueTables.forEach((tableText, tableIndex) => {
+      console.log(`📊 Processing table ${tableIndex + 1}:`, tableText.substring(0, 100) + '...');
+      
+      const lines = tableText.trim().split('\n');
+      const csvRows = [];
+      
+      lines.forEach((line, lineIndex) => {
+        // Skip separator lines (containing ---)
+        if (line.includes('---') || line.includes('===')) return;
+        
+        // Extract data from pipe-delimited line
+        const cells = line.split('|')
+          .map(cell => cell.trim())
+          .filter(cell => cell.length > 0);
+        
+        if (cells.length >= 2) {
+          // Clean each cell
+          const cleanedCells = cells.map(cell => {
+            let cleaned = cell.replace(/\[|\]/g, '').trim();
+            cleaned = cleaned.replace(/^["']|["']$/g, '');
+            cleaned = cleaned.replace(/^\*\*|\*\*$/g, ''); // Remove markdown bold
+            cleaned = cleaned.replace(/^`|`$/g, ''); // Remove code ticks
+            
+            // Remove template text and placeholders
+            if (cleaned.match(/^\[.*\]$/) || 
+                cleaned.match(/^(extract|include|numeric|professional|rating|assessment|analysis)$/i) ||
+                cleaned.match(/^(value|data\s*point|metric|factor|score|justification|calculation)$/i)) {
+              cleaned = '';
+            }
+            
+            // Handle N/A and empty values
+            if (cleaned.match(/^(n\/a|na|not\s*available|unknown|tbd|to\s*be\s*determined|-+)$/i)) {
+              cleaned = '';
+            }
+            
+            // Escape commas and quotes for CSV
+            if (cleaned.includes(',') || cleaned.includes('"') || cleaned.includes('\n')) {
+              cleaned = `"${cleaned.replace(/"/g, '""')}"`;
+            }
+            
+            return cleaned;
+          });
+          
+          csvRows.push(cleanedCells.join(','));
+        }
+      });
+      
+      if (csvRows.length > 1) { // Must have at least header + 1 data row
+        tables.push({
+          index: tableIndex,
+          csvContent: csvRows.join('\n'),
+          rowCount: csvRows.length
+        });
+        
+        console.log(`✅ Converted table ${tableIndex + 1} to CSV: ${csvRows.length} rows`);
+      }
+    });
+    
+    return tables;
+    
+  } catch (error) {
+    console.error('❌ Error parsing table to CSV:', error);
+    return [];
+  }
+  }
 
 // Function to extract data from tabular format (pipe-delimited tables)
 function extractFromTabularFormat(responseText, analysis) {
