@@ -2765,7 +2765,7 @@ Maintenance Risk	N/A	N/A`;
       link.click();
       document.body.removeChild(link);
       
-      this.showChatGPTMessage('success', `Exported ${exportedCount} properties with ${allTables.length} tables converted directly from ChatGPT output!`);
+      this.showChatGPTMessage('success', `✅ Direct Table Export: Converted ${exportedCount} properties with ${allTables.length} tables directly from ChatGPT output! This preserves the exact tabular format.`);
       
     } catch (error) {
       console.error('❌ Failed to export direct table CSV:', error);
@@ -2805,9 +2805,11 @@ Maintenance Risk	N/A	N/A`;
       // Choose export method based on available data
       if (hasTabularData) {
         console.log('📊 Tabular data detected, using direct table export');
+        console.log('💡 This will convert ChatGPT tables directly to CSV format');
         return this.exportDirectTableToCSV();
       } else {
         console.log('📊 No tabular data detected, using column-based export');
+        console.log('💡 This will use extracted data with your column configuration');
         return this.exportColumnBasedCSV();
       }
       
@@ -10345,8 +10347,21 @@ function extractPropertyAnalysisData(responseText) {
     return analysis;
   }
   
-  // Validate and clean extracted data
-  analysis.extractedData = validateAndCleanData(analysis.extractedData);
+  // Skip complex validation for tabular data - use direct table export instead
+  if (responseText.includes('Data Point') && responseText.includes('Value')) {
+    console.log('🔄 Tabular data detected, skipping complex validation to prevent object errors');
+    console.log('📊 Use direct table export for clean CSV output');
+    
+    // Simple type conversion without complex validation
+    for (const [key, value] of Object.entries(analysis.extractedData)) {
+      if (typeof value === 'object' && value !== null) {
+        analysis.extractedData[key] = String(value);
+      }
+    }
+  } else {
+    // Only use complex validation for non-tabular data
+    analysis.extractedData = validateAndCleanData(analysis.extractedData);
+  }
   
   // Normalize international formats and currencies
   analysis.extractedData = normalizeInternationalData(analysis.extractedData);
