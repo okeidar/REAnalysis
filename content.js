@@ -2567,6 +2567,81 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
+  async testTableParsing() {
+    console.log('🧪 Testing table parsing with sample data...');
+    
+    // Use the exact example from the user
+    const sampleResponse = `🏡 PROPERTY DATA TABLE
+Data Point	Value
+Property Address	3 Ha'Argaman Street, Oranit, Israel
+Asking Price	₪4,600,000
+Property Type	Duplex (דו משפחתי)
+Bedrooms	6.5
+Bathrooms	3
+Square Footage	290 m² (Built Area: 210 m²)
+Year Built	N/A
+Lot Size	N/A
+Neighborhood	Oranit
+City	Oranit
+State	Central District
+ZIP Code	N/A
+School Quality Rating	N/A
+Estimated Monthly Rent	N/A
+Days on Market	N/A
+Price History	N/A
+Market Type	Seller's Market
+Market Cycle	Upward Trend
+Inventory Level	Low
+Demand Level	High
+Job Growth Rate	N/A
+Population Growth Rate	N/A
+Income Growth Rate	N/A
+Unemployment Rate	N/A
+New Construction Level	N/A
+Infrastructure Development	N/A
+Commercial Development	N/A
+Parking Spaces	2
+Garage Type	N/A
+Heating Type	N/A
+Cooling Type	Tornado Air Conditioning (מזגן טורנדו)
+Appliances Included	Refrigerator, Stove, Oven, Dishwasher, Washing Machine
+Amenities	Elevator, Disabled Access, Secure Doors (רב-בריח), Barred Windows (סורגים), Storage Room, Solar Water Heater (דוד שמש), Renovated, Protected Room (ממ"ד), Balcony
+Market Trend	Rising
+Key Advantages	Spacious Layout, Separate Unit for Rental or Office, High-Quality Neighborhood
+Key Concerns	Limited Information on Year Built and Lot Size, No Garage, Unspecified Infrastructure Developments
+Red Flags	N/A
+Investment Grade	B
+Rental Potential	Moderate
+Appreciation Potential	High
+📊 CALCULATED METRICS TABLE
+Metric	Value	Calculation
+Price per m²	₪15,862	₪4,600,000 ÷ 290 m²
+Cap Rate	N/A	N/A
+1% Rule Ratio	N/A	N/A
+Location Premium	N/A	N/A
+Vacancy Risk	N/A	N/A
+Maintenance Risk	N/A	N/A`;
+    
+    console.log('📊 Testing table parsing...');
+    const tables = parseTableToCSV(sampleResponse);
+    
+    console.log(`📊 Parsing Results:`);
+    console.log(`   Found ${tables.length} tables`);
+    
+    tables.forEach((table, index) => {
+      console.log(`📋 Table ${index + 1} (${table.name || 'Unnamed'}):`);
+      console.log(`   Rows: ${table.rowCount}`);
+      console.log(`   Content preview:`);
+      console.log(table.csvContent.split('\n').slice(0, 5).join('\n'));
+    });
+    
+    if (tables.length > 0) {
+      this.showChatGPTMessage('success', `Table parsing test completed! Found ${tables.length} tables.`);
+    } else {
+      this.showChatGPTMessage('warning', 'Table parsing test failed - no tables found.');
+    }
+  }
+
   async testColumnConfiguration() {
     console.log('🧪 Testing column configuration...');
     
@@ -2713,12 +2788,14 @@ class REAnalyzerEmbeddedUI {
         return;
       }
       
-      // Check if we have tabular data in the responses
+      // Check if we have tabular data in the responses (look for tab-separated format)
       let hasTabularData = false;
       for (const property of properties) {
         if (property.analysis && property.analysis.fullResponse) {
-          if (property.analysis.fullResponse.includes('|') && 
-              property.analysis.fullResponse.includes('Data Point')) {
+          // Look for the specific format: "Data Point" followed by tab and "Value"
+          if (property.analysis.fullResponse.includes('Data Point') && 
+              (property.analysis.fullResponse.includes('Data Point\tValue') ||
+               property.analysis.fullResponse.match(/Data\s+Point\s+Value/))) {
             hasTabularData = true;
             break;
           }
@@ -3023,7 +3100,7 @@ class REAnalyzerEmbeddedUI {
       console.log('📋 Field details:', fieldInfo);
       
       // Let user choose a test URL
-      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, 6, or 7):
+      const testUrl = prompt(`Choose a test URL (enter 1, 2, 3, 4, 5, 6, 7, or 8):
 1. Zillow Test URL
 2. Realtor.com Test URL  
 3. Redfin Test URL
@@ -3031,6 +3108,7 @@ class REAnalyzerEmbeddedUI {
 5. Debug saved analysis data
 6. Test View Analysis functionality
 7. Test Column Configuration (for CSV export)
+8. Test Table Parsing (for direct CSV conversion)
       
 Or enter your own property URL:`);
       
@@ -3065,6 +3143,12 @@ Or enter your own property URL:`);
       // Test Column Configuration
       if (testUrl === '7') {
         this.testColumnConfiguration();
+        return;
+      }
+      
+      // Test Table Parsing
+      if (testUrl === '8') {
+        this.testTableParsing();
         return;
       }
 
@@ -8950,105 +9034,76 @@ function parseTableToCSV(responseText) {
   try {
     const tables = [];
     
-    // Enhanced table detection - handle multiple table formats
-    const tablePatterns = [
-      // Standard markdown tables with headers and separators
-      /\|[^|\n]+\|[^|\n]+\|[^\n]*\n\|[-\s|:]+\|\n(\|[^|\n]*\|[^|\n]*\|[^\n]*\n?)*/g,
-      // Tables without separators (just header + data rows)
-      /\|[^|\n]+\|[^|\n]+\|[^\n]*\n(\|[^|\n]*\|[^|\n]*\|[^\n]*\n?)+/g,
-      // Property data table format
-      /\|\s*Data\s+Point\s*\|\s*Value\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
-      // Calculated metrics table
-      /\|\s*Metric\s*\|\s*Value\s*\|\s*Calculation\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
-      // Market analysis table
-      /\|\s*Market\s+Factor\s*\|\s*Value\s*\|\s*Assessment\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
-      // Risk assessment table
-      /\|\s*Risk\s+Factor\s*\|\s*Score\s*\|\s*Justification\s*\|[\s\S]*?(?=\n\n|\n\*\*|\n#|$)/gi,
-      // Any table with at least 2 columns
-      /\|[^|\n]+\|[^|\n]+(?:\|[^|\n]*)?\|?\n(\|[^|\n]*\|[^|\n]*(?:\|[^|\n]*)?\|?\n?)+/g
-    ];
+    // Simple and direct approach: Find "Data Point" followed by "Value" and extract the table
+    const tableMatch = responseText.match(/Data\s+Point\s+Value\s*\n([\s\S]*?)(?=📊|🧠|\n\n|$)/i);
     
-    let allMatches = [];
-    
-    // Collect all table matches
-    tablePatterns.forEach(pattern => {
-      const matches = [...responseText.matchAll(pattern)];
-      allMatches.push(...matches);
-    });
-    
-    // Remove duplicates by checking content overlap
-    const uniqueTables = [];
-    allMatches.forEach(match => {
-      const tableText = match[0];
-      const isDuplicate = uniqueTables.some(existing => 
-        existing.includes(tableText.substring(0, 50)) || 
-        tableText.includes(existing.substring(0, 50))
-      );
+    if (tableMatch) {
+      console.log('📊 Found table data, parsing...');
+      const tableContent = tableMatch[1].trim();
+      console.log('📋 Table content preview:', tableContent.substring(0, 300));
+      console.log('📋 Table content length:', tableContent.length);
       
-      if (!isDuplicate) {
-        uniqueTables.push(tableText);
-      }
-    });
-    
-    console.log(`📊 Found ${uniqueTables.length} unique tables in response`);
-    
-    uniqueTables.forEach((tableText, tableIndex) => {
-      console.log(`📊 Processing table ${tableIndex + 1}:`, tableText.substring(0, 100) + '...');
+      const csvRows = ['Data Point,Value']; // Header
       
-      const lines = tableText.trim().split('\n');
-      const csvRows = [];
+      // Split into lines and process each one
+      const lines = tableContent.split('\n');
+      console.log(`📋 Found ${lines.length} lines in table`);
       
-      lines.forEach((line, lineIndex) => {
-        // Skip separator lines (containing ---)
-        if (line.includes('---') || line.includes('===')) return;
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
         
-        // Extract data from pipe-delimited line
-        const cells = line.split('|')
-          .map(cell => cell.trim())
-          .filter(cell => cell.length > 0);
+        console.log(`📋 Processing line: "${trimmedLine}"`);
         
-        if (cells.length >= 2) {
-          // Clean each cell
-          const cleanedCells = cells.map(cell => {
-            let cleaned = cell.replace(/\[|\]/g, '').trim();
-            cleaned = cleaned.replace(/^["']|["']$/g, '');
-            cleaned = cleaned.replace(/^\*\*|\*\*$/g, ''); // Remove markdown bold
-            cleaned = cleaned.replace(/^`|`$/g, ''); // Remove code ticks
-            
-            // Remove template text and placeholders
-            if (cleaned.match(/^\[.*\]$/) || 
-                cleaned.match(/^(extract|include|numeric|professional|rating|assessment|analysis)$/i) ||
-                cleaned.match(/^(value|data\s*point|metric|factor|score|justification|calculation)$/i)) {
-              cleaned = '';
-            }
-            
-            // Handle N/A and empty values
-            if (cleaned.match(/^(n\/a|na|not\s*available|unknown|tbd|to\s*be\s*determined|-+)$/i)) {
-              cleaned = '';
-            }
-            
-            // Escape commas and quotes for CSV
-            if (cleaned.includes(',') || cleaned.includes('"') || cleaned.includes('\n')) {
-              cleaned = `"${cleaned.replace(/"/g, '""')}"`;
-            }
-            
-            return cleaned;
-          });
-          
-          csvRows.push(cleanedCells.join(','));
+        // Try tab separation first, then fall back to multiple spaces
+        let parts = trimmedLine.split('\t');
+        console.log(`   Tab split result: ${parts.length} parts:`, parts);
+        
+        if (parts.length < 2) {
+          // Fallback: split by multiple spaces (2 or more)
+          parts = trimmedLine.split(/\s{2,}/);
+          console.log(`   Space split result: ${parts.length} parts:`, parts);
         }
-      });
+        
+        if (parts.length >= 2) {
+          const dataPoint = parts[0].trim();
+          const value = parts.slice(1).join(' ').trim();
+          
+          console.log(`   Data Point: "${dataPoint}", Value: "${value}"`);
+          
+          // Skip if this looks like a header or separator
+          if (dataPoint.toLowerCase().includes('data point') || 
+              dataPoint.toLowerCase().includes('metric') ||
+              value.toLowerCase().includes('value')) {
+            console.log(`   Skipping header line`);
+            continue;
+          }
+          
+          // Properly escape for CSV
+          const escapedDataPoint = dataPoint.includes(',') || dataPoint.includes('"') ? 
+            `"${dataPoint.replace(/"/g, '""')}"` : dataPoint;
+          const escapedValue = value.includes(',') || value.includes('"') ? 
+            `"${value.replace(/"/g, '""')}"` : value;
+          
+          csvRows.push(`${escapedDataPoint},${escapedValue}`);
+          console.log(`   ✅ Added to CSV: ${escapedDataPoint},${escapedValue}`);
+        } else {
+          console.log(`   ⚠️ Skipped line with ${parts.length} parts`);
+        }
+      }
       
-      if (csvRows.length > 1) { // Must have at least header + 1 data row
+      if (csvRows.length > 1) {
         tables.push({
-          index: tableIndex,
+          index: 0,
+          name: 'Property Data',
           csvContent: csvRows.join('\n'),
           rowCount: csvRows.length
         });
-        
-        console.log(`✅ Converted table ${tableIndex + 1} to CSV: ${csvRows.length} rows`);
+        console.log(`✅ Successfully parsed table with ${csvRows.length - 1} data rows`);
       }
-    });
+    } else {
+      console.log('⚠️ No table data found in response');
+    }
     
     return tables;
     
