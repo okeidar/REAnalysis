@@ -2801,13 +2801,10 @@ class REAnalyzerEmbeddedUI {
               // Clean up the value
               value = value.trim();
               
-              // Additional validation to prevent gibberish in CSV
+              // Additional validation to prevent gibberish in CSV (but allow international content)
               const isValidForCSV = value.length <= 1000 &&
-                !value.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) && // Not all special characters
-                !value.match(/^[\u4e00-\u9fff\u3400-\u4dbf]+$/u) && // Not Chinese characters
-                !value.match(/^[\u0400-\u04ff]+$/i) && // Not Cyrillic
-                !value.match(/^[\u0590-\u05ff]+$/i) && // Not Hebrew
-                !value.match(/^[\u0600-\u06ff]+$/i); // Not Arabic
+                !value.match(/^[^a-zA-Z0-9\s$%.,'\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff-]+$/) && // Allow international characters
+                (value.match(/[a-zA-Z0-9$%.,'-]/) || value.match(/[\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff]/)); // Allow international text
               
               if (!isValidForCSV) {
                 console.log(`⚠️ Filtering out invalid CSV value for ${col.id}:`, value);
@@ -8751,6 +8748,44 @@ async function loadPromptSplittingSettings() {
   }
 }
 
+// Helper function to extract numbers from descriptive text
+function extractNumberFromDescription(text, fieldType) {
+  if (!text || typeof text !== 'string') return text;
+  
+  try {
+    switch (fieldType) {
+      case 'bedrooms':
+        // Look for "Estimated X bedrooms" or similar patterns
+        const bedroomMatch = text.match(/(?:estimated?|approximately?|about|around)\s*(\d+)\s*bedroom/i) ||
+                            text.match(/(\d+)\s*(?:bedroom|bed\b|br\b)/i) ||
+                            text.match(/^(\d+)/);
+        return bedroomMatch ? bedroomMatch[1] : text;
+        
+      case 'bathrooms':
+        const bathroomMatch = text.match(/(?:estimated?|approximately?|about|around)\s*(\d+(?:\.\d+)?)\s*bathroom/i) ||
+                             text.match(/(\d+(?:\.\d+)?)\s*(?:bathroom|bath\b|ba\b)/i) ||
+                             text.match(/^(\d+(?:\.\d+)?)/);
+        return bathroomMatch ? bathroomMatch[1] : text;
+        
+      case 'squareFootage':
+        const sqftMatch = text.match(/(\d+[,\d]*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft)/i) ||
+                         text.match(/(?:approximately?|about|around)\s*(\d+[,\d]*)/i) ||
+                         text.match(/^(\d+[,\d]*)/);
+        return sqftMatch ? sqftMatch[1].replace(/,/g, '') : text;
+        
+      case 'yearBuilt':
+        const yearMatch = text.match(/(\d{4})/);
+        return yearMatch ? yearMatch[1] : text;
+        
+      default:
+        return text;
+    }
+  } catch (error) {
+    console.warn(`Error extracting number from ${fieldType}:`, error);
+    return text;
+  }
+}
+
 // Function to extract data from tabular format (pipe-delimited tables)
 function extractFromTabularFormat(responseText, analysis) {
   console.log('🔍 Attempting to extract data from tabular format...');
@@ -8870,20 +8905,20 @@ function extractFromTabularFormat(responseText, analysis) {
         cleanValue = cleanValue.replace(/^\s*-\s*/, ''); // Remove leading dash
         cleanValue = cleanValue.replace(/\s*\|\s*$/, ''); // Remove trailing pipe
         
-        // Validate the value isn't placeholder text, gibberish, or template text
+        // For numeric fields, try to extract numbers from descriptive text
+        if (['bedrooms', 'bathrooms', 'squareFootage', 'yearBuilt'].includes(columnId)) {
+          cleanValue = extractNumberFromDescription(cleanValue, columnId);
+        }
+        
+        // Validate the value isn't placeholder text, but allow international content
         const isValidData = cleanValue && 
           cleanValue.length >= 1 && 
           cleanValue.length <= 500 &&
           !cleanValue.match(/^(extract|include|numeric|professional|rating|assessment|analysis|top\s*\d+|buyer|seller|balanced|low|medium|high|rising|stable|declining)$/i) &&
           !cleanValue.match(/^\[.*\]$/) && // Not template brackets
           !cleanValue.match(/^(n\/a|na|not available|unknown|tbd|to be determined)$/i) &&
-          !cleanValue.match(/^[^a-zA-Z0-9\s$%.,'-]+$/) && // Not all special characters (gibberish)
-          !cleanValue.match(/^[\u4e00-\u9fff\u3400-\u4dbf\u{20000}-\u{2a6df}\u{2a700}-\u{2b73f}\u{2b740}-\u{2b81f}\u{2b820}-\u{2ceaf}\uf900-\ufaff\u3300-\u33ff\ufe30-\ufe4f\uf900-\ufaff\u{2f800}-\u{2fa1f}]+$/u) && // Not Chinese characters
-          !cleanValue.match(/^[\u0400-\u04ff]+$/i) && // Not Cyrillic
-          !cleanValue.match(/^[\u0590-\u05ff]+$/i) && // Not Hebrew
-          !cleanValue.match(/^[\u0600-\u06ff]+$/i) && // Not Arabic
-          cleanValue.match(/[a-zA-Z0-9$%.,'-]/) && // Contains valid characters
-          (cleanValue.match(/[a-zA-Z]/) || cleanValue.match(/\d/)); // Contains letters or numbers
+          !cleanValue.match(/^[^a-zA-Z0-9\s$%.,'\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff-]+$/) && // Allow international characters
+          (cleanValue.match(/[a-zA-Z0-9$%.,'-]/) || cleanValue.match(/[\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff]/)); // Allow international text
         
         if (isValidData) {
           // Don't overwrite existing data unless the new value is more complete
@@ -10324,7 +10359,21 @@ function validateAndCleanData(data) {
   try {
     // Clean and validate price
     if (cleanedData.price) {
-      let priceStr = String(cleanedData.price || '').replace(/[\$,]/g, '');
+      let priceValue = cleanedData.price;
+      
+      // Handle descriptive responses - extract the actual price
+      if (typeof priceValue === 'string') {
+        // Look for currency amounts in descriptive text
+        const priceMatch = priceValue.match(/[\$£€¥₪]?\s*(\d+[,\d]*(?:\.\d{2})?)\s*[kKmM]?/i) ||
+                          priceValue.match(/(?:priced?|asking|listed|sale)\s*(?:at|for)?\s*[\$£€¥₪]?\s*(\d+[,\d]*)/i) ||
+                          priceValue.match(/(\d+[,\d]*)\s*(?:thousand|million|k|m)\b/i);
+        if (priceMatch) {
+          priceValue = priceMatch[1].replace(/,/g, '');
+          console.log(`🔄 Extracted price: ${priceValue} from: ${cleanedData.price.substring(0, 100)}...`);
+        }
+      }
+      
+      let priceStr = String(priceValue || '').replace(/[\$,£€¥₪]/g, '');
       
       // Handle K and M suffixes
       if (priceStr.match(/k$/i)) {
@@ -10334,66 +10383,181 @@ function validateAndCleanData(data) {
       }
       
       const priceNum = parseFloat(priceStr);
-      if (!isNaN(priceNum) && priceNum >= 10000 && priceNum <= 50000000) {
+      if (!isNaN(priceNum) && priceNum >= 1000 && priceNum <= 100000000) { // Expanded range for international markets
         cleanedData.price = priceNum.toString();
+        console.log(`✅ Validated price: ${priceNum}`);
       } else {
-        console.warn('❌ Invalid price detected:', cleanedData.price, '→', priceNum);
+        console.warn('❌ Invalid price after parsing:', {
+          original: cleanedData.price,
+          parsed: priceValue,
+          cleaned: priceStr,
+          finalNumber: priceNum,
+          note: 'Could not extract valid price from descriptive text'
+        });
         delete cleanedData.price;
       }
     }
     
     // Clean and validate bedrooms
     if (cleanedData.bedrooms) {
-      const beds = parseInt(cleanedData.bedrooms);
-      if (beds >= 0 && beds <= 20) {
+      let bedroomValue = cleanedData.bedrooms;
+      
+      // Handle complex descriptive responses - extract the actual number
+      if (typeof bedroomValue === 'string') {
+        // Look for "Estimated X bedrooms" or similar patterns
+        const estimatedMatch = bedroomValue.match(/(?:estimated?|approximately?|about|around)\s*(\d+)\s*bedroom/i);
+        if (estimatedMatch) {
+          bedroomValue = estimatedMatch[1];
+          console.log(`🔄 Extracted estimated bedrooms: ${bedroomValue} from: ${cleanedData.bedrooms.substring(0, 100)}...`);
+        } else {
+          // Look for any number followed by "bedroom" or at the start
+          const numberMatch = bedroomValue.match(/(\d+)\s*(?:bedroom|bed\b|br\b)/i) || bedroomValue.match(/^(\d+)/);
+          if (numberMatch) {
+            bedroomValue = numberMatch[1];
+            console.log(`🔄 Extracted bedrooms number: ${bedroomValue} from: ${cleanedData.bedrooms.substring(0, 100)}...`);
+          }
+        }
+      }
+      
+      const beds = parseInt(bedroomValue);
+      if (!isNaN(beds) && beds >= 0 && beds <= 50) { // Expanded range for large properties
         cleanedData.bedrooms = beds.toString();
+        console.log(`✅ Validated bedrooms: ${beds}`);
       } else {
-        console.warn('❌ Invalid bedrooms count:', cleanedData.bedrooms);
+        console.warn('❌ Invalid bedrooms count after parsing:', {
+          original: cleanedData.bedrooms,
+          parsed: bedroomValue,
+          finalNumber: beds,
+          note: 'Could not extract valid bedroom count from descriptive text'
+        });
         delete cleanedData.bedrooms;
       }
     }
     
     // Clean and validate bathrooms
     if (cleanedData.bathrooms) {
-      const baths = parseFloat(cleanedData.bathrooms);
-      if (baths >= 0 && baths <= 20) {
+      let bathroomValue = cleanedData.bathrooms;
+      
+      // Handle complex descriptive responses - extract the actual number
+      if (typeof bathroomValue === 'string') {
+        // Look for "Estimated X bathrooms" or similar patterns
+        const estimatedMatch = bathroomValue.match(/(?:estimated?|approximately?|about|around)\s*(\d+(?:\.\d+)?)\s*bathroom/i);
+        if (estimatedMatch) {
+          bathroomValue = estimatedMatch[1];
+          console.log(`🔄 Extracted estimated bathrooms: ${bathroomValue} from: ${cleanedData.bathrooms.substring(0, 100)}...`);
+        } else {
+          // Look for any number (including decimals) followed by "bathroom" or at the start
+          const numberMatch = bathroomValue.match(/(\d+(?:\.\d+)?)\s*(?:bathroom|bath\b|ba\b)/i) || bathroomValue.match(/^(\d+(?:\.\d+)?)/);
+          if (numberMatch) {
+            bathroomValue = numberMatch[1];
+            console.log(`🔄 Extracted bathrooms number: ${bathroomValue} from: ${cleanedData.bathrooms.substring(0, 100)}...`);
+          }
+        }
+      }
+      
+      const baths = parseFloat(bathroomValue);
+      if (!isNaN(baths) && baths >= 0 && baths <= 50) { // Expanded range for large properties
         cleanedData.bathrooms = baths.toString();
+        console.log(`✅ Validated bathrooms: ${baths}`);
       } else {
-        console.warn('❌ Invalid bathrooms count:', cleanedData.bathrooms);
+        console.warn('❌ Invalid bathrooms count after parsing:', {
+          original: cleanedData.bathrooms,
+          parsed: bathroomValue,
+          finalNumber: baths,
+          note: 'Could not extract valid bathroom count from descriptive text'
+        });
         delete cleanedData.bathrooms;
       }
     }
     
     // Clean and validate square feet
     if (cleanedData.squareFeet) {
-      const sqft = parseInt(String(cleanedData.squareFeet || '').replace(/[,]/g, ''));
-      if (sqft >= 100 && sqft <= 50000) {
+      let sqftValue = cleanedData.squareFeet;
+      
+      // Handle descriptive responses - extract the actual number
+      if (typeof sqftValue === 'string') {
+        // Look for numbers followed by sq ft indicators
+        const sqftMatch = sqftValue.match(/(\d+[,\d]*)\s*(?:sq\.?\s*ft\.?|square\s*feet|sqft|square\s*meters?)/i) || 
+                         sqftValue.match(/(?:approximately?|about|around)\s*(\d+[,\d]*)/i) ||
+                         sqftValue.match(/^(\d+[,\d]*)/);
+        if (sqftMatch) {
+          sqftValue = sqftMatch[1].replace(/,/g, '');
+          console.log(`🔄 Extracted square feet: ${sqftValue} from: ${cleanedData.squareFeet.substring(0, 100)}...`);
+        }
+      }
+      
+      const sqft = parseInt(String(sqftValue || '').replace(/[,]/g, ''));
+      if (!isNaN(sqft) && sqft >= 50 && sqft <= 500000) { // Expanded range for tiny homes to large commercial
         cleanedData.squareFeet = sqft.toString();
+        console.log(`✅ Validated square feet: ${sqft}`);
       } else {
-        console.warn('❌ Invalid square footage:', cleanedData.squareFeet);
+        console.warn('❌ Invalid square footage after parsing:', {
+          original: cleanedData.squareFeet,
+          parsed: sqftValue,
+          finalNumber: sqft,
+          note: 'Could not extract valid square footage from descriptive text'
+        });
         delete cleanedData.squareFeet;
       }
     }
     
     // Clean and validate year built
     if (cleanedData.yearBuilt) {
-      const year = parseInt(cleanedData.yearBuilt);
+      let yearValue = cleanedData.yearBuilt;
+      
+      // Handle descriptive responses - extract the year
+      if (typeof yearValue === 'string') {
+        // Look for 4-digit years
+        const yearMatch = yearValue.match(/(\d{4})/);
+        if (yearMatch) {
+          yearValue = yearMatch[1];
+          console.log(`🔄 Extracted year built: ${yearValue} from: ${cleanedData.yearBuilt.substring(0, 100)}...`);
+        }
+      }
+      
+      const year = parseInt(yearValue);
       const currentYear = new Date().getFullYear();
-      if (year >= 1800 && year <= currentYear) {
+      if (!isNaN(year) && year >= 1600 && year <= currentYear) { // Expanded range for historic properties
         cleanedData.yearBuilt = year.toString();
+        console.log(`✅ Validated year built: ${year}`);
       } else {
-        console.warn('❌ Invalid year built:', cleanedData.yearBuilt);
+        console.warn('❌ Invalid year built after parsing:', {
+          original: cleanedData.yearBuilt,
+          parsed: yearValue,
+          finalNumber: year,
+          note: 'Could not extract valid year from descriptive text'
+        });
         delete cleanedData.yearBuilt;
       }
     }
     
     // Clean and validate estimated rental income
     if (cleanedData.estimatedRentalIncome) {
-      const rental = parseFloat(String(cleanedData.estimatedRentalIncome || '').replace(/[\$,]/g, ''));
-      if (rental >= 100 && rental <= 50000) {
+      let rentalValue = cleanedData.estimatedRentalIncome;
+      
+      // Handle descriptive responses - extract the actual amount
+      if (typeof rentalValue === 'string') {
+        // Look for currency amounts
+        const rentalMatch = rentalValue.match(/[\$£€¥]?\s*(\d+[,\d]*(?:\.\d{2})?)/i) ||
+                           rentalValue.match(/(?:estimated?|approximately?|about|around)\s*[\$£€¥]?\s*(\d+[,\d]*)/i) ||
+                           rentalValue.match(/(\d+[,\d]*)\s*(?:per\s*month|monthly|\/month)/i);
+        if (rentalMatch) {
+          rentalValue = rentalMatch[1].replace(/,/g, '');
+          console.log(`🔄 Extracted rental income: ${rentalValue} from: ${cleanedData.estimatedRentalIncome.substring(0, 100)}...`);
+        }
+      }
+      
+      const rental = parseFloat(String(rentalValue || '').replace(/[\$,£€¥]/g, ''));
+      if (!isNaN(rental) && rental >= 50 && rental <= 100000) { // Expanded range for different markets
         cleanedData.estimatedRentalIncome = rental.toString();
+        console.log(`✅ Validated rental income: ${rental}`);
       } else {
-        console.warn('❌ Invalid rental income:', cleanedData.estimatedRentalIncome);
+        console.warn('❌ Invalid rental income after parsing:', {
+          original: cleanedData.estimatedRentalIncome,
+          parsed: rentalValue,
+          finalNumber: rental,
+          note: 'Could not extract valid rental amount from descriptive text'
+        });
         delete cleanedData.estimatedRentalIncome;
       }
     }
