@@ -8883,6 +8883,28 @@ async function loadPromptSplittingSettings() {
   }
 }
 
+// Safety function to ensure no objects are stored in analysis data
+function safeSetAnalysisData(analysis, key, value) {
+  if (typeof value === 'object' && value !== null) {
+    console.warn(`⚠️ Preventing object storage in analysis.extractedData[${key}]:`, value);
+    
+    // Try to extract meaningful data from the object
+    if (value.toString && typeof value.toString === 'function') {
+      analysis.extractedData[key] = value.toString();
+    } else if (value.value !== undefined) {
+      analysis.extractedData[key] = String(value.value);
+    } else if (value.text !== undefined) {
+      analysis.extractedData[key] = String(value.text);
+    } else {
+      analysis.extractedData[key] = JSON.stringify(value);
+    }
+    
+    console.log(`🔄 Safely converted ${key} to string:`, analysis.extractedData[key]);
+  } else {
+    analysis.extractedData[key] = value;
+  }
+}
+
 // Helper function to extract numbers from descriptive text
 function extractNumberFromDescription(text, fieldType) {
   if (!text || typeof text !== 'string') return text;
@@ -9171,13 +9193,10 @@ function extractFromTabularFormat(responseText, analysis) {
           (cleanValue.match(/[a-zA-Z0-9$%.,'-]/) || cleanValue.match(/[\u0590-\u05ff\u4e00-\u9fff\u0400-\u04ff\u0600-\u06ff]/)); // Allow international text
         
         if (isValidData) {
-          // Ensure the value is always a string, never an object
-          const stringValue = String(cleanValue);
-          
           // Don't overwrite existing data unless the new value is more complete
-          if (!analysis.extractedData[columnId] || stringValue.length > (String(analysis.extractedData[columnId] || '')).length) {
-            analysis.extractedData[columnId] = stringValue;
-            console.log(`✅ Extracted from table - ${columnId}:`, stringValue);
+          if (!analysis.extractedData[columnId] || cleanValue.length > (String(analysis.extractedData[columnId] || '')).length) {
+            safeSetAnalysisData(analysis, columnId, cleanValue);
+            console.log(`✅ Extracted from table - ${columnId}:`, analysis.extractedData[columnId]);
             extractedCount++;
           }
         } else {
@@ -9235,13 +9254,15 @@ function extractFromTabularFormat(responseText, analysis) {
           cleanMetricValue.match(/[a-zA-Z0-9$%.,'-]/); // Contains valid characters
         
         if (isValidMetric) {
-          // Ensure the value is always a string, never an object
-          const stringMetricValue = String(cleanMetricValue);
-          
           // Don't overwrite existing calculated metrics unless the new value is more complete
-          if (!analysis.calculatedMetrics[metricId] || stringMetricValue.length > (String(analysis.calculatedMetrics[metricId] || '')).length) {
-            analysis.calculatedMetrics[metricId] = stringMetricValue;
-            console.log(`✅ Extracted calculated metric - ${metricId}:`, stringMetricValue);
+          if (!analysis.calculatedMetrics[metricId] || cleanMetricValue.length > (String(analysis.calculatedMetrics[metricId] || '')).length) {
+            // Ensure calculated metrics are also stored safely
+            if (typeof cleanMetricValue === 'object' && cleanMetricValue !== null) {
+              analysis.calculatedMetrics[metricId] = String(cleanMetricValue);
+            } else {
+              analysis.calculatedMetrics[metricId] = cleanMetricValue;
+            }
+            console.log(`✅ Extracted calculated metric - ${metricId}:`, analysis.calculatedMetrics[metricId]);
             extractedCount++;
           }
         } else {
@@ -9271,10 +9292,8 @@ function extractFromTabularFormat(responseText, analysis) {
           cleanValue.match(/[a-zA-Z0-9$%.,'-]/);
         
         if (isValidColonData && !analysis.extractedData[columnId]) {
-          // Ensure the value is always a string, never an object
-          const stringValue = String(cleanValue);
-          analysis.extractedData[columnId] = stringValue;
-          console.log(`✅ Extracted from colon format - ${columnId}:`, stringValue);
+          safeSetAnalysisData(analysis, columnId, cleanValue);
+          console.log(`✅ Extracted from colon format - ${columnId}:`, analysis.extractedData[columnId]);
           extractedCount++;
         }
       }
@@ -9298,10 +9317,8 @@ function extractFromTabularFormat(responseText, analysis) {
             if (flexValue.length > 0 && flexValue.length <= 200 && 
                 !flexValue.match(/^(extract|include|analysis|assessment)$/i) &&
                 flexValue.match(/[a-zA-Z0-9$%]/)) {
-              // Ensure the value is always a string, never an object
-              const stringValue = String(flexValue);
-              analysis.extractedData[columnId] = stringValue;
-              console.log(`✅ Flexible extraction - ${columnId}:`, stringValue);
+              safeSetAnalysisData(analysis, columnId, flexValue);
+              console.log(`✅ Flexible extraction - ${columnId}:`, analysis.extractedData[columnId]);
               extractedCount++;
             }
           }
@@ -9868,8 +9885,9 @@ function extractPropertyAnalysisData(responseText) {
         }
         
         if (bestMatch) {
-          analysis.extractedData[key] = bestMatch;
-          console.log(`✅ Extracted ${key} from Property Details:`, bestMatch);
+          // Use safe storage function to prevent objects
+          safeSetAnalysisData(analysis, key, bestMatch);
+          console.log(`✅ Extracted ${key} from Property Details:`, analysis.extractedData[key]);
         } else {
           console.log(`❌ Failed to extract ${key} from Property Details section`);
           if (key === 'streetName' || key === 'price') {
@@ -10036,7 +10054,8 @@ function extractPropertyAnalysisData(responseText) {
     // Extract location score in X/10 format
     const locationScoreMatch = text.match(/(\d+)\/10/);
     if (locationScoreMatch) {
-      analysis.extractedData.locationScore = `${locationScoreMatch[1]}/10`;
+      const scoreValue = `${locationScoreMatch[1]}/10`;
+      analysis.extractedData.locationScore = typeof scoreValue === 'object' ? String(scoreValue) : scoreValue;
       console.log(`✅ Extracted location score:`, analysis.extractedData.locationScore);
     }
     
@@ -10138,10 +10157,11 @@ function extractPropertyAnalysisData(responseText) {
         }
       }
       
-      if (bestMatch) {
-        analysis.extractedData[fieldName] = bestMatch;
-        console.log(`✅ Extracted ${fieldName} (fallback):`, bestMatch);
-      } else {
+              if (bestMatch) {
+          // Use safe storage function to prevent objects
+          safeSetAnalysisData(analysis, fieldName, bestMatch);
+          console.log(`✅ Extracted ${fieldName} (fallback):`, analysis.extractedData[fieldName]);
+        } else {
         console.log(`❌ Failed to extract ${fieldName} from full response`);
         // Show sample text around potential matches for debugging
         if (fieldName === 'price') {
@@ -10623,7 +10643,20 @@ function validateAndCleanData(data) {
     for (const [key, value] of Object.entries(cleanedData)) {
       if (typeof value === 'object' && value !== null) {
         console.log(`⚠️ Converting object to string for ${key}:`, value);
-        cleanedData[key] = String(value);
+        console.log(`⚠️ Object details:`, JSON.stringify(value, null, 2));
+        
+        // Try to extract meaningful data from the object
+        if (value.toString && typeof value.toString === 'function') {
+          cleanedData[key] = value.toString();
+        } else if (value.value !== undefined) {
+          cleanedData[key] = String(value.value);
+        } else if (value.text !== undefined) {
+          cleanedData[key] = String(value.text);
+        } else {
+          cleanedData[key] = JSON.stringify(value);
+        }
+        
+        console.log(`🔄 Converted to:`, cleanedData[key]);
       }
     }
     // Clean and validate price
@@ -10678,9 +10711,22 @@ function validateAndCleanData(data) {
       let bedroomValue = cleanedData.bedrooms;
       
       // Handle object values - convert to string first
-      if (typeof bedroomValue === 'object') {
+      if (typeof bedroomValue === 'object' && bedroomValue !== null) {
         console.log('⚠️ Bedrooms value is an object, converting to string:', bedroomValue);
-        bedroomValue = String(bedroomValue);
+        console.log('⚠️ Object content:', JSON.stringify(bedroomValue, null, 2));
+        
+        // Try multiple ways to extract meaningful data
+        if (bedroomValue.toString && typeof bedroomValue.toString === 'function') {
+          bedroomValue = bedroomValue.toString();
+        } else if (bedroomValue.value !== undefined) {
+          bedroomValue = String(bedroomValue.value);
+        } else if (bedroomValue.text !== undefined) {
+          bedroomValue = String(bedroomValue.text);
+        } else {
+          bedroomValue = JSON.stringify(bedroomValue);
+        }
+        
+        console.log('🔄 Converted bedroom value to:', bedroomValue);
       }
       
       // Handle complex descriptive responses - extract the actual number
@@ -10720,9 +10766,21 @@ function validateAndCleanData(data) {
       let bathroomValue = cleanedData.bathrooms;
       
       // Handle object values - convert to string first
-      if (typeof bathroomValue === 'object') {
+      if (typeof bathroomValue === 'object' && bathroomValue !== null) {
         console.log('⚠️ Bathrooms value is an object, converting to string:', bathroomValue);
-        bathroomValue = String(bathroomValue);
+        console.log('⚠️ Object content:', JSON.stringify(bathroomValue, null, 2));
+        
+        if (bathroomValue.toString && typeof bathroomValue.toString === 'function') {
+          bathroomValue = bathroomValue.toString();
+        } else if (bathroomValue.value !== undefined) {
+          bathroomValue = String(bathroomValue.value);
+        } else if (bathroomValue.text !== undefined) {
+          bathroomValue = String(bathroomValue.text);
+        } else {
+          bathroomValue = JSON.stringify(bathroomValue);
+        }
+        
+        console.log('🔄 Converted bathroom value to:', bathroomValue);
       }
       
       // Handle complex descriptive responses - extract the actual number
@@ -10799,9 +10857,22 @@ function validateAndCleanData(data) {
       let yearValue = cleanedData.yearBuilt;
       
       // Handle object values - convert to string first
-      if (typeof yearValue === 'object') {
+      if (typeof yearValue === 'object' && yearValue !== null) {
         console.log('⚠️ Year built value is an object, converting to string:', yearValue);
-        yearValue = String(yearValue);
+        console.log('⚠️ Object content:', JSON.stringify(yearValue, null, 2));
+        
+        // Try multiple ways to extract meaningful data
+        if (yearValue.toString && typeof yearValue.toString === 'function') {
+          yearValue = yearValue.toString();
+        } else if (yearValue.value !== undefined) {
+          yearValue = String(yearValue.value);
+        } else if (yearValue.text !== undefined) {
+          yearValue = String(yearValue.text);
+        } else {
+          yearValue = JSON.stringify(yearValue);
+        }
+        
+        console.log('🔄 Converted year value to:', yearValue);
       }
       
       // Handle descriptive responses - extract the year
