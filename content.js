@@ -1191,6 +1191,10 @@ class REAnalyzerEmbeddedUI {
               <div>📊</div>
               <span>Export CSV</span>
             </button>
+            <button class="re-btn re-btn-primary re-btn-full" id="re-export-direct-table">
+              <div>⚡</div>
+              <span>Direct Table Export</span>
+            </button>
             <button class="re-btn re-btn-secondary re-btn-full" id="re-export-prompts">
               <div>📤</div>
               <span>Export Settings</span>
@@ -1673,6 +1677,11 @@ class REAnalyzerEmbeddedUI {
 
     if (exportCsvBtn) {
       exportCsvBtn.addEventListener('click', () => this.exportPropertiesToCSV());
+    }
+
+    const exportDirectTableBtn = this.panel.querySelector('#re-export-direct-table');
+    if (exportDirectTableBtn) {
+      exportDirectTableBtn.addEventListener('click', () => this.exportTabularDataDirectly());
     }
 
     if (testBtn) {
@@ -2567,6 +2576,65 @@ class REAnalyzerEmbeddedUI {
     }
   }
 
+  async exportTabularDataDirectly() {
+    console.log('🚀 Direct tabular data export - bypassing all complex extraction');
+    
+    try {
+      // Get the latest ChatGPT response directly from the page
+      const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+      if (messages.length === 0) {
+        this.showChatGPTMessage('warning', 'No ChatGPT responses found on this page');
+        return;
+      }
+      
+      const latestMessage = messages[messages.length - 1];
+      const responseText = latestMessage.textContent || latestMessage.innerText || '';
+      
+      if (!responseText.includes('Data Point')) {
+        this.showChatGPTMessage('warning', 'No tabular data found in latest ChatGPT response');
+        return;
+      }
+      
+      console.log('📊 Found tabular data, parsing directly...');
+      const tables = parseTableToCSV(responseText);
+      
+      if (tables.length === 0) {
+        this.showChatGPTMessage('warning', 'Could not parse tabular data');
+        return;
+      }
+      
+      // Create CSV content
+      let csvContent = 'Property Index,URL,Domain,Analysis Date,Table Index,Data Point,Value\n';
+      
+      tables.forEach((table, tableIndex) => {
+        const tableLines = table.csvContent.split('\n');
+        
+        tableLines.forEach(line => {
+          if (line.trim()) {
+            // Add metadata + table data
+            csvContent += `1,"Current Page","chatgpt.com","${new Date().toLocaleDateString()}",${tableIndex + 1},${line}\n`;
+          }
+        });
+      });
+      
+      // Download the file
+      const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `chatgpt-table-direct-${Date.now()}.csv`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      this.showChatGPTMessage('success', `✅ Direct export completed! ${tables.length} tables converted to CSV.`);
+      
+    } catch (error) {
+      console.error('❌ Direct tabular export failed:', error);
+      this.showChatGPTMessage('error', 'Direct tabular export failed');
+    }
+  }
+
   async testTableParsing() {
     console.log('🧪 Testing table parsing with sample data...');
     
@@ -2682,11 +2750,23 @@ Maintenance Risk	N/A	N/A`;
 
   async exportDirectTableToCSV() {
     try {
-      // Load all property data
-      const result = await safeChromeFall(
+      // Load all property data with fallback to localStorage
+      let result = await safeChromeFall(
         () => chrome.storage.local.get(['propertyHistory']),
-        { propertyHistory: [] }
+        null
       );
+      
+      // Fallback to localStorage if extension context is invalid
+      if (!result) {
+        console.log('🔄 Using localStorage fallback for property data');
+        try {
+          const localData = localStorage.getItem('reAnalyzer_propertyHistory');
+          result = localData ? { propertyHistory: JSON.parse(localData) } : { propertyHistory: [] };
+        } catch (e) {
+          console.warn('Failed to load from localStorage:', e);
+          result = { propertyHistory: [] };
+        }
+      }
       
       const properties = result.propertyHistory || [];
       
@@ -9451,7 +9531,20 @@ function extractPropertyAnalysisData(responseText) {
     extractFromInvestmentSummary(structuredSections.investmentSummary, analysis);
   }
   
-  // Try to extract from tabular format (pipe-delimited tables)
+  // Skip complex extraction for tabular data to prevent object errors
+  if (responseText.includes('Data Point') && responseText.includes('Value')) {
+    console.log('🔄 Tabular data detected, skipping complex extraction to prevent validation errors');
+    console.log('💡 Use direct table export (CSV button) for clean output');
+    
+    // Store the full response for direct table parsing
+    analysis.fullResponse = responseText;
+    analysis.isTabularFormat = true;
+    
+    // Skip all complex extraction and return
+    return analysis;
+  }
+  
+  // Try to extract from tabular format (pipe-delimited tables) - only for non-tabular data
   extractFromTabularFormat(responseText, analysis);
   
   // Enhanced extraction with multiple strategies for each data type (fallback for unstructured responses)
