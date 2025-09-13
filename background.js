@@ -144,7 +144,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       hasFullResponse: !!request.analysisData?.fullResponse,
       responseLength: request.analysisData?.fullResponse?.length || 0,
       extractedDataKeys: Object.keys(request.analysisData?.extractedData || {}),
-      extractedDataCount: Object.keys(request.analysisData?.extractedData || {}).length
+      extractedDataCount: Object.keys(request.analysisData?.extractedData || {}).length,
+      promptType: request.analysisData?.promptType || 'unknown'
     });
     
     (async () => {

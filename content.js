@@ -2454,9 +2454,15 @@ class REAnalyzerEmbeddedUI {
             View Analysis
           </button>
                       ${hasAnalysis ? `
-              <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
+              ${isCSVExportAvailable(property) ? `
+                <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}" title="Export to CSV (Tabular Data)">
                 📊 CSV
               </button>
+              ` : `
+                <button class="re-btn re-btn-ghost re-btn-sm" disabled title="CSV export only available for Tabular Data prompts">
+                  📊 CSV
+                </button>
+              `}
             ` : `
             <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
               Analyze
@@ -2582,38 +2588,56 @@ class REAnalyzerEmbeddedUI {
         return;
       }
       
-      // Get comprehensive column set for tabular data
-      const columns = getTabularDataColumns();
+      // Filter properties that have CSV export available
+      const exportableProperties = properties.filter(property => isCSVExportAvailable(property));
+      
+      if (exportableProperties.length === 0) {
+        this.showChatGPTMessage('warning', 'No properties with tabular data available for CSV export. Only properties analyzed with "Tabular Data" prompts can be exported to CSV.');
+        return;
+      }
+      
+      // Get unified column system
+      const unifiedSystem = getUnifiedColumnSystem();
+      const columns = Object.values(unifiedSystem).filter(col => col.enabled);
       
       // Create CSV headers
       const headers = [
         'URL',
         'Domain', 
         'Analysis Date',
+        'Prompt Type',
         ...columns.map(col => col.name)
       ];
       
       // Create CSV rows
       const rows = [headers];
       
-      properties.forEach(property => {
-        if (property.analysis) {
+      for (const property of exportableProperties) {
+        // Parse ChatGPT response directly for accurate data
+        const directData = await parseChatGPTResponseDirectly(property.analysis.fullResponse, unifiedSystem);
+        
           const row = [
             property.url || '',
             property.domain || '',
-            property.date || ''
+          property.date || '',
+          property.analysis.promptType || 'unknown',
           ];
           
-          // Add extracted data columns
+        // Add data for each column using direct parsing
           columns.forEach(col => {
             let value = '';
             
-            if (col.isCalculated) {
-              // Get from calculated metrics
-              value = property.analysis.calculatedMetrics?.[col.id] || '';
-            } else {
-              // Get from extracted data
-              value = property.analysis.extractedData?.[col.id] || '';
+          // Try direct parsing first, then fallback to extracted data
+          if (directData && directData[col.id]) {
+            value = directData[col.id];
+          } else if (property.analysis.extractedData) {
+            // Try to find value using aliases
+            for (const alias of col.aliases) {
+              if (property.analysis.extractedData[alias]) {
+                value = property.analysis.extractedData[alias];
+                break;
+              }
+            }
             }
             
             // Format value for CSV
@@ -2631,7 +2655,6 @@ class REAnalyzerEmbeddedUI {
           
           rows.push(row);
         }
-      });
       
       // Convert to CSV string
       const csvContent = rows.map(row => row.join(',')).join('\n');
@@ -2641,14 +2664,13 @@ class REAnalyzerEmbeddedUI {
       
       const link = document.createElement('a');
       link.href = URL.createObjectURL(dataBlob);
-      link.download = `property-analysis-comprehensive-${Date.now()}.csv`;
+      link.download = `property-analysis-${new Date().toISOString().split('T')[0]}.csv`;
       
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      const analyzedCount = properties.filter(p => p.analysis && p.analysis.extractedData).length;
-      this.showChatGPTMessage('success', `Exported ${analyzedCount} analyzed properties to CSV with ${columns.length} columns!`);
+      this.showChatGPTMessage('success', `Exported ${exportableProperties.length} properties with tabular data to CSV with ${columns.length} columns!`);
       
     } catch (error) {
       console.error('❌ Failed to export properties to CSV:', error);
@@ -3762,15 +3784,26 @@ Or enter your own property URL:`);
             <span class="re-property-domain">${this.getDomainDisplayName(property.domain)}</span>
             <span class="re-property-date">${property.date || 'Unknown date'}</span>
             ${hasAnalysis ? `<span class="re-analysis-date">Analyzed: ${analysisDate}</span>` : ''}
+            ${hasAnalysis && property.analysis.promptType ? `
+              <span class="re-prompt-type-badge re-prompt-type-${property.analysis.promptType}" title="Analysis prompt type: ${property.analysis.promptType}">
+                ${this.getPromptTypeDisplayName(property.analysis.promptType)}
+              </span>
+            ` : ''}
           </div>
           <div class="re-property-actions">
             <button class="re-btn re-btn-ghost re-btn-sm re-view-btn" data-property-url="${property.url}">
               View
             </button>
             ${hasAnalysis ? `
-              <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}">
+              ${isCSVExportAvailable(property) ? `
+                <button class="re-btn re-btn-secondary re-btn-sm re-export-btn" data-property-url="${property.url}" title="Export to CSV (Tabular Data)">
                 📊 CSV
               </button>
+              ` : `
+                <button class="re-btn re-btn-ghost re-btn-sm" disabled title="CSV export only available for Tabular Data prompts">
+                  📊 CSV
+                </button>
+              `}
             ` : `
               <button class="re-btn re-btn-primary re-btn-sm re-analyze-btn" data-property-url="${property.url}">
                 Analyze
@@ -3804,6 +3837,18 @@ Or enter your own property URL:`);
     };
     
     return domainNames[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
+  }
+
+  getPromptTypeDisplayName(promptType) {
+    const typeNames = {
+      'default': 'Standard',
+      'dynamic': 'Dynamic',
+      'tabular': 'Tabular',
+      'custom': 'Custom',
+      'unknown': 'Unknown'
+    };
+    
+    return typeNames[promptType] || 'Unknown';
   }
 
   getPropertyDisplayInfo(property) {
@@ -4541,47 +4586,55 @@ Or enter your own property URL:`);
         return;
       }
       
+      // Check if CSV export is available for this property
+      if (!isCSVExportAvailable(property)) {
+        this.showChatGPTMessage('warning', 'CSV export is not available for this property. Only properties analyzed with "Tabular Data" prompts can be exported to CSV.');
+        return;
+      }
+      
+      // Get unified column system
+      const unifiedSystem = getUnifiedColumnSystem();
+      const columns = Object.values(unifiedSystem).filter(col => col.enabled);
+      
       // Create CSV headers
       const headers = [
         'Property URL',
         'Domain',
         'Analysis Date',
-        'Address',
-        'Price',
-        'Bedrooms',
-        'Bathrooms',
-        'Square Feet',
-        'Property Type',
-        'Year Built',
-        'Neighborhood',
-        'Location Score',
-        'Estimated Rental Income',
-        'Investment Grade',
-        'Key Advantages',
-        'Key Concerns'
+        'Prompt Type',
+        ...columns.map(col => col.name)
       ];
       
-      const data = property.analysis.extractedData || {};
+      // Parse ChatGPT response directly for accurate data
+      const directData = await parseChatGPTResponseDirectly(property.analysis.fullResponse, unifiedSystem);
       
       // Create single property row
       const row = [
         property.url || '',
         property.domain || '',
         property.date || '',
-        data.address || data['Property Address'] || data['Street Name'] || '',
-        data.price || data['Property Price'] || data['Asking Price'] || '',
-        data.bedrooms || data['Number of Bedrooms'] || data['Bedrooms'] || '',
-        data.bathrooms || data['Bathrooms'] || '',
-        data.squareFootage || data['Square Footage'] || data.sqft || '',
-        data.propertyType || data['Type of Property'] || data['Property Type'] || '',
-        data.yearBuilt || data['Year Built'] || '',
-        data.neighborhood || data['Neighborhood'] || '',
-        data.locationScore || data['Location Score'] || '',
-        data.estimatedRentalIncome || data['Estimated Monthly Rent'] || '',
-        data.investmentGrade || data['Investment Grade'] || '',
-        data.pros || data['Key Advantages'] || '',
-        data.cons || data['Key Concerns'] || ''
+        property.analysis.promptType || 'unknown',
       ];
+      
+      // Add data for each column using direct parsing
+      columns.forEach(col => {
+        let value = '';
+        
+        // Try direct parsing first, then fallback to extracted data
+        if (directData && directData[col.id]) {
+          value = directData[col.id];
+        } else if (property.analysis.extractedData) {
+          // Try to find value using aliases
+          for (const alias of col.aliases) {
+            if (property.analysis.extractedData[alias]) {
+              value = property.analysis.extractedData[alias];
+              break;
+            }
+          }
+        }
+        
+        row.push(value);
+      });
       
       // Escape CSV values that contain commas or quotes
       const escapedRow = row.map(value => {
@@ -7126,18 +7179,43 @@ function detectConfirmation(responseText) {
 
 // Helper function to validate property links
 function isValidPropertyLink(link) {
+  // Handle null/undefined cases
   if (!link || 
       link === 'null' || 
       link === 'undefined' || 
       link === null || 
-      link === undefined ||
-      typeof link !== 'string' ||
-      link.trim().length === 0) {
+      link === undefined) {
+    return false;
+  }
+  
+  // Handle object types - try to extract URL
+  if (typeof link === 'object') {
+    console.warn('⚠️ Property link is an object, attempting to extract URL...');
+    if (link.url && typeof link.url === 'string') {
+      link = link.url;
+    } else if (link.href && typeof link.href === 'string') {
+      link = link.href;
+    } else if (link.toString && typeof link.toString === 'function') {
+      link = link.toString();
+    } else {
+      console.warn('⚠️ Cannot extract URL from object property link:', link);
+      return false;
+    }
+  }
+  
+  // Ensure it's a string
+  if (typeof link !== 'string') {
+    console.warn('⚠️ Property link is not a string after conversion:', typeof link, link);
+    return false;
+  }
+  
+  // Check for empty string
+  const trimmedLink = link.trim();
+  if (trimmedLink.length === 0) {
     return false;
   }
   
   // Additional URL format validation
-  const trimmedLink = link.trim();
   try {
     new URL(trimmedLink);
     return true;
@@ -7474,53 +7552,57 @@ async function handleSplittingFallback() {
 
 // Helper function to get default prompt template
 function getDefaultPromptTemplate() {
-  return `You are a professional real estate investment analyst. Please analyze this property listing and provide a comprehensive assessment focusing on the following key data points that will be used for Excel export and comparison:
+  return `# Real Estate Data Extraction Prompt Instructions
 
-**REQUIRED DATA EXTRACTION:**
-1. **Street Name**: Property street address (e.g., "123 Main Street")
-2. **Property Price**: Exact asking price (include currency symbol)
-3. **Number of Bedrooms**: Number of bedrooms (numeric)
-4. **Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)
+## Objective
+Extract real estate property data from web pages and present it in a clear, compact tabular format.
 
-**ANALYSIS STRUCTURE:**
-Please organize your response with clear sections:
+## Instructions
 
-**PROPERTY DETAILS:**
-- List all the required data points above in a clear format
-- Include any additional relevant specifications (lot size, parking, etc.)
+### Data Extraction Requirements
+- Extract only the specified data points from the current web page
+- Present data in a simple two-column table format
+- Use clear, concise language
+- Focus on accuracy over completeness
 
-**LOCATION & NEIGHBORHOOD ANALYSIS:**
-- Provide your location score (X/10) with detailed justification
-- Analyze proximity to schools, shopping, transportation, employment centers
-- Assess neighborhood safety, walkability, and future development plans
-- Comment on property taxes, HOA fees, and local regulations
+### Output Format
+Present extracted data using this exact markdown table structure (NOT PostgreSQL format):
 
-**RENTAL INCOME ANALYSIS:**
-- Provide your estimated monthly rental income with reasoning
-- Compare to local rental comps if possible
-- Assess rental growth potential ("Growth: High", "Growth: Strong", "Growth: Moderate", "Growth: Low", or "Growth: Limited") with specific factors:
-  * Population growth trends
-  * Economic development in the area
-  * New construction and inventory levels
-  * Employment opportunities and job market
-  * Infrastructure improvements planned
+| Property Data | Value |
+|---------------|-------|
+| Price | [extracted price] |
+| Location | [extracted location] |
+| Estimated Rent | [extracted rent amount] |
+| Number of Rooms | [extracted room count] |
 
-**INVESTMENT SUMMARY:**
-- Overall investment grade and reasoning
-- Top 3 advantages (pros)
-- Top 3 concerns or limitations (cons)
-- Any red flags or warning signs
-- Price comparison to market value
-- Recommendation for this property as a rental investment
+### Extraction Guidelines
+- **Price**: Look for purchase price, listing price, or asking price
+- **Location**: Extract full address or neighborhood/area name
+- **Estimated Rent**: Find rental income estimates or market rent values
+- **Number of Rooms**: Count bedrooms, total rooms, or room specifications
 
-**FORMAT REQUIREMENTS:**
-- Use clear headings and bullet points
-- Include specific numbers and percentages where possible
-- Provide location score in X/10 format
-- Categorize rental growth potential clearly
-- Be concise but thorough in your analysis
+### Response Format
+- Use markdown table syntax with proper pipe separators (|)
+- Include table headers with dashes (|-------|)
+- If a data point is not found, use "Not specified" as the value
+- Keep responses brief and focused
+- Do not include explanations or additional commentary
+- **IMPORTANT: Provide ONLY the markdown table above. Do not include any analysis, commentary, or additional information.**
+- **CRITICAL: Use markdown table format, NOT PostgreSQL or any other database format.**
 
-Focus on data accuracy and practical investment considerations that would be valuable for property comparison and decision-making.
+### Example Output
+| Property Data | Value |
+|---------------|-------|
+| Price | $450,000 |
+| Location | 123 Main Street, Downtown |
+| Estimated Rent | $2,500/month |
+| Number of Rooms | 3 bedrooms, 2 bathrooms |
+
+## Notes
+- Prioritize accuracy over speed
+- If multiple values exist for the same data point, use the most prominent or recent one
+- Maintain consistency in formatting and terminology
+- **CRITICAL: Your response must contain ONLY the markdown table in the specified format. No analysis, no explanations, no additional content.**
 
 Property Link: {PROPERTY_URL}`;
 }
@@ -7721,49 +7803,60 @@ Thank you for providing accurate, structured data for investment analysis.`;
 
 // Default tabular prompt template with placeholder for columns
 function getDefaultTabularPromptTemplate() {
-  return `You are a professional real estate data analyst specializing in extracting structured property data for investment analysis. Please analyze the provided property listing and extract the following data points in a structured tabular format suitable for spreadsheet import and export.
+  return `# Real Estate Data Extraction Prompt Instructions
 
-**TABULAR OUTPUT FORMAT REQUIREMENTS:**
-- Provide your analysis in a structured tabular format suitable for spreadsheet import and export
-- Use clear column headers and consistent data formatting
-- Include currency symbols, proper number formatting, and standardized text
-- Organize data in rows and columns with clear labels
-- Format output as a table that can be easily copied into Excel or Google Sheets
+## Objective
+Extract real estate property data from web pages and present it in a clear, compact tabular format.
 
-**PROPERTY DATA EXTRACTION REQUIREMENTS:**
+## Instructions
+
+### Data Extraction Requirements
+- Extract only the specified data points from the current web page
+- Present data in a simple two-column table format
+- Use clear, concise language
+- Focus on accuracy over completeness
+
+### Output Format
+Present extracted data using this exact table structure:
+
+\`\`\`
+Property Data | Value
+Price | [extracted price]
+Location | [extracted location]
+Estimated Rent | [extracted rent amount]
+Number of Rooms | [extracted room count]
+\`\`\`
+
+### Extraction Guidelines
+- **Price**: Look for purchase price, listing price, or asking price
+- **Location**: Extract full address or neighborhood/area name
+- **Estimated Rent**: Find rental income estimates or market rent values
+- **Number of Rooms**: Count bedrooms, total rooms, or room specifications
+
+### Response Format
+- Use markdown table syntax
+- If a data point is not found, use "Not specified" as the value
+- Keep responses brief and focused
+- Do not include explanations or additional commentary
+
+### Example Output
+\`\`\`
+Property Data | Value
+Price | $450,000
+Location | 123 Main Street, Downtown
+Estimated Rent | $2,500/month
+Number of Rooms | 3 bedrooms, 2 bathrooms
+\`\`\`
+
+## Notes
+- Prioritize accuracy over speed
+- If multiple values exist for the same data point, use the most prominent or recent one
+- Maintain consistency in formatting and terminology
 
 {{COLUMNS}}
 
-**DATA FORMAT REQUIREMENTS:**
-- Use exact numbers and percentages where applicable
-- Include currency symbols for monetary values
-- Use consistent text formatting for categorical data
-- Mark unavailable data as "N/A" or leave blank
-- Ensure all numeric values are properly formatted
-- Use standardized abbreviations for consistency
-
-**TABULAR OUTPUT FORMAT:**
-Please provide your analysis in a structured tabular format with the following structure:
-
-**PROPERTY DATA TABLE:**
-| Data Point | Value |
-|------------|-------|
-[For each requested data point above, create a row with the data point name and extracted value]
-
-**CALCULATED METRICS TABLE:** (if applicable)
-| Metric | Value | Calculation |
-|--------|-------|-------------|
-[Include any calculated metrics with their values and formulas]
-
-**ANALYSIS SUMMARY TABLE:** (if applicable)
-| Analysis Factor | Assessment | Details |
-|-----------------|------------|---------|
-[Include qualitative analysis points in tabular format]
-
 Property Link: {PROPERTY_URL}
-Analysis Date: {DATE}
-
-Focus on data accuracy and provide specific, measurable values in tabular format that can be easily imported into spreadsheets for property comparison and investment decision-making.`;
+Analysis Date: {DATE}`;
 }
 
 // Function to generate tabular prompt with selected columns
@@ -8207,90 +8300,933 @@ async function generateDynamicPrompt() {
 }
 
 function getDefaultColumns() {
-  // Default columns matching popup.js specification
+  // Default columns matching ChatGPT tabular output format
   return [
-    { id: 'streetName', name: 'Street Name', category: 'core', enabled: true },
-    { id: 'price', name: 'Property Price', category: 'core', enabled: true },
-    { id: 'bedrooms', name: 'Number of Bedrooms', category: 'core', enabled: true },
-    { id: 'propertyType', name: 'Type of Property', category: 'core', enabled: true }
+    { id: 'address', name: 'Property Address', category: 'core', enabled: true },
+    { id: 'price', name: 'Asking Price', category: 'core', enabled: true },
+    { id: 'bedrooms', name: 'Bedrooms', category: 'core', enabled: true },
+    { id: 'propertyType', name: 'Property Type', category: 'core', enabled: true }
   ];
 }
 
 // Comprehensive column set for tabular data extraction
-function getTabularDataColumns() {
-  return [
-    // Basic Property Information
-    { id: 'propertyAddress', name: 'Property Address', description: 'Complete street address of the property', type: 'text', category: 'core', enabled: true, required: true },
-    { id: 'askingPrice', name: 'Asking Price', description: 'Listed price with currency symbol', type: 'currency', category: 'core', enabled: true, required: true },
-    { id: 'propertyType', name: 'Property Type', description: 'Classification (House, Condo, Apartment, etc.)', type: 'text', category: 'core', enabled: true, required: true },
-    { id: 'bedrooms', name: 'Bedrooms', description: 'Number of bedrooms in the property', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'bathrooms', name: 'Bathrooms', description: 'Number of bathrooms (include half baths as .5)', type: 'number', category: 'core', enabled: true, required: true },
-    { id: 'squareFootage', name: 'Square Footage', description: 'Total interior square footage', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'yearBuilt', name: 'Year Built', description: 'Year the property was constructed', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'lotSize', name: 'Lot Size (sq ft)', description: 'Size of the lot in square feet', type: 'number', category: 'core', enabled: true, required: false },
-    { id: 'neighborhood', name: 'Neighborhood', description: 'Name of the neighborhood or area', type: 'text', category: 'location', enabled: true, required: false },
-    { id: 'city', name: 'City', description: 'City where the property is located', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'state', name: 'State', description: 'State where the property is located', type: 'text', category: 'location', enabled: true, required: true },
-    { id: 'zipCode', name: 'ZIP Code', description: 'Postal ZIP code of the property', type: 'text', category: 'location', enabled: true, required: false },
+// Unified column system that matches ChatGPT's actual output format
+function getUnifiedColumnSystem() {
+  return {
+    // Core property information that matches ChatGPT tabular output exactly
+    'address': { 
+      id: 'address', 
+      name: 'Property Address', 
+      description: 'Complete street address of the property',
+      type: 'text', 
+      category: 'core', 
+      enabled: true, 
+      required: true,
+      aliases: ['Property Address', 'Street Name', 'propertyAddress', 'streetName']
+    },
+    'price': { 
+      id: 'price', 
+      name: 'Asking Price', 
+      description: 'Listed price with currency symbol',
+      type: 'currency', 
+      category: 'core', 
+      enabled: true, 
+      required: true,
+      aliases: ['Asking Price', 'Property Price', 'askingPrice', 'propertyPrice']
+    },
+    'propertyType': { 
+      id: 'propertyType', 
+      name: 'Property Type', 
+      description: 'Classification (House, Condo, Apartment, etc.)',
+      type: 'text', 
+      category: 'core', 
+      enabled: true, 
+      required: true,
+      aliases: ['Type of Property', 'Property Type', 'type']
+    },
+    'bedrooms': { 
+      id: 'bedrooms', 
+      name: 'Bedrooms', 
+      description: 'Number of bedrooms in the property',
+      type: 'number', 
+      category: 'core', 
+      enabled: true, 
+      required: true,
+      aliases: ['Number of Bedrooms', 'Bedrooms', 'bedroom']
+    },
+    'bathrooms': { 
+      id: 'bathrooms', 
+      name: 'Bathrooms', 
+      description: 'Number of bathrooms (include half baths as .5)',
+      type: 'number', 
+      category: 'core', 
+      enabled: true, 
+      required: false,
+      aliases: ['Bathrooms', 'bathroom']
+    },
+    'squareFootage': { 
+      id: 'squareFootage', 
+      name: 'Square Footage', 
+      description: 'Total interior square footage',
+      type: 'number', 
+      category: 'core', 
+      enabled: true, 
+      required: false,
+      aliases: ['Square Footage', 'Sq Ft', 'sqft', 'squareFeet']
+    },
+    'yearBuilt': { 
+      id: 'yearBuilt', 
+      name: 'Year Built', 
+      description: 'Year the property was constructed',
+      type: 'number', 
+      category: 'core', 
+      enabled: true, 
+      required: false,
+      aliases: ['Year Built', 'Built', 'year']
+    },
+    'lotSize': { 
+      id: 'lotSize', 
+      name: 'Lot Size', 
+      description: 'Size of the lot in square feet',
+      type: 'number', 
+      category: 'core', 
+      enabled: true, 
+      required: false,
+      aliases: ['Lot Size', 'Lot', 'lotSize']
+    },
+    'neighborhood': { 
+      id: 'neighborhood', 
+      name: 'Neighborhood', 
+      description: 'Name of the neighborhood or area',
+      type: 'text', 
+      category: 'location', 
+      enabled: true, 
+      required: false,
+      aliases: ['Neighborhood', 'Area', 'neighborhood']
+    },
+    'city': { 
+      id: 'city', 
+      name: 'City', 
+      description: 'City where the property is located',
+      type: 'text', 
+      category: 'location', 
+      enabled: true, 
+      required: true,
+      aliases: ['City', 'city']
+    },
+    'state': { 
+      id: 'state', 
+      name: 'State', 
+      description: 'State where the property is located',
+      type: 'text', 
+      category: 'location', 
+      enabled: true, 
+      required: true,
+      aliases: ['State', 'state']
+    },
+    'zipCode': { 
+      id: 'zipCode', 
+      name: 'ZIP Code', 
+      description: 'Postal ZIP code of the property',
+      type: 'text', 
+      category: 'location', 
+      enabled: true, 
+      required: false,
+      aliases: ['ZIP Code', 'Zip', 'zipCode']
+    },
     
     // Market Data
-    { id: 'estimatedRent', name: 'Estimated Monthly Rent', description: 'Professional estimate of monthly rental income', type: 'currency', category: 'financial', enabled: true, required: false },
-    { id: 'locationScore', name: 'Location Score (1-10)', description: 'Rating of location quality (schools, safety, amenities)', type: 'number', category: 'scoring', enabled: true, required: false },
-    { id: 'marketTrend', name: 'Market Trend', description: 'Current market direction (Rising, Stable, Declining)', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'daysOnMarket', name: 'Days on Market', description: 'Number of days the property has been listed', type: 'number', category: 'market', enabled: true, required: false },
-    { id: 'priceHistory', name: 'Price History', description: 'Any recent price changes or reductions', type: 'text', category: 'market', enabled: true, required: false },
+    'estimatedRent': { 
+      id: 'estimatedRent', 
+      name: 'Estimated Monthly Rent', 
+      description: 'Professional estimate of monthly rental income',
+      type: 'currency', 
+      category: 'financial', 
+      enabled: true, 
+      required: false,
+      aliases: ['Estimated Monthly Rent', 'Rent', 'estimatedRent', 'rentalIncome']
+    },
+    'locationScore': { 
+      id: 'locationScore', 
+      name: 'Location Score', 
+      description: 'Rating of location quality (schools, safety, amenities)',
+      type: 'number', 
+      category: 'scoring', 
+      enabled: true, 
+      required: false,
+      aliases: ['Location Score', 'Location Rating', 'locationScore']
+    },
+    'marketTrend': { 
+      id: 'marketTrend', 
+      name: 'Market Trend', 
+      description: 'Current market direction (Rising, Stable, Declining)',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Market Trend', 'Trend', 'marketTrend']
+    },
+    'daysOnMarket': { 
+      id: 'daysOnMarket', 
+      name: 'Days on Market', 
+      description: 'Number of days the property has been listed',
+      type: 'number', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Days on Market', 'DOM', 'daysOnMarket']
+    },
+    'priceHistory': { 
+      id: 'priceHistory', 
+      name: 'Price History', 
+      description: 'Any recent price changes or reductions',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Price History', 'History', 'priceHistory']
+    },
     
     // Property Features
-    { id: 'parkingSpaces', name: 'Parking Spaces', description: 'Number of available parking spaces', type: 'number', category: 'features', enabled: true, required: false },
-    { id: 'garageType', name: 'Garage Type', description: 'Type of garage (Attached, Detached, None)', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'heatingType', name: 'Heating Type', description: 'Type of heating system in the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'coolingType', name: 'Cooling Type', description: 'Type of cooling/AC system in the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'appliances', name: 'Appliances Included', description: 'List of appliances that come with the property', type: 'text', category: 'features', enabled: true, required: false },
-    { id: 'amenities', name: 'Amenities', description: 'Property amenities and special features', type: 'text', category: 'features', enabled: true, required: false },
+    'parkingSpaces': { 
+      id: 'parkingSpaces', 
+      name: 'Parking Spaces', 
+      description: 'Number of available parking spaces',
+      type: 'number', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Parking Spaces', 'Parking', 'parkingSpaces']
+    },
+    'garageType': { 
+      id: 'garageType', 
+      name: 'Garage Type', 
+      description: 'Type of garage (Attached, Detached, None)',
+      type: 'text', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Garage Type', 'Garage', 'garageType']
+    },
+    'heatingType': { 
+      id: 'heatingType', 
+      name: 'Heating Type', 
+      description: 'Type of heating system in the property',
+      type: 'text', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Heating Type', 'Heating', 'heatingType']
+    },
+    'coolingType': { 
+      id: 'coolingType', 
+      name: 'Cooling Type', 
+      description: 'Type of cooling/AC system in the property',
+      type: 'text', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Cooling Type', 'Cooling', 'coolingType']
+    },
+    'appliances': { 
+      id: 'appliances', 
+      name: 'Appliances Included', 
+      description: 'List of appliances that come with the property',
+      type: 'text', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Appliances Included', 'Appliances', 'appliances']
+    },
+    'amenities': { 
+      id: 'amenities', 
+      name: 'Amenities', 
+      description: 'Property amenities and special features',
+      type: 'text', 
+      category: 'features', 
+      enabled: true, 
+      required: false,
+      aliases: ['Amenities', 'Features', 'amenities']
+    },
     
     // Analysis Data
-    { id: 'keyAdvantages', name: 'Key Advantages', description: 'Top 3 advantages for investment purposes', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'keyConcerns', name: 'Key Concerns', description: 'Top 3 concerns or potential issues', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'redFlags', name: 'Red Flags', description: 'Warning signs or serious risk indicators', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'investmentGrade', name: 'Investment Grade', description: 'Overall investment quality grade (A, B, C, D)', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'rentalPotential', name: 'Rental Potential', description: 'Assessment of rental market viability', type: 'text', category: 'analysis', enabled: true, required: false },
-    { id: 'appreciationPotential', name: 'Appreciation Potential', description: 'Long-term property value growth outlook', type: 'text', category: 'analysis', enabled: true, required: false },
+    'keyAdvantages': { 
+      id: 'keyAdvantages', 
+      name: 'Key Advantages', 
+      description: 'Top 3 advantages for investment purposes',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Key Advantages', 'Advantages', 'Pros', 'keyAdvantages', 'pros']
+    },
+    'keyConcerns': { 
+      id: 'keyConcerns', 
+      name: 'Key Concerns', 
+      description: 'Top 3 concerns or potential issues',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Key Concerns', 'Concerns', 'Cons', 'keyConcerns', 'cons']
+    },
+    'redFlags': { 
+      id: 'redFlags', 
+      name: 'Red Flags', 
+      description: 'Warning signs or serious risk indicators',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Red Flags', 'Warnings', 'redFlags']
+    },
+    'investmentGrade': { 
+      id: 'investmentGrade', 
+      name: 'Investment Grade', 
+      description: 'Overall investment quality grade (A, B, C, D)',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Investment Grade', 'Grade', 'investmentGrade']
+    },
+    'rentalPotential': { 
+      id: 'rentalPotential', 
+      name: 'Rental Potential', 
+      description: 'Assessment of rental market viability',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Rental Potential', 'Rental', 'rentalPotential']
+    },
+    'appreciationPotential': { 
+      id: 'appreciationPotential', 
+      name: 'Appreciation Potential', 
+      description: 'Long-term property value growth outlook',
+      type: 'text', 
+      category: 'analysis', 
+      enabled: true, 
+      required: false,
+      aliases: ['Appreciation Potential', 'Appreciation', 'appreciationPotential']
+    },
     
-    // Market Analysis
-    { id: 'marketType', name: 'Market Type', description: 'Current market condition (Buyer\'s, Seller\'s, Balanced)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'marketCycle', name: 'Market Cycle', description: 'Current phase of the real estate market cycle', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'inventoryLevel', name: 'Inventory Level', description: 'Current housing inventory level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'demandLevel', name: 'Demand Level', description: 'Current buyer demand level (Low, Medium, High)', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'jobGrowth', name: 'Job Growth Rate', description: 'Local employment growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'populationGrowth', name: 'Population Growth Rate', description: 'Local population growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'incomeGrowth', name: 'Income Growth Rate', description: 'Local median income growth rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'unemploymentRate', name: 'Unemployment Rate', description: 'Local unemployment rate percentage', type: 'percentage', category: 'market', enabled: true, required: false },
-    { id: 'newConstruction', name: 'New Construction Level', description: 'Level of new construction activity in the area', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'infrastructureDev', name: 'Infrastructure Development', description: 'Status of infrastructure development projects', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'commercialDev', name: 'Commercial Development', description: 'Commercial development activity in the area', type: 'text', category: 'market', enabled: true, required: false },
-    { id: 'schoolQuality', name: 'School Quality Rating', description: 'Local school quality rating (1-10 scale)', type: 'number', category: 'location', enabled: true, required: false },
+    // Calculated Metrics Table
+    'pricePerSqFt': { 
+      id: 'pricePerSqFt', 
+      name: 'Price per Sq Ft', 
+      description: 'Price per square foot calculation',
+      type: 'currency', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Price per Sq Ft', 'Price per Sq Ft (₪ / sqft)', 'pricePerSqFt']
+    },
+    'pricePerSqMeter': { 
+      id: 'pricePerSqMeter', 
+      name: 'Price per Sq Meter', 
+      description: 'Price per square meter calculation',
+      type: 'currency', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Price per Sq Meter', 'Price per Sq Meter (₪ / m²)', 'pricePerSqMeter']
+    },
+    'rentPerSqFt': { 
+      id: 'rentPerSqFt', 
+      name: 'Rent per Sq Ft', 
+      description: 'Monthly rent per square foot',
+      type: 'currency', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Rent per Sq Ft', 'Rent per Sq Ft (₪ / sqft / month)', 'rentPerSqFt']
+    },
+    'propertyAge': { 
+      id: 'propertyAge', 
+      name: 'Property Age', 
+      description: 'Age of the property in years',
+      type: 'number', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Property Age', 'Age', 'propertyAge']
+    },
+    'bedroomRatio': { 
+      id: 'bedroomRatio', 
+      name: 'Bedroom Ratio', 
+      description: 'Ratio of bedrooms to total rooms',
+      type: 'number', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Bedroom Ratio', 'bedroomRatio']
+    },
+    'grossRentMultiplier': { 
+      id: 'grossRentMultiplier', 
+      name: 'Gross Rent Multiplier (GRM)', 
+      description: 'Price divided by annual rent',
+      type: 'number', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Gross Rent Multiplier (GRM)', 'GRM', 'grossRentMultiplier']
+    },
+    'capRate': { 
+      id: 'capRate', 
+      name: 'Cap Rate', 
+      description: 'Annual return percentage',
+      type: 'percentage', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Cap Rate', 'capRate']
+    },
+    'onePercentRule': { 
+      id: 'onePercentRule', 
+      name: '1% Rule Ratio', 
+      description: 'Monthly rent to price ratio',
+      type: 'percentage', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['1% Rule Ratio', '1% Rule', 'onePercentRule']
+    },
+    'priceToRentRatio': { 
+      id: 'priceToRentRatio', 
+      name: 'Price-to-Rent Ratio', 
+      description: 'Price to annual rent ratio',
+      type: 'number', 
+      category: 'metrics', 
+      enabled: true, 
+      required: false,
+      aliases: ['Price-to-Rent Ratio', 'priceToRentRatio']
+    },
     
-    // Calculated Metrics
-    { id: 'pricePerSqFt', name: 'Price per Sq Ft', description: 'Asking price divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'rentPerSqFt', name: 'Rent per Sq Ft', description: 'Estimated monthly rent divided by square footage', type: 'currency', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'propertyAge', name: 'Property Age (Years)', description: 'Current year minus year built', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'bedroomRatio', name: 'Bedroom Ratio', description: 'Bedrooms divided by total rooms (bed+bath)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'grossRentMultiplier', name: 'Gross Rent Multiplier', description: 'Price divided by annual rent (investment metric)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'capRate', name: 'Cap Rate (%)', description: 'Annual rental income divided by property price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'onePercentRule', name: '1% Rule Ratio', description: 'Monthly rent as percentage of purchase price', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceToRentRatio', name: 'Price-to-Rent Ratio', description: 'Purchase price divided by annual rent', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
+    // Market Analysis Table
+    'marketType': { 
+      id: 'marketType', 
+      name: 'Market Type', 
+      description: 'Current market conditions (Buyer\'s/Seller\'s/Balanced)',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Market Type', 'marketType']
+    },
+    'inventoryLevel': { 
+      id: 'inventoryLevel', 
+      name: 'Inventory Level', 
+      description: 'Current inventory level (Low/Medium/High)',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Inventory Level', 'inventoryLevel']
+    },
+    'demandLevel': { 
+      id: 'demandLevel', 
+      name: 'Demand Level', 
+      description: 'Current demand level (Low/Medium/High)',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Demand Level', 'demandLevel']
+    },
+    'jobGrowthRate': { 
+      id: 'jobGrowthRate', 
+      name: 'Job Growth Rate (local)', 
+      description: 'Local job growth percentage',
+      type: 'percentage', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Job Growth Rate (local)', 'Job Growth Rate', 'jobGrowthRate']
+    },
+    'populationGrowth': { 
+      id: 'populationGrowth', 
+      name: 'Population Growth', 
+      description: 'Local population growth percentage',
+      type: 'percentage', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Population Growth', 'populationGrowth']
+    },
+    'schoolQuality': { 
+      id: 'schoolQuality', 
+      name: 'School Quality', 
+      description: 'Local school quality rating (1-10)',
+      type: 'number', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['School Quality', 'schoolQuality']
+    },
+    'newConstructionLevel': { 
+      id: 'newConstructionLevel', 
+      name: 'New Construction Level', 
+      description: 'Level of new construction activity (Low/Medium/High)',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['New Construction Level', 'newConstructionLevel']
+    },
+    'infrastructureDevelopment': { 
+      id: 'infrastructureDevelopment', 
+      name: 'Infrastructure Development', 
+      description: 'Infrastructure development status',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Infrastructure Development', 'infrastructureDevelopment']
+    },
+    'commercialDevelopment': { 
+      id: 'commercialDevelopment', 
+      name: 'Commercial Development', 
+      description: 'Commercial development activity level',
+      type: 'text', 
+      category: 'market', 
+      enabled: true, 
+      required: false,
+      aliases: ['Commercial Development', 'commercialDevelopment']
+    },
     
-    // Risk Metrics
-    { id: 'vacancyRisk', name: 'Vacancy Risk Score', description: 'Risk of vacancy based on demand and appeal (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'maintenanceRisk', name: 'Maintenance Risk Score', description: 'Risk of high maintenance costs based on age/condition (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'marketRisk', name: 'Market Risk Score', description: 'Risk from market instability and trends (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
-    { id: 'overallRiskScore', name: 'Overall Risk Score', description: 'Average of all risk scores (1-10)', type: 'number', category: 'risk', enabled: true, required: false, isCalculated: true },
+    // Risk Assessment Table
+    'vacancyRisk': { 
+      id: 'vacancyRisk', 
+      name: 'Vacancy Risk', 
+      description: 'Vacancy risk score (1-10)',
+      type: 'number', 
+      category: 'risk', 
+      enabled: true, 
+      required: false,
+      aliases: ['Vacancy Risk', 'vacancyRisk']
+    },
+    'maintenanceRisk': { 
+      id: 'maintenanceRisk', 
+      name: 'Maintenance Risk', 
+      description: 'Maintenance risk score (1-10)',
+      type: 'number', 
+      category: 'risk', 
+      enabled: true, 
+      required: false,
+      aliases: ['Maintenance Risk', 'maintenanceRisk']
+    },
+    'marketRisk': { 
+      id: 'marketRisk', 
+      name: 'Market Risk', 
+      description: 'Market risk score (1-10)',
+      type: 'number', 
+      category: 'risk', 
+      enabled: true, 
+      required: false,
+      aliases: ['Market Risk', 'marketRisk']
+    },
+    'overallRisk': { 
+      id: 'overallRisk', 
+      name: 'Overall Risk', 
+      description: 'Overall risk score (1-10)',
+      type: 'number', 
+      category: 'risk', 
+      enabled: true, 
+      required: false,
+      aliases: ['Overall Risk', 'overallRisk']
+    }
+  };
+}
+
+// Legacy function for backward compatibility
+function getTabularDataColumns() {
+  const unifiedSystem = getUnifiedColumnSystem();
+  return Object.values(unifiedSystem).map(column => ({
+    id: column.id,
+    name: column.name,
+    description: column.description,
+    type: column.type,
+    category: column.category,
+    enabled: column.enabled,
+    required: column.required
+  }));
+}
+
+// Function to get column by ID or alias
+function getColumnByIdOrAlias(columnId, unifiedSystem = null) {
+  if (!unifiedSystem) {
+    unifiedSystem = getUnifiedColumnSystem();
+  }
+  
+  // First try direct ID match
+  if (unifiedSystem[columnId]) {
+    return unifiedSystem[columnId];
+  }
+  
+  // Then try alias match
+  for (const [id, column] of Object.entries(unifiedSystem)) {
+    if (column.aliases && column.aliases.includes(columnId)) {
+      return column;
+    }
+  }
+  
+  return null;
+}
+
+// Function to parse ChatGPT response directly using unified column system
+async function parseChatGPTResponseDirectly(responseText, columnSystem = null) {
+  if (!responseText || typeof responseText !== 'string') {
+    console.error('❌ Invalid input to parseChatGPTResponseDirectly:', typeof responseText);
+    return null;
+  }
+  
+  if (!columnSystem) {
+    columnSystem = getUnifiedColumnSystem();
+  }
+  
+  console.log('🔍 Parsing ChatGPT response directly with unified column system...');
+  console.log('📝 Response length:', responseText.length, 'characters');
+  
+  const extractedData = {};
+  
+  // First, try to parse structured tables with "|" separators
+  const tableData = parseStructuredTables(responseText);
+  if (tableData && Object.keys(tableData).length > 0) {
+    console.log('📊 Found structured table data:', Object.keys(tableData).length, 'items');
+    Object.assign(extractedData, tableData);
+  }
+  
+  // Then, parse each column using the unified system for any missing data
+  for (const [columnId, column] of Object.entries(columnSystem)) {
+    if (!column.enabled) continue;
     
-    // Market Analysis Calculated
-    { id: 'locationPremium', name: 'Location Premium (%)', description: 'Premium/discount based on location score', type: 'percentage', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'daysOnMarketScore', name: 'Days on Market Score', description: 'Score based on days on market vs. average (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true },
-    { id: 'priceTrendScore', name: 'Price Trend Score', description: 'Score based on price history and market direction (1-10)', type: 'number', category: 'calculated', enabled: true, required: false, isCalculated: true }
+    // Skip if we already extracted this from structured tables
+    if (extractedData[columnId]) continue;
+    
+    // Try to extract using all aliases
+    let value = null;
+    for (const alias of column.aliases) {
+      value = extractValueByLabel(responseText, alias, column.type);
+      if (value) break;
+    }
+    
+    if (value) {
+      extractedData[columnId] = value;
+      console.log(`✅ Extracted ${columnId}:`, value);
+    } else {
+      console.log(`❌ Could not extract ${columnId}`);
+    }
+  }
+  
+  return extractedData;
+}
+
+// Function to parse structured tables with "|" separators
+function parseStructuredTables(responseText) {
+  const extractedData = {};
+  
+  // Split response into lines
+  const lines = responseText.split('\n');
+  
+  // Look for table sections
+  let inTable = false;
+  let currentTableType = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Check if we're entering a table section
+    if (line.includes('PROPERTY DATA TABLE:') || line.includes('**PROPERTY DATA TABLE:**')) {
+      inTable = true;
+      currentTableType = 'property';
+      continue;
+    } else if (line.includes('CALCULATED METRICS TABLE:') || line.includes('**CALCULATED METRICS TABLE:**')) {
+      inTable = true;
+      currentTableType = 'metrics';
+      continue;
+    } else if (line.includes('MARKET ANALYSIS TABLE:') || line.includes('**MARKET ANALYSIS TABLE:**')) {
+      inTable = true;
+      currentTableType = 'market';
+      continue;
+    } else if (line.includes('RISK ASSESSMENT TABLE:') || line.includes('**RISK ASSESSMENT TABLE:**')) {
+      inTable = true;
+      currentTableType = 'risk';
+      continue;
+    }
+    
+    // Check if we're exiting a table section
+    if (inTable && (line.includes('**') && !line.includes('|') && !line.includes('TABLE:'))) {
+      inTable = false;
+      currentTableType = null;
+      continue;
+    }
+    
+    // Parse table rows
+    if (inTable && line.includes('|')) {
+      const parts = line.split('|').map(part => part.trim()).filter(part => part.length > 0);
+      
+      if (parts.length >= 2) {
+        const label = parts[0];
+        const value = parts[1];
+        
+        // Skip header rows
+        if (label.toLowerCase().includes('data point') || 
+            label.toLowerCase().includes('metric') || 
+            label.toLowerCase().includes('market factor') ||
+            label.toLowerCase().includes('risk factor') ||
+            label.toLowerCase().includes('value') ||
+            label.toLowerCase().includes('calculation') ||
+            label.toLowerCase().includes('assessment') ||
+            label.toLowerCase().includes('justification')) {
+          continue;
+        }
+        
+        // Map the label to our column system
+        const columnId = mapTableLabelToColumnId(label, currentTableType);
+        if (columnId && value && value !== 'N/A' && value !== '') {
+          extractedData[columnId] = cleanValue(value);
+          console.log(`📊 Table extracted ${columnId}:`, value);
+        }
+      }
+    }
+  }
+  
+  return extractedData;
+}
+
+// Function to map table labels to column IDs
+function mapTableLabelToColumnId(label, tableType) {
+  const labelLower = label.toLowerCase();
+  
+  // Property Data Table mappings
+  if (tableType === 'property') {
+    if (labelLower.includes('property address') || labelLower.includes('address')) return 'address';
+    if (labelLower.includes('asking price') || labelLower.includes('price')) return 'price';
+    if (labelLower.includes('property type') || labelLower.includes('type')) return 'propertyType';
+    if (labelLower.includes('bedrooms') || labelLower.includes('bedroom')) return 'bedrooms';
+    if (labelLower.includes('bathrooms') || labelLower.includes('bathroom')) return 'bathrooms';
+    if (labelLower.includes('square footage') || labelLower.includes('sqft') || labelLower.includes('sq ft')) return 'squareFootage';
+    if (labelLower.includes('year built') || labelLower.includes('built')) return 'yearBuilt';
+    if (labelLower.includes('lot size') || labelLower.includes('lot')) return 'lotSize';
+    if (labelLower.includes('neighborhood')) return 'neighborhood';
+    if (labelLower.includes('city')) return 'city';
+    if (labelLower.includes('state') || labelLower.includes('district')) return 'state';
+    if (labelLower.includes('zip') || labelLower.includes('postal')) return 'zipCode';
+    if (labelLower.includes('estimated monthly rent') || labelLower.includes('rent')) return 'estimatedRent';
+    if (labelLower.includes('location score')) return 'locationScore';
+    if (labelLower.includes('market trend')) return 'marketTrend';
+    if (labelLower.includes('days on market')) return 'daysOnMarket';
+    if (labelLower.includes('price history')) return 'priceHistory';
+    if (labelLower.includes('parking spaces') || labelLower.includes('parking')) return 'parkingSpaces';
+    if (labelLower.includes('garage type') || labelLower.includes('garage')) return 'garageType';
+    if (labelLower.includes('heating type') || labelLower.includes('heating')) return 'heatingType';
+    if (labelLower.includes('cooling type') || labelLower.includes('cooling')) return 'coolingType';
+    if (labelLower.includes('appliances included') || labelLower.includes('appliances')) return 'appliances';
+    if (labelLower.includes('amenities')) return 'amenities';
+    if (labelLower.includes('key advantages') || labelLower.includes('advantages')) return 'keyAdvantages';
+    if (labelLower.includes('key concerns') || labelLower.includes('concerns')) return 'keyConcerns';
+    if (labelLower.includes('red flags') || labelLower.includes('flags')) return 'redFlags';
+    if (labelLower.includes('investment grade') || labelLower.includes('grade')) return 'investmentGrade';
+    if (labelLower.includes('rental potential') || labelLower.includes('rental')) return 'rentalPotential';
+    if (labelLower.includes('appreciation potential') || labelLower.includes('appreciation')) return 'appreciationPotential';
+  }
+  
+  // Calculated Metrics Table mappings
+  if (tableType === 'metrics') {
+    if (labelLower.includes('price per sq ft') || labelLower.includes('price per sqft')) return 'pricePerSqFt';
+    if (labelLower.includes('price per sq meter') || labelLower.includes('price per m²')) return 'pricePerSqMeter';
+    if (labelLower.includes('rent per sq ft') || labelLower.includes('rent per sqft')) return 'rentPerSqFt';
+    if (labelLower.includes('property age') || labelLower.includes('age')) return 'propertyAge';
+    if (labelLower.includes('bedroom ratio')) return 'bedroomRatio';
+    if (labelLower.includes('gross rent multiplier') || labelLower.includes('grm')) return 'grossRentMultiplier';
+    if (labelLower.includes('cap rate')) return 'capRate';
+    if (labelLower.includes('1% rule') || labelLower.includes('one percent rule')) return 'onePercentRule';
+    if (labelLower.includes('price-to-rent ratio') || labelLower.includes('price to rent')) return 'priceToRentRatio';
+  }
+  
+  // Market Analysis Table mappings
+  if (tableType === 'market') {
+    if (labelLower.includes('market type')) return 'marketType';
+    if (labelLower.includes('inventory level')) return 'inventoryLevel';
+    if (labelLower.includes('demand level')) return 'demandLevel';
+    if (labelLower.includes('job growth rate')) return 'jobGrowthRate';
+    if (labelLower.includes('population growth')) return 'populationGrowth';
+    if (labelLower.includes('school quality')) return 'schoolQuality';
+    if (labelLower.includes('new construction level')) return 'newConstructionLevel';
+    if (labelLower.includes('infrastructure development')) return 'infrastructureDevelopment';
+    if (labelLower.includes('commercial development')) return 'commercialDevelopment';
+  }
+  
+  // Risk Assessment Table mappings
+  if (tableType === 'risk') {
+    if (labelLower.includes('vacancy risk')) return 'vacancyRisk';
+    if (labelLower.includes('maintenance risk')) return 'maintenanceRisk';
+    if (labelLower.includes('market risk')) return 'marketRisk';
+    if (labelLower.includes('overall risk')) return 'overallRisk';
+  }
+  
+  return null;
+}
+
+// Function to clean extracted values
+function cleanValue(value) {
+  if (!value) return '';
+  
+  // Remove extra whitespace
+  value = value.trim();
+  
+  // Remove common suffixes in parentheses that might interfere with parsing
+  value = value.replace(/\s*\([^)]*\)\s*$/, '');
+  
+  // Handle currency symbols and formatting
+  if (value.includes('₪') || value.includes('$') || value.includes('€') || value.includes('£')) {
+    // Keep currency symbols for currency fields
+    return value;
+  }
+  
+  // Handle percentages
+  if (value.includes('%')) {
+    return value;
+  }
+  
+  // Handle numeric values
+  if (/^\d+(\.\d+)?$/.test(value)) {
+    return parseFloat(value);
+  }
+  
+  return value;
+}
+
+// Helper function to extract value by label
+function extractValueByLabel(text, label, type) {
+  // Create patterns for different label formats
+  const patterns = [
+    new RegExp(`${label}\\s*[:\\-]\\s*([^\\n,;]+)`, 'gi'),
+    new RegExp(`\\*\\*${label}\\*\\*\\s*[:\\-]\\s*([^\\n,;]+)`, 'gi'),
+    new RegExp(`-\\s*${label}\\s*[:\\-]\\s*([^\\n,;]+)`, 'gi'),
+    new RegExp(`${label}\\s*[:\\-]\\s*\\$?([^\\n,;]+)`, 'gi')
   ];
+  
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match && match[1]) {
+      let value = match[1].trim();
+      
+      // Clean up the value based on type
+      if (type === 'number') {
+        value = value.replace(/[^0-9.-]/g, '');
+        return value ? parseFloat(value) : null;
+      } else if (type === 'currency') {
+        return value;
+      } else {
+        return value;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Function to check if CSV export should be available for a property
+function isCSVExportAvailable(property) {
+  if (!property || !property.analysis) {
+    return false;
+  }
+  
+  const promptType = property.analysis.promptType;
+  
+  // CSV export is available for tabular prompts
+  if (promptType === 'tabular') {
+    return true;
+  }
+  
+  // CSV export is available for custom prompts that contain tabular content
+  if (promptType === 'custom') {
+    return hasTabularContent(property.analysis.fullResponse);
+  }
+  
+  // CSV export is NOT available for default or dynamic prompts
+  return false;
+}
+
+// Function to detect if response contains tabular content
+function hasTabularContent(responseText) {
+  if (!responseText) return false;
+  
+  // Look for structured data patterns
+  const tabularPatterns = [
+    /Address\s*[:\\-]/gi,
+    /Price\s*[:\\-]/gi,
+    /Bedrooms\s*[:\\-]/gi,
+    /Property Type\s*[:\\-]/gi,
+    /\\*\\*.*\\*\\*\\s*[:\\-]/g, // Bold labels
+    /-\\s*.*\\s*[:\\-]/g, // Bullet points
+    /\\|.*\\|/g // Table format
+  ];
+  
+  let matchCount = 0;
+  for (const pattern of tabularPatterns) {
+    if (pattern.test(responseText)) {
+      matchCount++;
+    }
+  }
+  
+  // If we find 3 or more tabular patterns, consider it tabular content
+  return matchCount >= 3;
+}
+
+// Function to migrate legacy properties to include prompt type
+async function migrateLegacyProperties() {
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['propertyHistory']),
+      { propertyHistory: [] }
+    );
+    
+    const properties = result.propertyHistory || [];
+    let migratedCount = 0;
+    
+    for (const property of properties) {
+      if (property.analysis && !property.analysis.promptType) {
+        // Detect prompt type from analysis content
+        const promptType = detectPromptTypeFromContent(property.analysis.fullResponse);
+        property.analysis.promptType = promptType;
+        migratedCount++;
+      }
+    }
+    
+    if (migratedCount > 0) {
+      await safeChromeFall(
+        () => chrome.storage.local.set({ propertyHistory: properties }),
+        null
+      );
+      console.log(`✅ Migrated ${migratedCount} legacy properties with prompt types`);
+    }
+    
+    return migratedCount;
+  } catch (error) {
+    console.error('❌ Failed to migrate legacy properties:', error);
+    return 0;
+  }
+}
+
+// Function to detect prompt type from content
+function detectPromptTypeFromContent(responseText) {
+  if (!responseText) return 'unknown';
+  
+  // Check for tabular content
+  if (hasTabularContent(responseText)) {
+    return 'tabular';
+  }
+  
+  // Check for structured analysis content
+  if (responseText.includes('**') && responseText.includes(':')) {
+    return 'dynamic';
+  }
+  
+  // Default to standard analysis
+  return 'default';
 }
 
 function generateCorePropertySection(columns) {
@@ -8298,26 +9234,26 @@ function generateCorePropertySection(columns) {
   
   columns.forEach(col => {
     switch (col.id) {
-      case 'streetName':
-        dataPoints.push('**Street Name**: Property street address (e.g., "123 Main Street")');
+      case 'address':
+        dataPoints.push('**Property Address**: Complete street address of the property');
         break;
       case 'price':
-        dataPoints.push('**Property Price**: Exact asking price (include currency symbol)');
+        dataPoints.push('**Asking Price**: Exact asking price (include currency symbol)');
         break;
       case 'bedrooms':
-        dataPoints.push('**Number of Bedrooms**: Number of bedrooms (numeric)');
+        dataPoints.push('**Bedrooms**: Number of bedrooms (numeric)');
         break;
       case 'bathrooms':
         dataPoints.push('**Bathrooms**: Number of bathrooms (numeric, include half baths as .5)');
         break;
-      case 'squareFeet':
+      case 'squareFootage':
         dataPoints.push('**Square Footage**: Total square footage (numeric)');
         break;
       case 'yearBuilt':
         dataPoints.push('**Year Built**: Construction year (4-digit year)');
         break;
       case 'propertyType':
-        dataPoints.push('**Type of Property**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)');
+        dataPoints.push('**Property Type**: Classify as "House" or "Apartment" (or specific type like "Condo", "Townhouse", etc.)');
         break;
       case 'neighborhood':
         dataPoints.push('**Neighborhood**: Property location/neighborhood name');
@@ -8504,7 +9440,7 @@ async function loadPromptSplittingSettings() {
 }
 
 // Function to extract key information from ChatGPT response
-function extractPropertyAnalysisData(responseText) {
+async function extractPropertyAnalysisData(responseText) {
   if (!responseText || typeof responseText !== 'string') {
     console.error('❌ Invalid input to extractPropertyAnalysisData:', typeof responseText);
     return null;
@@ -8527,6 +9463,19 @@ function extractPropertyAnalysisData(responseText) {
     console.warn('⚠️ Large response detected:', responseText.length, 'characters - extraction may be slower');
   }
   
+  // Get current prompt type from storage
+  let currentPromptType = 'unknown';
+  try {
+    const result = await safeChromeFall(
+      () => chrome.storage.local.get(['promptType']),
+      { promptType: 'default' }
+    );
+    currentPromptType = result.promptType || 'default';
+    console.log('📋 Current prompt type:', currentPromptType);
+  } catch (error) {
+    console.warn('⚠️ Could not retrieve prompt type:', error);
+  }
+  
       // Update analytics
     extractionAnalytics.totalExtractions++;
     
@@ -8536,6 +9485,7 @@ function extractPropertyAnalysisData(responseText) {
       extractedData: {},
       calculatedMetrics: {}, // Store calculated metrics
       timestamp: Date.now(),
+      promptType: currentPromptType, // Store the prompt type used for this analysis
       errors: [], // Track any errors during extraction
       warnings: [] // Track any warnings during extraction
     };
@@ -9090,7 +10040,7 @@ function extractPropertyAnalysisData(responseText) {
         const streetHasIndicators = streetHasNumber || streetHasStreetWords;
         
         // More lenient validation - warn instead of reject for some cases
-        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
+        const streetIsLikelyValid = streetCleaned && streetValidLength && streetNotJustKeywords && streetNotJustNumber && streetNotPrice && streetNotFeature;
         
         if (streetIsLikelyValid && !streetHasIndicators) {
           console.log(`⚠️ Street name "${streetCleaned}" passed basic validation but lacks typical street indicators (numbers or street words) - accepting anyway`);
@@ -9103,7 +10053,7 @@ function extractPropertyAnalysisData(responseText) {
             hasNumber: !!streetHasNumber,
             hasStreetWords: !!streetHasStreetWords,
             hasIndicators: streetHasIndicators,
-            isNotJustKeywords: streetNotKeywords,
+            isNotJustKeywords: streetNotJustKeywords,
             isNotPropertyFeature: streetNotFeature,
             isNotPrice: streetNotPrice,
             isNotJustNumber: streetNotJustNumber
@@ -10880,7 +11830,7 @@ function setupResponseMonitor() {
   };
   
   // Function to process completed response
-  const processCompletedResponse = (messageText, currentUrl) => {
+  const processCompletedResponse = async (messageText, currentUrl) => {
     console.log('🎯 Processing completed response for:', currentUrl);
     console.log('📝 Final response length:', messageText.length);
     
@@ -10993,7 +11943,7 @@ function setupResponseMonitor() {
           console.log('📊 Response length:', messageText.length);
           console.log('📄 Response preview:', messageText.substring(0, 300));
           
-          const analysisData = extractPropertyAnalysisData(messageText);
+          const analysisData = await extractPropertyAnalysisData(messageText);
           console.log('🔍 Extracted analysis data preview:', {
             extractedDataKeys: Object.keys(analysisData?.extractedData || {}),
             hasFullResponse: !!(analysisData?.fullResponse),
@@ -11062,7 +12012,7 @@ function setupResponseMonitor() {
           console.log('🔗 Property URL:', promptSplittingState.pendingPropertyLink);
           console.log('📊 Response length:', messageText.length);
           
-          const analysisData = extractPropertyAnalysisData(messageText);
+          const analysisData = await extractPropertyAnalysisData(messageText);
           if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
             
             console.log('✅ Successfully extracted analysis data from split prompt response');
@@ -11105,7 +12055,7 @@ function setupResponseMonitor() {
         console.log('✅ Detected completed property analysis response (no current analysis tracking)');
       }
       console.log('🎯 Keywords matched:', keywordMatches, '/', propertyKeywords.length);
-      const analysisData = extractPropertyAnalysisData(messageText);
+      const analysisData = await extractPropertyAnalysisData(messageText);
       
       if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
         const propertyUrl = currentPropertyAnalysis?.url || 'Unknown URL';
@@ -11212,7 +12162,7 @@ function setupResponseMonitor() {
     responseBuffer.delete(currentUrl);
   };
   
-  const checkForNewMessages = () => {
+  const checkForNewMessages = async () => {
     // Comprehensive selectors for ChatGPT interface with fallbacks for interface changes
     const messageSelectors = [
       // Current primary selectors (December 2024)
@@ -11315,7 +12265,7 @@ function setupResponseMonitor() {
         console.log('⚠️ IMPORTANT: This is the FIRST response (confirmation). We will save the SECOND response (after property link).');
         // Don't save this response - we only want the response AFTER the property link is sent
         // Just continue to trigger sending the property link
-        processCompletedResponse(messageText, currentUrl);
+        await processCompletedResponse(messageText, currentUrl);
         return; // Don't process as regular property analysis
       }
       
@@ -11369,7 +12319,7 @@ function setupResponseMonitor() {
         const monitoringTime = currentTime - bufferEntry.firstSeen;
         if (monitoringTime > 30000 && messageText.length > 500) {
           console.log('⏰ Fallback triggered - response has been monitored for 30+ seconds, processing anyway');
-          processCompletedResponse(messageText, currentUrl);
+          await processCompletedResponse(messageText, currentUrl);
           return;
         }
         
@@ -11390,7 +12340,7 @@ function setupResponseMonitor() {
           }
           
           // Process immediately
-          processCompletedResponse(messageText, currentUrl);
+          await processCompletedResponse(messageText, currentUrl);
           
         } else if (isStreaming) {
           console.log('⏳ ChatGPT still writing, waiting for completion...');
@@ -11401,11 +12351,11 @@ function setupResponseMonitor() {
           }
           
           // Set a shorter completion timer (1.5 seconds after last change for faster processing)
-          completionTimers.set(currentUrl, setTimeout(() => {
+          completionTimers.set(currentUrl, setTimeout(async () => {
             console.log('⏰ Completion timer triggered - assuming response is complete');
             const bufferedResponse = responseBuffer.get(currentUrl);
             if (bufferedResponse) {
-              processCompletedResponse(bufferedResponse.messageText, currentUrl);
+              await processCompletedResponse(bufferedResponse.messageText, currentUrl);
             }
           }, 1500)); // Reduced from 2000ms to 1500ms
         }
@@ -11417,10 +12367,10 @@ function setupResponseMonitor() {
   
   // Check for new messages every 500ms for better completion detection
   // Only run when we have an active analysis session or prompt splitting
-  const intervalId = setInterval(() => {
+  const intervalId = setInterval(async () => {
     // Only check if we have an active session
     if (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle') {
-      checkForNewMessages();
+      await checkForNewMessages();
     }
   }, 500);
   
@@ -11454,7 +12404,7 @@ function setupResponseMonitor() {
     
     if (shouldCheck && (currentPropertyAnalysis || promptSplittingState.currentPhase !== 'idle')) {
       console.log('🔍 MutationObserver detected potential message change');
-      setTimeout(checkForNewMessages, 500); // Small delay to let content load
+      setTimeout(async () => await checkForNewMessages(), 500); // Small delay to let content load
     }
   });
   
@@ -12075,6 +13025,25 @@ async function insertPropertyAnalysisPrompt(propertyLink) {
   console.log('🔍 Property link type:', typeof propertyLink);
   console.log('🔍 Property link length:', propertyLink ? propertyLink.length : 'null/undefined');
   
+  // Convert property link to string if it's an object (additional safety check)
+  if (typeof propertyLink === 'object' && propertyLink !== null) {
+    console.warn('⚠️ Property link is an object, attempting conversion...');
+    if (propertyLink.url) {
+      propertyLink = propertyLink.url;
+    } else if (propertyLink.href) {
+      propertyLink = propertyLink.href;
+    } else if (propertyLink.toString) {
+      propertyLink = propertyLink.toString();
+    } else {
+      console.error('❌ Cannot convert object property link to string:', propertyLink);
+      throw new Error('Invalid property link format - object cannot be converted to URL');
+    }
+    console.log('🔄 Converted object property link to string:', propertyLink);
+  }
+  
+  // Ensure it's a string and trim it
+  propertyLink = String(propertyLink).trim();
+  
   // Early validation to prevent null property links from proceeding
   if (!isValidPropertyLink(propertyLink)) {
     console.error('❌ Invalid property link provided to insertPropertyAnalysisPrompt:', propertyLink);
@@ -12484,10 +13453,31 @@ function setupGlobalEventDelegation() {
       console.log('🔍 Link type:', typeof request.link);
       console.log('🔍 Link value:', request.link);
       
+      // Convert property link to string if it's an object
+      let propertyLink = request.link;
+      if (typeof propertyLink === 'object' && propertyLink !== null) {
+        // If it's an object, try to extract the URL from common properties
+        if (propertyLink.url) {
+          propertyLink = propertyLink.url;
+        } else if (propertyLink.href) {
+          propertyLink = propertyLink.href;
+        } else if (propertyLink.toString) {
+          propertyLink = propertyLink.toString();
+        } else {
+          console.error('❌ Cannot convert object property link to string:', propertyLink);
+          sendResponse({ success: false, error: 'Invalid property link format - object cannot be converted to URL' });
+          return true;
+        }
+        console.log('🔄 Converted object property link to string:', propertyLink);
+      }
+      
+      // Ensure it's a string and trim it
+      propertyLink = String(propertyLink).trim();
+      
       // Validate property link before processing
-      if (!isValidPropertyLink(request.link)) {
-        console.error('❌ Invalid property link received in message handler:', request.link);
-        console.error('❌ Link type:', typeof request.link);
+      if (!isValidPropertyLink(propertyLink)) {
+        console.error('❌ Invalid property link received in message handler:', propertyLink);
+        console.error('❌ Link type:', typeof propertyLink);
         sendResponse({ success: false, error: 'Invalid property link provided' });
         return true;
       }
@@ -12495,7 +13485,7 @@ function setupGlobalEventDelegation() {
       // Handle async operation properly
       (async () => {
         try {
-          const success = await insertPropertyAnalysisPrompt(request.link.trim());
+          const success = await insertPropertyAnalysisPrompt(propertyLink);
           
           if (success) {
             // Optionally auto-submit (uncomment the next line if desired)
@@ -12611,7 +13601,7 @@ window.analyzeExtractionFailures = function(fieldName = null) {
   return analysis;
 };
 
-window.testExtractionPerformance = function(iterations = 10) {
+window.testExtractionPerformance = async function(iterations = 10) {
   const testResponse = `**PROPERTY DETAILS:**
 - Address: 123 Main Street
 - Property Price: $450,000
@@ -12638,7 +13628,7 @@ window.testExtractionPerformance = function(iterations = 10) {
   
   for (let i = 0; i < iterations; i++) {
     const iterationStart = performance.now();
-    const result = extractPropertyAnalysisData(testResponse);
+    const result = await extractPropertyAnalysisData(testResponse);
     const iterationTime = performance.now() - iterationStart;
     
     results.push({
@@ -12665,10 +13655,10 @@ window.testExtractionPerformance = function(iterations = 10) {
   return performanceReport;
 };
 
-window.validateExtractionAccuracy = function(expectedData, actualResponse) {
+window.validateExtractionAccuracy = async function(expectedData, actualResponse) {
   console.log('🎯 Validating extraction accuracy...');
   
-  const extracted = extractPropertyAnalysisData(actualResponse);
+  const extracted = await extractPropertyAnalysisData(actualResponse);
   if (!extracted) {
     console.log('❌ Extraction failed completely');
     return { accuracy: 0, details: 'Complete extraction failure' };
@@ -12704,7 +13694,7 @@ window.validateExtractionAccuracy = function(expectedData, actualResponse) {
 };
 
 // Add comprehensive debugging function
-window.testPropertyExtraction = function(sampleResponse) {
+window.testPropertyExtraction = async function(sampleResponse) {
   console.log('🧪=== TESTING PROPERTY EXTRACTION ===');
   console.log('📝 Input text length:', sampleResponse ? sampleResponse.length : 0);
   
@@ -12733,7 +13723,7 @@ window.testPropertyExtraction = function(sampleResponse) {
   
   // Test extraction
   console.log('🔍=== RUNNING FULL EXTRACTION ===');
-  const result = extractPropertyAnalysisData(sampleResponse);
+  const result = await extractPropertyAnalysisData(sampleResponse);
   
   console.log('📊 EXTRACTION RESULTS:');
   console.log('   Total data points extracted:', Object.keys(result.extractedData).length);
@@ -12746,7 +13736,7 @@ window.testPropertyExtraction = function(sampleResponse) {
 };
 
 // Quick test with common patterns
-window.quickTestPatterns = function() {
+window.quickTestPatterns = async function() {
   const testCases = [
     'Address: 123 Main Street',
     'Property Price: $450,000',
@@ -12758,15 +13748,16 @@ window.quickTestPatterns = function() {
   
   console.log('🧪=== QUICK PATTERN TESTS ===');
   
-  testCases.forEach((testCase, index) => {
+  for (let index = 0; index < testCases.length; index++) {
+    const testCase = testCases[index];
     console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
-    const result = extractPropertyAnalysisData(testCase);
+    const result = await extractPropertyAnalysisData(testCase);
     console.log('   Result:', result.extractedData);
-  });
+  }
 };
 
 // Test patterns with source links
-window.testSourceLinks = function() {
+window.testSourceLinks = async function() {
   const testCases = [
     'Address: 123 Main Street [Source: Zillow.com]',
     'Property Price: $450,000 [Source: Realtor.com]',
@@ -12780,11 +13771,12 @@ window.testSourceLinks = function() {
   
   console.log('🧪=== SOURCE LINK PATTERN TESTS ===');
   
-  testCases.forEach((testCase, index) => {
+  for (let index = 0; index < testCases.length; index++) {
+    const testCase = testCases[index];
     console.log(`\n📋 Test ${index + 1}: "${testCase}"`);
-    const result = extractPropertyAnalysisData(testCase);
+    const result = await extractPropertyAnalysisData(testCase);
     console.log('   Result:', result.extractedData);
-  });
+  }
 };
 
 // Test function for current webpage
@@ -12802,7 +13794,7 @@ window.testCurrentExtraction = function() {
 };
 
 // Comprehensive diagnostic function
-window.diagnoseProblem = function() {
+window.diagnoseProblem = async function() {
   console.log('🔍=== COMPREHENSIVE EXTRACTION DIAGNOSIS ===');
   
   // 1. Check if extension is properly loaded
@@ -12838,7 +13830,7 @@ window.diagnoseProblem = function() {
     
     // 4. Test extraction
     console.log('📋 4. Extraction Test:');
-    const result = extractPropertyAnalysisData(messageText);
+    const result = await extractPropertyAnalysisData(messageText);
     console.log('   Extraction result:', result);
     console.log('   Data points extracted:', Object.keys(result?.extractedData || {}).length);
     console.log('   Extracted data:', result?.extractedData);
@@ -12869,7 +13861,7 @@ window.diagnoseProblem = function() {
 };
 
 // Force extraction on current message (bypasses all session tracking)
-window.forceExtractCurrent = function() {
+window.forceExtractCurrent = async function() {
   console.log('🚀 FORCING EXTRACTION ON CURRENT MESSAGE');
   
   const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
@@ -12885,7 +13877,7 @@ window.forceExtractCurrent = function() {
   console.log('📝 Message preview:', messageText.substring(0, 300) + '...');
   
   // Force extraction
-  const analysisData = extractPropertyAnalysisData(messageText);
+  const analysisData = await extractPropertyAnalysisData(messageText);
   
   if (analysisData && (Object.keys(analysisData.extractedData).length > 0 || analysisData.fullResponse)) {
     console.log('✅ Extraction successful!');
