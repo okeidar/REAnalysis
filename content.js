@@ -433,7 +433,7 @@ class REAnalyzerEmbeddedUI {
       
       for (const container of containers) {
         if (container && this.isValidIntegrationTarget(container)) {
-          console.log('✅ Found ChatGPT integration target via input field');
+          // Found ChatGPT integration target via input field
           return container;
         }
       }
@@ -451,7 +451,7 @@ class REAnalyzerEmbeddedUI {
       try {
         const element = document.querySelector(selector);
         if (element && this.isValidIntegrationTarget(element)) {
-          console.log('✅ Found ChatGPT integration target:', selector);
+          // Found ChatGPT integration target
           return element;
         }
       } catch (e) {
@@ -511,7 +511,7 @@ class REAnalyzerEmbeddedUI {
       }
     });
 
-    console.log('🎯 Created integrated ChatGPT UI button');
+    // Created integrated ChatGPT UI button
     
     // Set up observer to maintain integration if ChatGPT UI changes
     this.setupUIIntegrationObserver();
@@ -542,7 +542,7 @@ class REAnalyzerEmbeddedUI {
       // Check if our integrated button is still in the DOM
       const ourButton = document.querySelector('#re-analyzer-integrated, #re-analyzer-fab');
       if (!ourButton && shouldReintegrate) {
-        console.log('🔄 ChatGPT UI changed, attempting reintegration');
+        // ChatGPT UI changed, attempting reintegration
         setTimeout(() => {
           if (!document.querySelector('#re-analyzer-integrated, #re-analyzer-fab')) {
             this.createFloatingActionButton();
@@ -557,7 +557,7 @@ class REAnalyzerEmbeddedUI {
       subtree: true
     });
     
-    console.log('👀 Set up UI integration observer');
+    // Set up UI integration observer
   }
 
   insertIntegratedIcon(container) {
@@ -643,7 +643,7 @@ class REAnalyzerEmbeddedUI {
       }
     });
 
-    console.log('🎯 Created fallback floating action button');
+    // Created fallback floating action button
   }
 
   createEmbeddedPanel() {
@@ -2360,6 +2360,8 @@ class REAnalyzerEmbeddedUI {
 
   async exportPropertiesToCSV() {
     try {
+      console.log('🔍 [CSV Export] Starting CSV export process...');
+      
       // Load all property data
       const result = await safeChromeFall(
         () => chrome.storage.local.get(['propertyHistory']),
@@ -2367,85 +2369,128 @@ class REAnalyzerEmbeddedUI {
       );
       
       const properties = result.propertyHistory || [];
+      console.log(`🔍 [CSV Export] Loaded ${properties.length} total properties from storage`);
       
       if (properties.length === 0) {
+        console.log('⚠️ [CSV Export] No properties found in storage');
         this.showChatGPTMessage('warning', 'No properties to export');
         return;
       }
       
-      // Filter properties that have CSV export available
-      const exportableProperties = properties.filter(property => isCSVExportAvailable(property));
+      // Filter properties that have analysis data
+      const exportableProperties = properties.filter(property => 
+        property.analysis && property.analysis.fullResponse
+      );
+      
+      console.log(`🔍 [CSV Export] Found ${exportableProperties.length} properties with analysis data`);
       
       if (exportableProperties.length === 0) {
-        this.showChatGPTMessage('warning', 'No properties with tabular data available for CSV export. Only properties analyzed with "Tabular Data" prompts can be exported to CSV.');
+        console.log('⚠️ [CSV Export] No properties with analysis data available');
+        this.showChatGPTMessage('warning', 'No properties with analysis data available for CSV export.');
         return;
       }
       
-      // Get unified column system
-      const unifiedSystem = getUnifiedColumnSystem();
-      const columns = Object.values(unifiedSystem).filter(col => col.enabled);
-      
-      // Create CSV headers
-      const headers = [
-        'URL',
-        'Domain', 
-        'Analysis Date',
-        'Prompt Type',
-        ...columns.map(col => col.name)
-      ];
-      
-      // Create CSV rows
-      const rows = [headers];
-      
-      for (const property of exportableProperties) {
-        // Parse ChatGPT response directly for accurate data
-        const directData = await parseChatGPTResponseDirectly(property.analysis.fullResponse, unifiedSystem);
+      // Log sample property data
+      if (exportableProperties.length > 0) {
+        console.log('🔍 [CSV Export] Sample property data:', {
+          url: exportableProperties[0].url,
+          hasAnalysis: !!exportableProperties[0].analysis,
+          hasFullResponse: !!exportableProperties[0].analysis?.fullResponse,
+          responseLength: exportableProperties[0].analysis?.fullResponse?.length || 0
+        });
         
-          const row = [
-            property.url || '',
-            property.domain || '',
-          property.date || '',
-          property.analysis.promptType || 'unknown',
-          ];
-          
-        // Add data for each column using direct parsing
-          columns.forEach(col => {
-            let value = '';
-            
-          // Try direct parsing first, then fallback to extracted data
-          if (directData && directData[col.id]) {
-            value = directData[col.id];
-          } else if (property.analysis.extractedData) {
-            // Try to find value using aliases
-            for (const alias of col.aliases) {
-              if (property.analysis.extractedData[alias]) {
-                value = property.analysis.extractedData[alias];
-                break;
-              }
-            }
-            }
-            
-            // Format value for CSV
-            if (typeof value === 'number') {
-              value = value.toString();
-            } else if (typeof value === 'string') {
-              // Escape commas and quotes for CSV
-              if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-                value = `"${value.replace(/"/g, '""')}"`;
-              }
-            }
-            
-            row.push(value);
-          });
-          
-          rows.push(row);
+        // Log first 500 chars of response for debugging
+        if (exportableProperties[0].analysis?.fullResponse) {
+          console.log('🔍 [CSV Export] Sample response preview:', 
+            exportableProperties[0].analysis.fullResponse.substring(0, 500) + '...');
         }
+      }
       
-      // Convert to CSV string
-      const csvContent = rows.map(row => row.join(',')).join('\n');
+      // Collect all unique column names from all properties
+      const allColumns = new Set(['Link']);
+      console.log('🔍 [CSV Export] Starting column collection...');
+      
+      for (let i = 0; i < exportableProperties.length; i++) {
+        const property = exportableProperties[i];
+        console.log(`🔍 [CSV Export] Processing property ${i + 1}/${exportableProperties.length}: ${property.url}`);
+        
+        const tableData = parseMarkdownTableFromResponse(property.analysis.fullResponse);
+        console.log(`🔍 [CSV Export] Parsed table data for property ${i + 1}:`, tableData);
+        
+        // Log the raw response for debugging
+        console.log(`🔍 [CSV Export] Raw response for property ${i + 1}:`, property.analysis.fullResponse.substring(0, 500) + '...');
+        
+        if (tableData && tableData.length > 0) {
+          tableData.forEach((row, rowIndex) => {
+            console.log(`🔍 [CSV Export] Property ${i + 1}, Row ${rowIndex}:`, row);
+            if (row.propertyData) {
+              allColumns.add(row.propertyData);
+              console.log(`🔍 [CSV Export] Added column: "${row.propertyData}"`);
+            }
+          });
+        } else {
+          console.log(`⚠️ [CSV Export] No table data found for property ${i + 1}`);
+        }
+      }
+      
+      // Convert Set to Array and sort for consistent column order
+      const headers = Array.from(allColumns).sort();
+      console.log('🔍 [CSV Export] Final headers:', headers);
+      
+      // Create CSV rows - one row per property
+      const csvRows = [];
+      console.log('🔍 [CSV Export] Starting CSV row creation...');
+      
+      for (let i = 0; i < exportableProperties.length; i++) {
+        const property = exportableProperties[i];
+        console.log(`🔍 [CSV Export] Creating row for property ${i + 1}: ${property.url}`);
+        
+        // Parse markdown table from ChatGPT response
+        const tableData = parseMarkdownTableFromResponse(property.analysis.fullResponse);
+        
+        if (tableData && tableData.length > 0) {
+          // Create a row for this property
+          const propertyRow = [];
+          
+          // Add property URL as first column
+          propertyRow.push(property.url || '');
+          console.log(`🔍 [CSV Export] Property ${i + 1} URL: "${property.url}"`);
+          
+          // Add values for each column in the same order as headers
+          for (let j = 1; j < headers.length; j++) {
+            const columnName = headers[j];
+            const matchingData = tableData.find(row => row.propertyData === columnName);
+            const value = matchingData ? matchingData.value : '';
+            propertyRow.push(value);
+            console.log(`🔍 [CSV Export] Property ${i + 1}, Column "${columnName}": "${value}"`);
+          }
+          
+          csvRows.push(propertyRow);
+          console.log(`🔍 [CSV Export] Property ${i + 1} final row:`, propertyRow);
+        } else {
+          console.log(`⚠️ [CSV Export] No table data for property ${i + 1}, skipping`);
+        }
+      }
+      
+      console.log(`🔍 [CSV Export] Created ${csvRows.length} CSV rows`);
+      console.log('🔍 [CSV Export] All CSV rows:', csvRows);
+      
+      if (csvRows.length === 0) {
+        console.log('⚠️ [CSV Export] No CSV rows created');
+        this.showChatGPTMessage('warning', 'No tabular data found in any of the analyzed properties.');
+        return;
+      }
+      
+      // Create CSV content
+      const csvContent = [headers, ...csvRows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      
+      console.log('🔍 [CSV Export] Final CSV content:');
+      console.log(csvContent);
       
       // Create and download file
-      const dataBlob = new Blob([csvContent], {type: 'text/csv'});
+      const dataBlob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
       
       const link = document.createElement('a');
       link.href = URL.createObjectURL(dataBlob);
@@ -2455,10 +2500,11 @@ class REAnalyzerEmbeddedUI {
       link.click();
       document.body.removeChild(link);
       
-      this.showChatGPTMessage('success', `Exported ${exportableProperties.length} properties with tabular data to CSV with ${columns.length} columns!`);
+      console.log('✅ [CSV Export] File download initiated successfully');
+      this.showChatGPTMessage('success', `Successfully exported ${csvRows.length} properties to CSV`);
       
     } catch (error) {
-      console.error('❌ Failed to export properties to CSV:', error);
+      console.error('❌ [CSV Export] Failed to export properties to CSV:', error);
       this.showChatGPTMessage('error', 'Failed to export properties to CSV');
     }
   }
@@ -3936,16 +3982,21 @@ Or enter your own property URL:`);
   }
 
   formatAnalysisText(text) {
-    // Basic formatting to make the analysis more readable with proper contrast
-    const formatted = text
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p>')
-      .replace(/$/, '</p>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--re-text-primary); font-weight: 600;">$1</strong>') // Bold text with proper contrast
-      .replace(/\*(.*?)\*/g, '<em style="color: var(--re-text-primary);">$1</em>'); // Italic text with proper contrast
+    // Keep the raw ChatGPT response completely unprocessed
+    // Only escape HTML characters to prevent XSS and preserve formatting
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
     
-    return `<div style="color: var(--re-text-primary); line-height: 1.6;">${formatted}</div>`;
+    // Preserve line breaks and whitespace exactly as ChatGPT provided
+    const preserved = escaped
+      .replace(/\n/g, '<br>')
+      .replace(/ /g, '&nbsp;');
+    
+    return `<div style="color: var(--re-text-primary); line-height: 1.6; white-space: pre-wrap; font-family: monospace;">${preserved}</div>`;
   }
 
   addModalStyles() {
@@ -4366,92 +4417,49 @@ Or enter your own property URL:`);
         return;
       }
       
-      if (!property.analysis || !property.analysis.extractedData) {
+      if (!property.analysis || !property.analysis.fullResponse) {
         this.showChatGPTMessage('warning', 'No analysis data to export. Please analyze this property first.');
         return;
       }
       
-      // Check if CSV export is available for this property
-      if (!isCSVExportAvailable(property)) {
-        this.showChatGPTMessage('warning', 'CSV export is not available for this property. Only properties analyzed with "Tabular Data" prompts can be exported to CSV.');
+      // Parse markdown table from ChatGPT response
+      const tableData = parseMarkdownTableFromResponse(property.analysis.fullResponse);
+      
+      if (!tableData || tableData.length === 0) {
+        this.showChatGPTMessage('warning', 'No tabular data found in the analysis. The property may not have been analyzed with the correct format.');
         return;
       }
       
-      // Get unified column system
-      const unifiedSystem = getUnifiedColumnSystem();
-      const columns = Object.values(unifiedSystem).filter(col => col.enabled);
+      // Create CSV headers - use property data as column names
+      const headers = ['Link', ...tableData.map(row => row.propertyData)];
       
-      // Create CSV headers
-      const headers = [
-        'Property URL',
-        'Domain',
-        'Analysis Date',
-        'Prompt Type',
-        ...columns.map(col => col.name)
-      ];
-      
-      // Parse ChatGPT response directly for accurate data
-      const directData = await parseChatGPTResponseDirectly(property.analysis.fullResponse, unifiedSystem);
-      
-      // Create single property row
-      const row = [
+      // Create CSV row - one row per property with all data as columns
+      const csvRow = [
         property.url || '',
-        property.domain || '',
-        property.date || '',
-        property.analysis.promptType || 'unknown',
+        ...tableData.map(row => row.value || '')
       ];
       
-      // Add data for each column using direct parsing
-      columns.forEach(col => {
-        let value = '';
-        
-        // Try direct parsing first, then fallback to extracted data
-        if (directData && directData[col.id]) {
-          value = directData[col.id];
-        } else if (property.analysis.extractedData) {
-          // Try to find value using aliases
-          for (const alias of col.aliases) {
-            if (property.analysis.extractedData[alias]) {
-              value = property.analysis.extractedData[alias];
-              break;
-            }
-          }
-        }
-        
-        row.push(value);
-      });
+      // Create CSV content
+      const csvContent = [headers, csvRow]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
       
-      // Escape CSV values that contain commas or quotes
-      const escapedRow = row.map(value => {
-        const strValue = String(value || '');
-        if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
-          return `"${strValue.replace(/"/g, '""')}"`;
-        }
-        return strValue;
-      });
-      
-      // Create CSV content with headers and single row
-      const csvContent = [headers, escapedRow].map(row => row.join(',')).join('\n');
-      
-      // Create and download file
-      const dataBlob = new Blob([csvContent], {type: 'text/csv;charset=utf-8;'});
-      
-      // Generate filename from property data
-      const domain = property.domain?.replace(/\./g, '-') || 'property';
-      const date = new Date().toISOString().split('T')[0];
-      
+      // Download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(dataBlob);
-      link.download = `property-${domain}-${date}.csv`;
-      
+      const url2 = URL.createObjectURL(blob);
+      link.setAttribute('href', url2);
+      link.setAttribute('download', `property-analysis-${property.domain || 'unknown'}-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       this.showChatGPTMessage('success', 'Property exported to CSV successfully!');
+      console.log('📊 Property exported to CSV:', property.url);
       
     } catch (error) {
-      console.error('❌ Failed to export property:', error);
+      console.error('Failed to export property to CSV:', error);
       this.showChatGPTMessage('error', 'Failed to export property to CSV');
     }
   }
@@ -8439,18 +8447,9 @@ function getUnifiedColumnSystem() {
   };
 }
 
-// Legacy function for backward compatibility
+// Legacy function - no longer used
 function getTabularDataColumns() {
-  const unifiedSystem = getUnifiedColumnSystem();
-  return Object.values(unifiedSystem).map(column => ({
-    id: column.id,
-    name: column.name,
-    description: column.description,
-    type: column.type,
-    category: column.category,
-    enabled: column.enabled,
-    required: column.required
-  }));
+  return [];
 }
 
 // Function to get column by ID or alias
@@ -8475,51 +8474,9 @@ function getColumnByIdOrAlias(columnId, unifiedSystem = null) {
 }
 
 // Function to parse ChatGPT response directly using unified column system
+// Legacy function - no longer used
 async function parseChatGPTResponseDirectly(responseText, columnSystem = null) {
-  if (!responseText || typeof responseText !== 'string') {
-    console.error('❌ Invalid input to parseChatGPTResponseDirectly:', typeof responseText);
-    return null;
-  }
-  
-  if (!columnSystem) {
-    columnSystem = getUnifiedColumnSystem();
-  }
-  
-  console.log('🔍 Parsing ChatGPT response directly with unified column system...');
-  console.log('📝 Response length:', responseText.length, 'characters');
-  
-  const extractedData = {};
-  
-  // First, try to parse structured tables with "|" separators
-  const tableData = parseStructuredTables(responseText);
-  if (tableData && Object.keys(tableData).length > 0) {
-    console.log('📊 Found structured table data:', Object.keys(tableData).length, 'items');
-    Object.assign(extractedData, tableData);
-  }
-  
-  // Then, parse each column using the unified system for any missing data
-  for (const [columnId, column] of Object.entries(columnSystem)) {
-    if (!column.enabled) continue;
-    
-    // Skip if we already extracted this from structured tables
-    if (extractedData[columnId]) continue;
-    
-    // Try to extract using all aliases
-    let value = null;
-    for (const alias of column.aliases) {
-      value = extractValueByLabel(responseText, alias, column.type);
-      if (value) break;
-    }
-    
-    if (value) {
-      extractedData[columnId] = value;
-      console.log(`✅ Extracted ${columnId}:`, value);
-    } else {
-      console.log(`❌ Could not extract ${columnId}`);
-    }
-  }
-  
-  return extractedData;
+  return null;
 }
 
 // Function to parse structured tables with "|" separators
@@ -8728,57 +8685,131 @@ function extractValueByLabel(text, label, type) {
   return null;
 }
 
+// Function to convert HTML to markdown format (especially for tables)
+function convertHtmlToMarkdown(html) {
+  if (!html || typeof html !== 'string') {
+    return '';
+  }
+  
+  // Create a temporary div to parse HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  
+  // Convert HTML tables back to markdown format
+  const tables = tempDiv.querySelectorAll('table');
+  
+  tables.forEach((table, index) => {
+    const markdownTable = convertTableToMarkdown(table);
+    // Replace the table with markdown
+    const tableWrapper = document.createElement('div');
+    tableWrapper.textContent = markdownTable;
+    table.parentNode.replaceChild(tableWrapper, table);
+  });
+  
+  // Convert other HTML elements to markdown
+  let markdown = tempDiv.innerHTML
+    .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+    .replace(/<em>(.*?)<\/em>/g, '*$1*')
+    .replace(/<br\s*\/?>/g, '\n')
+    .replace(/<p>(.*?)<\/p>/g, '$1\n\n')
+    .replace(/<h([1-6])>(.*?)<\/h[1-6]>/g, (match, level, text) => '#'.repeat(parseInt(level)) + ' ' + text + '\n')
+    .replace(/<li>(.*?)<\/li>/g, '- $1\n')
+    .replace(/<ul>(.*?)<\/ul>/gs, '$1')
+    .replace(/<ol>(.*?)<\/ol>/gs, '$1')
+    .replace(/<[^>]+>/g, ''); // Remove any remaining HTML tags
+  
+  const result = markdown.trim();
+  
+  return result;
+}
+
+// Function to convert HTML table to markdown table
+function convertTableToMarkdown(table) {
+  const rows = table.querySelectorAll('tr');
+  if (rows.length === 0) return '';
+  
+  const markdownRows = [];
+  
+  rows.forEach((row, index) => {
+    const cells = row.querySelectorAll('td, th');
+    const cellTexts = Array.from(cells).map(cell => {
+      return (cell.textContent || '').trim();
+    });
+    
+    if (cellTexts.length > 0) {
+      const markdownRow = '| ' + cellTexts.join(' | ') + ' |';
+      markdownRows.push(markdownRow);
+      
+      // Add separator row after header
+      if (index === 0) {
+        const separator = '|' + cellTexts.map(() => ' --- ').join('|') + '|';
+        markdownRows.push(separator);
+      }
+    }
+  });
+  
+  return markdownRows.join('\n');
+}
+
+// Function to parse markdown table from ChatGPT response
+function parseMarkdownTableFromResponse(responseText) {
+  if (!responseText || typeof responseText !== 'string') {
+    return [];
+  }
+  
+  // Look for markdown table pattern: | Property Data | Value |
+  const tableRegex = /\| Property Data \| Value \|[\s\S]*?\|[-\s|]+\|[\s\S]*?(?=\n\n|\n#|$)/;
+  const tableMatch = responseText.match(tableRegex);
+  
+  if (!tableMatch) {
+    return [];
+  }
+  
+  const tableContent = tableMatch[0];
+  const rows = [];
+  
+  // Split by lines and process each row
+  const lines = tableContent.split('\n');
+  
+  for (const line of lines) {
+    // Skip header and separator lines
+    if (line.includes('Property Data') || line.includes('---') || line.includes('|--')) {
+      continue;
+    }
+    
+    // Parse table row: | Price | $450,000 |
+    const rowMatch = line.match(/\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/);
+    if (rowMatch) {
+      const propertyData = rowMatch[1].trim();
+      const value = rowMatch[2].trim();
+      
+      // Skip empty rows
+      if (propertyData && value) {
+        rows.push({
+          propertyData: propertyData,
+          value: value
+        });
+      }
+    }
+  }
+  
+  return rows;
+}
+
 // Function to check if CSV export should be available for a property
 function isCSVExportAvailable(property) {
   if (!property || !property.analysis) {
     return false;
   }
   
-  const promptType = property.analysis.promptType;
-  
-  // CSV export is available for default mode (now includes tabular data)
-  if (promptType === 'default') {
-    return true;
-  }
-  
-  // CSV export is available for tabular prompts (legacy support)
-  if (promptType === 'tabular') {
-    return true;
-  }
-  
-  // CSV export is available for custom prompts that contain tabular content
-  if (promptType === 'custom') {
-    return hasTabularContent(property.analysis.fullResponse);
-  }
-  
-  // CSV export is NOT available for dynamic prompts
-  return false;
+  // CSV export is available for all properties with analysis data
+  return true;
 }
 
 // Function to detect if response contains tabular content
+// Legacy function - no longer used
 function hasTabularContent(responseText) {
-  if (!responseText) return false;
-  
-  // Look for structured data patterns
-  const tabularPatterns = [
-    /Address\s*[:\\-]/gi,
-    /Price\s*[:\\-]/gi,
-    /Bedrooms\s*[:\\-]/gi,
-    /Property Type\s*[:\\-]/gi,
-    /\\*\\*.*\\*\\*\\s*[:\\-]/g, // Bold labels
-    /-\\s*.*\\s*[:\\-]/g, // Bullet points
-    /\\|.*\\|/g // Table format
-  ];
-  
-  let matchCount = 0;
-  for (const pattern of tabularPatterns) {
-    if (pattern.test(responseText)) {
-      matchCount++;
-    }
-  }
-  
-  // If we find 3 or more tabular patterns, consider it tabular content
-  return matchCount >= 3;
+  return false;
 }
 
 // Function to migrate legacy properties to include prompt type
@@ -11837,15 +11868,13 @@ function setupResponseMonitor() {
       }
     }
     
-    if (foundSelector) {
-      console.log(`Found ${messages.length} messages using selector: ${foundSelector}`);
-    }
+    // Found messages using selector
     
     if (messages.length > lastMessageCount || messages.length > 0) {
       const newMessage = messages[messages.length - 1];
       if (!newMessage) return;
       
-      const messageText = newMessage.textContent || newMessage.innerText || '';
+      const messageText = convertHtmlToMarkdown(newMessage.innerHTML) || newMessage.textContent || newMessage.innerText || '';
       
       // Debug logging for all messages when waiting for confirmation
       if (promptSplittingState.currentPhase === 'waiting_confirmation') {
@@ -13389,7 +13418,7 @@ window.testCurrentExtraction = function() {
   const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
   if (messages.length > 0) {
     const lastMessage = messages[messages.length - 1];
-    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    const messageText = convertHtmlToMarkdown(lastMessage.innerHTML) || lastMessage.textContent || lastMessage.innerText || '';
     console.log('🧪 Testing extraction on current ChatGPT response');
     return window.testPropertyExtraction(messageText);
   } else {
@@ -13415,7 +13444,7 @@ window.diagnoseProblem = async function() {
   
   if (messages.length > 0) {
     const lastMessage = messages[messages.length - 1];
-    const messageText = lastMessage.textContent || lastMessage.innerText || '';
+    const messageText = convertHtmlToMarkdown(lastMessage.innerHTML) || lastMessage.textContent || lastMessage.innerText || '';
     console.log('   Last message length:', messageText.length);
     console.log('   Last message preview:', messageText.substring(0, 200) + '...');
     
