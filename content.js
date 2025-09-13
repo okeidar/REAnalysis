@@ -927,15 +927,12 @@ class REAnalyzerEmbeddedUI {
           </div>
           
           <div class="re-form-group">
-            <label class="re-form-label">Prompt Type</label>
+            <label class="re-form-label">Analysis Mode</label>
             <select class="re-form-input" id="re-prompt-type-select">
-              <option value="default">Default - Standard Analysis</option>
-              <option value="dynamic">Dynamic - Column-Based</option>
-              <option value="tabular">Tabular - Data Extraction</option>
-              <option value="custom">Custom - User-Defined</option>
+              <option value="default">Standard Analysis</option>
             </select>
             <div class="re-text-description">
-              Select the type of analysis prompt to use
+              Real estate property analysis with structured data extraction
             </div>
           </div>
 
@@ -945,15 +942,6 @@ class REAnalyzerEmbeddedUI {
             </div>
           </div>
           
-          <div class="re-form-group" id="re-custom-prompt-group" style="display: none;">
-            <label class="re-form-label">Custom Prompt Template</label>
-            <textarea id="re-custom-prompt" class="re-form-input" rows="6" 
-                      placeholder="Enter your custom prompt template. Use {PROPERTY_URL} for the property link and {DATE} for current date."
-                      style="resize: vertical; font-family: monospace; font-size: 12px;"></textarea>
-            <div class="re-text-description">
-              Variables: {PROPERTY_URL}, {DATE}
-            </div>
-          </div>
           
           <div class="re-prompt-actions">
             <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-prompt-selection">
@@ -971,210 +959,7 @@ class REAnalyzerEmbeddedUI {
           </div>
         </div>
 
-        <!-- Advanced Prompt Editing -->
-        <div class="re-section">
-          <div class="re-section-header">
-            <div class="re-section-title">Advanced Prompt Editing</div>
-            <div class="re-section-subtitle">Customize prompt templates</div>
-          </div>
-          
-          <div class="re-advanced-prompt-buttons">
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-default-prompt">
-              📄 Edit Default
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-edit-dynamic-prompt">
-              🔄 Edit Dynamic
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-goto-tabular-config">
-              📊 Configure Tabular
-            </button>
-          </div>
-          
-          <!-- Default Prompt Editor -->
-          <div id="re-default-editor" class="re-prompt-editor" style="display: none;">
-            <div class="re-form-group">
-              <label class="re-form-label">Default Analysis Prompt</label>
-              <textarea id="re-default-prompt-template" class="re-form-input" rows="8" 
-                        placeholder="Enter your default analysis prompt..."
-                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
-            </div>
-            
-            <div class="re-editor-actions">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-default-prompt">Save</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-default-prompt">Reset</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-default-prompt">Preview</button>
-            </div>
-          </div>
-          
-          <!-- Dynamic Prompt Editor -->
-          <div id="re-dynamic-editor" class="re-prompt-editor" style="display: none;">
-            <div class="re-form-group">
-              <label class="re-form-label">Dynamic Prompt Template</label>
-              <textarea id="re-dynamic-prompt-template" class="re-form-input" rows="6" 
-                        placeholder="Enter dynamic template with {{COLUMNS}} placeholder..."
-                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
-            </div>
-            
-            <div class="re-form-group">
-              <label class="re-form-label">Data Points</label>
-              <div id="re-dynamic-columns-container" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 6px; font-size: 12px;">
-                <!-- Dynamic columns will be populated here -->
-              </div>
-            </div>
-            
-            <div class="re-editor-actions">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-dynamic-prompt">Save</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-dynamic-prompt">Reset</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-dynamic-prompt">Preview</button>
-            </div>
-          </div>
-        </div>
 
-        <!-- Tabular Data Configuration -->
-        <div class="re-section" id="re-tabular-columns-section" style="display: none;">
-          <div class="re-section-header">
-            <div class="re-section-title">Tabular Data Configuration</div>
-            <div class="re-section-subtitle">Advanced data extraction settings</div>
-          </div>
-          
-          <!-- Tabular Configuration Tabs -->
-          <div class="re-tabular-tabs" style="display: flex; border-bottom: 1px solid var(--chatgpt-border-light); margin-bottom: 12px;">
-            <button class="re-tabular-tab re-tabular-tab-active" data-tab="columns">
-              📊 Columns
-            </button>
-            <button class="re-tabular-tab" data-tab="prompt">
-              📝 Template
-            </button>
-            <button class="re-tabular-tab" data-tab="custom-columns">
-              ➕ Custom
-            </button>
-          </div>
-          
-          <!-- Data Columns Tab -->
-          <div id="re-tabular-columns-tab" class="re-tabular-tab-content">
-            <div class="re-form-group">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div class="re-text-muted">
-                  Select data points to extract
-                </div>
-                <div class="re-column-selection-buttons">
-                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-all" style="font-size: 11px; padding: 4px 8px;">
-                    ✅ All
-                  </button>
-                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-clear-all" style="font-size: 11px; padding: 4px 8px;">
-                    ❌ None
-                  </button>
-                  <button class="re-btn re-btn-ghost re-btn-sm" id="re-columns-select-defaults" style="font-size: 11px; padding: 4px 8px;">
-                    🏠 Defaults
-                  </button>
-                </div>
-              </div>
-              
-              <div id="re-columns-stats" class="re-text-muted">
-                Loading columns...
-              </div>
-            </div>
-            
-            <!-- Column Categories -->
-            <div id="re-columns-container">
-              <!-- Categories will be dynamically populated -->
-            </div>
-          </div>
-          
-          <!-- Prompt Template Tab -->
-          <div id="re-tabular-prompt-tab" class="re-tabular-tab-content" style="display: none;">
-            <div class="re-form-group">
-              <label class="re-form-label">Tabular Prompt Template</label>
-              <textarea id="re-tabular-prompt-template" class="re-form-input" rows="8" 
-                        placeholder="Enter tabular prompt template..."
-                        style="resize: vertical; font-family: monospace; font-size: 11px;"></textarea>
-              <div class="re-text-description">
-                Variables: {{COLUMNS}}, {PROPERTY_URL}, {DATE}
-              </div>
-            </div>
-            
-            <div class="re-editor-actions">
-              <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-tabular-template">Save</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-tabular-template">Reset</button>
-              <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-tabular-template">Preview</button>
-            </div>
-          </div>
-          
-          <!-- Custom Columns Tab -->
-          <div id="re-custom-columns-tab" class="re-tabular-tab-content" style="display: none;">
-            <div class="re-form-group">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div class="re-section-subtitle">Custom Data Columns</div>
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-add-custom-column" style="font-size: 11px; padding: 4px 8px;">
-                  ➕ Add
-                </button>
-              </div>
-            </div>
-            
-            <!-- Custom Columns List -->
-            <div id="re-custom-columns-list">
-              <!-- Custom columns will be populated here -->
-            </div>
-            
-            <!-- Add Custom Column Form -->
-            <div id="re-add-column-form" class="re-form-group" style="display: none; border: 1px solid var(--chatgpt-border-light); border-radius: 6px; padding: 12px; margin-top: 8px; background: var(--chatgpt-surface-primary);">
-              <div class="re-form-header">
-                <span>➕</span>
-                <span id="re-form-title">Add Custom Column</span>
-              </div>
-              
-              <div class="re-custom-column-inputs">
-                <div>
-                  <label class="re-form-label" style="font-size: 11px;">Column Name *</label>
-                  <input type="text" id="re-new-column-name" class="re-form-input" placeholder="e.g., HOA Fees, Pet Policy" style="font-size: 11px;" maxlength="50">
-                  <div class="re-input-help">Letters, numbers, spaces, hyphens, underscores only</div>
-                </div>
-                <div>
-                  <label class="re-form-label" style="font-size: 11px;">Category</label>
-                  <select id="re-new-column-category" class="re-form-input" style="font-size: 11px;">
-                    <option value="core">🏠 Core Info</option>
-                    <option value="location">📍 Location</option>
-                    <option value="financial">💰 Financial</option>
-                    <option value="features">🔧 Features</option>
-                    <option value="analysis">📊 Analysis</option>
-                    <option value="market">📈 Market</option>
-                    <option value="custom" selected>➕ Custom</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div class="re-form-group">
-                <label class="re-form-label" style="font-size: 11px;">Description</label>
-                <textarea id="re-new-column-description" class="re-form-input" rows="2" 
-                          placeholder="Describe what ChatGPT should extract for this data point..."
-                          style="font-size: 11px;" maxlength="200"></textarea>
-                <div class="re-input-help">Help ChatGPT understand what to look for</div>
-              </div>
-              
-              <div class="re-custom-column-actions">
-                <button class="re-btn re-btn-ghost re-btn-sm" id="re-cancel-custom-column" style="font-size: 11px;">
-                  Cancel
-                </button>
-                <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-custom-column" style="font-size: 11px;">
-                  💾 Save Column
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Tabular Action Buttons -->
-          <div class="re-tabular-actions">
-            <button class="re-btn re-btn-secondary re-btn-sm" id="re-save-all-tabular">
-              💾 Save All
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-reset-all-tabular">
-              🔄 Reset All
-            </button>
-            <button class="re-btn re-btn-ghost re-btn-sm" id="re-preview-complete-tabular">
-              👁️ Preview
-            </button>
-          </div>
-        </div>
 
         <!-- Data Management -->
         <div class="re-section">
@@ -4787,62 +4572,27 @@ Or enter your own property URL:`);
   
   async loadPromptSettings() {
     try {
-      const result = await safeChromeFall(
-        () => chrome.storage.local.get(['customPrompt', 'promptType']),
-        { customPrompt: null, promptType: 'default' }
-      );
-      
       const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
-      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
       
-      // Set prompt type
+      // Always set to default mode
       if (promptTypeSelect) {
-        promptTypeSelect.value = result.promptType || 'default';
+        promptTypeSelect.value = 'default';
       }
       
-      // Set custom prompt content
-      if (customPromptTextarea && result.customPrompt) {
-        customPromptTextarea.value = result.customPrompt;
-      }
-      
-      // Update UI based on prompt type
-      this.handlePromptTypeChange(result.promptType || 'default');
+      // Update UI
+      this.handlePromptTypeChange('default');
       
     } catch (error) {
-      console.error('Failed to load prompt settings:', error);
+      console.error('Failed to load analysis settings:', error);
     }
   }
 
   handlePromptTypeChange(promptType) {
-    const customPromptGroup = this.panel.querySelector('#re-custom-prompt-group');
     const promptDescContent = this.panel.querySelector('#re-prompt-desc-content');
-    const tabularColumnsSection = this.panel.querySelector('#re-tabular-columns-section');
-    
-    // Show/hide custom prompt textarea
-    if (customPromptGroup) {
-      customPromptGroup.style.display = promptType === 'custom' ? 'block' : 'none';
-    }
-    
-    // Show/hide tabular columns configuration
-    if (tabularColumnsSection) {
-      tabularColumnsSection.style.display = promptType === 'tabular' ? 'block' : 'none';
-      
-      // Load columns when tabular is selected
-      if (promptType === 'tabular') {
-        this.loadTabularColumns();
-      }
-    }
     
     // Update description
     if (promptDescContent) {
-      const descriptions = {
-        'default': 'Standard real estate investment analysis with basic property data extraction',
-        'dynamic': 'Adaptive prompt that generates based on your selected column configuration',
-        'tabular': 'Comprehensive data extraction with customizable data points for detailed spreadsheet analysis',
-        'custom': 'Use your own custom prompt template with full control over analysis structure'
-      };
-      
-      promptDescContent.textContent = descriptions[promptType] || descriptions.default;
+      promptDescContent.textContent = 'Real estate property analysis with structured data extraction';
     }
   }
 
@@ -4853,25 +4603,19 @@ Or enter your own property URL:`);
   
   async savePromptSettings() {
     try {
-      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
-      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-      
-      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
-      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
-      
+      // Always save as default mode
       await safeChromeFall(
         () => chrome.storage.local.set({ 
-          promptType: promptType,
-          customPrompt: customPrompt || null 
+          promptType: 'default'
         }),
         null
       );
       
-      this.showChatGPTMessage('success', 'Prompt settings saved successfully!');
-      console.log('💾 Prompt settings saved:', { promptType, hasCustomPrompt: !!customPrompt });
+      this.showChatGPTMessage('success', 'Analysis settings saved successfully!');
+      console.log('💾 Analysis settings saved');
     } catch (error) {
-      console.error('Failed to save prompt settings:', error);
-      this.showChatGPTMessage('error', 'Failed to save prompt settings');
+      console.error('Failed to save analysis settings:', error);
+      this.showChatGPTMessage('error', 'Failed to save analysis settings');
     }
   }
 
@@ -4881,7 +4625,7 @@ Or enter your own property URL:`);
   }
   
   async resetPromptSettings() {
-    if (confirm('Are you sure you want to reset all prompt settings to default?')) {
+    if (confirm('Are you sure you want to reset analysis settings to default?')) {
       try {
         await safeChromeFall(
           () => chrome.storage.local.remove(['customPrompt', 'promptType']),
@@ -4889,23 +4633,18 @@ Or enter your own property URL:`);
         );
         
         const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
-        const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
         
         if (promptTypeSelect) {
           promptTypeSelect.value = 'default';
         }
         
-        if (customPromptTextarea) {
-          customPromptTextarea.value = '';
-        }
-        
         this.handlePromptTypeChange('default');
         
-        this.showChatGPTMessage('success', 'Prompt settings reset to default');
-        console.log('🔄 Prompt settings reset');
+        this.showChatGPTMessage('success', 'Analysis settings reset to default');
+        console.log('🔄 Analysis settings reset');
       } catch (error) {
-        console.error('Failed to reset prompt settings:', error);
-        this.showChatGPTMessage('error', 'Failed to reset prompt settings');
+        console.error('Failed to reset analysis settings:', error);
+        this.showChatGPTMessage('error', 'Failed to reset analysis settings');
       }
     }
   }
@@ -4917,14 +4656,8 @@ Or enter your own property URL:`);
   
   async previewPrompt() {
     try {
-      const promptTypeSelect = this.panel.querySelector('#re-prompt-type-select');
-      const customPromptTextarea = this.panel.querySelector('#re-custom-prompt');
-      
-      const promptType = promptTypeSelect ? promptTypeSelect.value : 'default';
-      const customPrompt = customPromptTextarea ? customPromptTextarea.value.trim() : null;
-      
-      // Get the actual prompt that would be used
-      const promptTemplate = await getSelectedPrompt(promptType, customPrompt, null);
+      // Get the default prompt template
+      const promptTemplate = await getSelectedPrompt('default', null, null);
       
       if (!promptTemplate) {
         this.showChatGPTMessage('warning', 'No prompt to preview');
@@ -4937,8 +4670,8 @@ Or enter your own property URL:`);
         .replace('{PROPERTY_URL}', exampleUrl)
         .replace('{DATE}', new Date().toLocaleDateString());
       
-      // Create and show preview modal with prompt type info
-      this.showPromptPreviewModal(previewText, promptType);
+      // Create and show preview modal
+      this.showPromptPreviewModal(previewText, 'default');
     } catch (error) {
       console.error('Failed to preview prompt:', error);
       this.showChatGPTMessage('error', 'Failed to generate prompt preview');
@@ -8142,88 +7875,7 @@ async function getCustomColumnsStatic() {
 // Function to get the selected prompt based on user preference
 async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) {
   try {
-    switch (promptType) {
-      case 'tabular':
-        // Check if we have a custom template
-        const templateResult = await safeChromeFall(
-          () => chrome.storage.local.get(['tabularPromptTemplate', 'tabularColumnConfiguration', 'customColumns']),
-          { tabularPromptTemplate: null, tabularColumnConfiguration: null, customColumns: [] }
-        );
-        
-        // Use custom template if available
-        if (templateResult.tabularPromptTemplate) {
-          // Get enabled columns
-          let enabledColumns = [];
-          if (templateResult.tabularColumnConfiguration) {
-            enabledColumns = templateResult.tabularColumnConfiguration
-              .filter(col => col.enabled)
-              .map(col => col.id);
-          }
-          
-          // Get all columns (built-in + custom)
-          const defaultColumns = getTabularDataColumns();
-          const customColumns = templateResult.customColumns || [];
-          const allColumns = [...defaultColumns, ...customColumns];
-          
-          // Generate columns section if we have enabled columns
-          if (enabledColumns.length > 0) {
-            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
-            const columnsSection = generateColumnsSectionForPrompt(selectedColumns);
-            
-            // Replace template placeholders
-            return templateResult.tabularPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
-          } else {
-            // Return template without columns replacement
-            return templateResult.tabularPromptTemplate;
-          }
-        }
-        
-        // Check if we have saved column configuration for default prompt
-        if (templateResult.tabularColumnConfiguration) {
-          // Use columns selected by user with default prompt structure
-          const enabledColumns = templateResult.tabularColumnConfiguration
-            .filter(col => col.enabled)
-            .map(col => col.id);
-          
-          if (enabledColumns.length > 0) {
-            return await getTabularDataExtractionPromptWithColumns(enabledColumns);
-          }
-        }
-        
-        // Fallback to full tabular prompt
-        return getTabularDataExtractionPrompt();
-        
-      case 'dynamic':
-        // Check if user has custom dynamic template
-        const dynamicResult = await safeChromeFall(
-          () => chrome.storage.local.get(['dynamicPromptTemplate', 'dynamicPromptColumns']),
-          { dynamicPromptTemplate: null, dynamicPromptColumns: null }
-        );
-        
-        if (dynamicResult.dynamicPromptTemplate) {
-          // Get enabled columns
-          const enabledColumns = dynamicResult.dynamicPromptColumns || [];
-          
-          // Generate columns section
-          let columnsSection = '';
-          if (enabledColumns.length > 0) {
-            const allColumns = [...getTabularDataColumns(), ...await getCustomColumnsStatic()];
-            const selectedColumns = allColumns.filter(col => enabledColumns.includes(col.id));
-            columnsSection = generateColumnsSectionForPrompt(selectedColumns);
-          }
-          
-          // Replace template placeholders
-          return dynamicResult.dynamicPromptTemplate.replace(/\{\{COLUMNS\}\}/g, columnsSection);
-        }
-        
-        // Fallback to default dynamic generation
-        return await generateDynamicPrompt();
-        
-      case 'custom':
-        return customPrompt || getDefaultPromptTemplate();
-        
-      case 'default':
-      default:
+    // Only support default mode now
         // Check if user has custom default template
         const defaultResult = await safeChromeFall(
           () => chrome.storage.local.get(['defaultPromptTemplate']),
@@ -8234,69 +7886,17 @@ async function getSelectedPrompt(promptType, customPrompt, columnConfiguration) 
           return defaultResult.defaultPromptTemplate;
         }
         
-        // Check if user has custom prompt set, otherwise use built-in default
-        return customPrompt || getDefaultPromptTemplate();
-    }
+    // Use built-in default prompt
+    return getDefaultPromptTemplate();
   } catch (error) {
     console.error('Error selecting prompt:', error);
     return getDefaultPromptTemplate();
   }
 }
 
-// Dynamic prompt generation based on user's column selection
+// Legacy function - no longer used
 async function generateDynamicPrompt() {
-  try {
-    // Get user's column configuration
-    const columnResult = await safeChromeFall(
-      () => chrome.storage.local.get(['columnConfiguration']),
-      { columnConfiguration: null }
-    );
-    const columnConfig = columnResult.columnConfiguration || getDefaultColumns();
-    
-    // Filter to enabled columns
-    const enabledColumns = columnConfig.filter(col => col.enabled);
-    
-    // Generate prompt sections based on enabled columns
-    const promptSections = [];
-    
-    // Core property details
-    const coreColumns = enabledColumns.filter(col => col.category === 'core');
-    if (coreColumns.length > 0) {
-      promptSections.push(generateCorePropertySection(coreColumns));
-    }
-    
-    // Financial metrics
-    const financialColumns = enabledColumns.filter(col => col.category === 'financial');
-    if (financialColumns.length > 0) {
-      promptSections.push(generateFinancialSection(financialColumns));
-    }
-    
-    // Location and scoring
-    const scoringColumns = enabledColumns.filter(col => col.category === 'scoring');
-    if (scoringColumns.length > 0) {
-      promptSections.push(generateLocationSection(scoringColumns));
-    }
-    
-    // Analysis data
-    const analysisColumns = enabledColumns.filter(col => col.category === 'analysis');
-    if (analysisColumns.length > 0) {
-      promptSections.push(generateAnalysisSection(analysisColumns));
-    }
-    
-    // Custom columns
-    const customColumns = enabledColumns.filter(col => col.isCustom);
-    if (customColumns.length > 0) {
-      promptSections.push(generateCustomColumnsSection(customColumns));
-    }
-    
-    // Combine sections into final prompt
-    const dynamicPrompt = combinePromptSections(promptSections);
-    
-    return dynamicPrompt;
-  } catch (error) {
-    console.error('Error generating dynamic prompt:', error);
     return getDefaultPromptTemplate();
-  }
 }
 
 function getDefaultColumns() {
@@ -9136,7 +8736,12 @@ function isCSVExportAvailable(property) {
   
   const promptType = property.analysis.promptType;
   
-  // CSV export is available for tabular prompts
+  // CSV export is available for default mode (now includes tabular data)
+  if (promptType === 'default') {
+    return true;
+  }
+  
+  // CSV export is available for tabular prompts (legacy support)
   if (promptType === 'tabular') {
     return true;
   }
@@ -9146,7 +8751,7 @@ function isCSVExportAvailable(property) {
     return hasTabularContent(property.analysis.fullResponse);
   }
   
-  // CSV export is NOT available for default or dynamic prompts
+  // CSV export is NOT available for dynamic prompts
   return false;
 }
 
